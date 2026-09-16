@@ -1,0 +1,183 @@
+// Package fly is the Fly.io target: an app's URL for this clone, its deploy,
+// its logs and its secrets. Every verb takes the app's directory, the one
+// holding its fly.toml; package app sends a directory here when it finds that
+// file. Deploys run from the repo root, which is the Docker build context, as
+// the upstream gsx repos do; the Dockerfile is relative to fly.toml.
+package fly
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/BurntSushi/toml"
+
+	"github.com/joeblew999/dev/fnox"
+	"github.com/joeblew999/dev/internal/cli"
+	"github.com/joeblew999/dev/internal/suffix"
+)
+
+const configFile = "fly.toml"
+
+// Run is every Fly verb but wait. DIR comes first; flags may follow anywhere,
+// and for deploy everything after a bare -- goes to flyctl.
+func Run(verb string, args []string, stdout, stderr io.Writer) error {
+	fs := cli.Flags(verb, stderr)
+	env := fs.String("env", "", "not a Fly concept; one fly.toml is one app")
+	switch verb {
+	case "url":
+		var deployed, refresh cli.Bool
+		fs.Var(&deployed, "deployed", "the deployed app's URL; otherwise --local")
+		fs.Var(&refresh, "refresh", "accepted for symmetry with a Worker; a Fly URL is never cached")
+		local := fs.String("local", "", "what to print when not --deployed")
+		dir, _, err := cli.DirAnd(fs, args, 0)
+		if err != nil {
+			return err
+		}
+		if err := noEnv(dir, *env); err != nil {
+			return err
+		}
+		if !deployed {
+			fmt.Fprintln(stdout, *local)
+			return nil
+		}
+		u, err := URL(dir)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(stdout, u)
+		return nil
+	case "deploy":
+		waitPath := fs.String("wait", "", "path to wait for a 200 on after deploying, e.g. /health")
+		dir, extra, err := cli.DirAnd(fs, args, -1)
+		if err != nil {
+			return err
+		}
+		if err := noEnv(dir, *env); err != nil {
+			return err
+		}
+		if err := Deploy(stdout, dir, extra); err != nil {
+			return err
+		}
+		if *waitPath == "" {
+			return nil
+		}
+		u, err := URL(dir)
+		if err != nil {
+			return err
+		}
+		return Wait(stdout, u+*waitPath, 2*time.Minute)
+	case "logs":
+		dir, _, err := cli.DirAnd(fs, args, 0)
+		if err != nil {
+			return err
+		}
+		if err := noEnv(dir, *env); err != nil {
+			return err
+		}
+		return Logs(dir)
+	case "smoke":
+		return fmt.Errorf("smoke runs a Worker on local workerd; a Fly app has no local runtime here. dev check DIR tests it, and dev deploy DIR --wait PATH proves it online")
+	}
+	return cli.Usagef("fly: unknown verb %q", verb)
+}
+
+func noEnv(dir, env string) error {
+	if env != "" {
+		return fmt.Errorf("a Fly app has no environments (--env %q): %s deploys one app; a second app is a second directory", env, filepath.Join(dir, configFile))
+	}
+	return nil
+}
+
+// App is the app dir's fly.toml deploys, with the developer's suffix.
+func App(dir string) (string, error) {
+	var cfg struct {
+		App string `toml:"app"`
+	}
+	path := filepath.Join(dir, configFile)
+	if _, err := toml.DecodeFile(path, &cfg); err != nil {
+		return "", fmt.Errorf("%s: %w", path, err)
+	}
+	if cfg.App == "" {
+		return "", fmt.Errorf("%s has no app; add: app = \"<name>\"", path)
+	}
+	return suffix.Apply(cfg.App), nil
+}
+
+// URL is the app's fly.dev address.
+func URL(dir string) (string, error) {
+	app, err := App(dir)
+	if err != nil {
+		return "", err
+	}
+	return "https://" + app + ".fly.dev", nil
+}
+
+// Deploy is `flyctl deploy` for the app in dir, run from the repo root as the
+// build context, under fnox for FLY_API_TOKEN. A suffixed app is named
+// explicitly; the committed fly.toml keeps the shared name. extra goes to
+// flyctl as typed (--ha=false, --remote-only, ...).
+func Deploy(out io.Writer, dir string, extra []string) error {
+	if err := installed(); err != nil {
+		return err
+	}
+	app, err := App(dir)
+	if err != nil {
+		return err
+	}
+	args := []string{"flyctl", "deploy", "--config", filepath.Join(dir, configFile)}
+	if suffix.Set() {
+		args = append(args, "--app", app)
+	}
+	args = append(args, extra...)
+	args = append(args, ".")
+	if err := fnox.Exec(".", nil, out, args...); err != nil {
+		return fmt.Errorf("flyctl deploy of %s failed: %w. It needs FLY_API_TOKEN in fnox (a deploy token from: flyctl tokens create deploy), or a login from: flyctl auth login; and the app must exist: flyctl apps create %s", app, err, app)
+	}
+	return nil
+}
+
+// Logs streams the deployed app's logs in the foreground until interrupted.
+func Logs(dir string) error {
+	if err := installed(); err != nil {
+		return err
+	}
+	app, err := App(dir)
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command("fnox", "exec", "--", "flyctl", "logs", "--app", app)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	return cmd.Run()
+}
+
+// PutSecret is `flyctl secrets import`, which reads NAME=VALUE lines on stdin
+// and releases the app with them, so the value is never an argument.
+func PutSecret(dir, name, value string) error {
+	if err := installed(); err != nil {
+		return err
+	}
+	app, err := App(dir)
+	if err != nil {
+		return err
+	}
+	return fnox.Exec(".", strings.NewReader(name+"="+value+"\n"), io.Discard, "flyctl", "secrets", "import", "--app", app)
+}
+
+func installed() error {
+	if _, err := lookPath("flyctl"); err != nil {
+		return fmt.Errorf("flyctl is not installed; add to mise.toml under [tools]: flyctl = \"latest\", then: mise install")
+	}
+	return nil
+}
+
+// The seams tests replace. wait is the same steady-200 poll a Worker gets;
+// package app wires it, since this package must not import that one.
+var (
+	lookPath = exec.LookPath
+	Wait     func(out io.Writer, url string, timeout time.Duration) error
+)

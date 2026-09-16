@@ -1,0 +1,69 @@
+# The stack's developer tool, built and released here; `mise tasks` lists
+# what this repo does. Other repos pin the release:
+#   "packslip:github.com/joeblew999/dev" = "<version>"
+# and get `dev` on PATH plus its skill in .claude/skills/dev.
+
+[tools]
+go = "1.27"
+"packslip:github.com/jdx/hk" = "2.0.1"
+goreleaser = "latest"
+packslip = "latest"
+gh = "latest"
+
+[hooks]
+postinstall = { task = "bootstrap" }
+
+[settings.skills]
+auto_sync = true
+prune = true
+
+# Exact packslip pins are signature-checked; the 24h wait only ever held CI.
+[settings]
+minimum_release_age_excludes = ["packslip:*"]
+
+# ------------------------------------------------------------------------------
+# This repo is one command at its root, so its stages take ".".
+# ------------------------------------------------------------------------------
+
+[tasks.bootstrap]
+description = "After mise install: git hooks and the tool itself"
+depends = ["build"]
+run = "hk install"
+
+[tasks.build]
+description = "bin/dev"
+sources = ["**/*.go", "go.mod", "go.sum"]
+outputs = ["bin/dev"]
+run = "go build -o bin/dev ."
+
+[tasks.lint]
+description = "hk checks: gofmt, vet, tidy, whitespace, secrets"
+run = "hk check --all"
+
+[tasks.check]
+description = "vet, tests, and the skill still matches the verbs"
+depends = ["build"]
+run = [
+  "go vet ./...",
+  "go test ./...",
+  "bin/dev skill --check",
+]
+
+[tasks.test]
+description = "What CI runs: lint, then check"
+depends = ["lint", "check"]
+
+[tasks.skill]
+description = "Regenerate skills/dev/SKILL.md from the verbs' own usage"
+depends = ["build"]
+run = "bin/dev skill"
+
+[tasks.release]
+description = "Publish the release for the tag CI is on, or the version given"
+depends = ["build"]
+run = "bin/dev release ."
+
+[tasks."release:snapshot"]
+description = "Build and sign the release locally, publishing nothing"
+depends = ["build"]
+run = "bin/dev release . --snapshot"
