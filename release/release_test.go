@@ -13,3 +13,16 @@ func TestGoreleaserConfigNamesTheCommandAndBinary(t *testing.T) {
 		}
 	}
 }
+
+func TestSnapshotVersionIsAlwaysSemver(t *testing.T) {
+	for describe, want := range map[string]string{
+		"v0.1.0":            "0.1.0",
+		"v0.1.0-3-g2feb4c7": "0.1.0-3-g2feb4c7",
+		"2feb4c7":           "0.0.0-2feb4c7",
+		"":                  "0.0.0-",
+	} {
+		if v, tag := snapshotVersion(describe); v != want || tag != "v"+want {
+			t.Errorf("snapshotVersion(%q) = %q, %q; want %q", describe, v, tag, want)
+		}
+	}
+}

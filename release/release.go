@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/joeblew999/dev/internal/cli"
@@ -214,10 +215,11 @@ func (r *release) snapshot() error {
 	if err := run("goreleaser", "release", "--snapshot", "--clean", "--config", r.config); err != nil {
 		return err
 	}
-	tag, err := out("git", "describe", "--tags", "--always")
+	describe, err := out("git", "describe", "--tags", "--always")
 	if err != nil {
 		return err
 	}
+	version, tag := snapshotVersion(describe)
 	commit, err := out("git", "rev-parse", "HEAD")
 	if err != nil {
 		return err
@@ -226,7 +228,7 @@ func (r *release) snapshot() error {
 	if err != nil {
 		return err
 	}
-	if err := r.create(strings.TrimPrefix(tag, "v"), commit, tag, key, true); err != nil {
+	if err := r.create(version, commit, tag, key, true); err != nil {
 		return err
 	}
 	// packslip writes the public key as "<id> <base64>"; verify wants the base64 alone.
@@ -246,6 +248,19 @@ func (r *release) snapshot() error {
 		return err
 	}
 	return run("packslip", "show", "dist/packslip.sigstore.json")
+}
+
+var semverStart = regexp.MustCompile(`^\d+\.\d+\.\d+`)
+
+// snapshotVersion turns what git describe said into the semver packslip
+// wants. After a tag it is that tag with git's own prerelease suffix; in a
+// repo with no tag yet, where describe is a bare commit, it is 0.0.0-<commit>.
+func snapshotVersion(describe string) (version, tag string) {
+	version = strings.TrimPrefix(describe, "v")
+	if !semverStart.MatchString(version) {
+		version = "0.0.0-" + describe
+	}
+	return version, "v" + version
 }
 
 // publish tags, builds, signs and uploads. In CI the tag is GITHUB_REF_NAME
