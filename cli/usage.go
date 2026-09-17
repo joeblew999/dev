@@ -191,3 +191,31 @@ func blankFrontmatter(md string) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// Entry is the one list item in md that documents "<name> <verb>", or "" when
+// the usage does not use the markdown shape or does not name that verb.
+//
+// A package's verbs share one usage — build, wasm, check, run and workerd are
+// all stage's — so asking what `check` takes would otherwise answer with all
+// five. Help is read when someone is already stuck on one verb; the rest is
+// noise at exactly the wrong moment.
+func Entry(md, name, verb string) string {
+	want := "- `" + name + " " + verb
+	lines := strings.Split(strings.TrimRight(md, "\n"), "\n")
+	for i, line := range lines {
+		if !strings.HasPrefix(line, want) {
+			continue
+		}
+		// The item runs to the next item, heading or blank line: its
+		// continuations are the two-space-indented lines under it.
+		entry := []string{line}
+		for _, next := range lines[i+1:] {
+			if !strings.HasPrefix(next, "  ") || strings.TrimSpace(next) == "" {
+				break
+			}
+			entry = append(entry, next)
+		}
+		return strings.Join(entry, "\n") + "\n"
+	}
+	return ""
+}

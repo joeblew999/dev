@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"io"
 	"strings"
 	"testing"
 )
@@ -232,4 +233,57 @@ func TestFlattenLeavesLegacyTextUnchanged(t *testing.T) {
 	if got := Flatten(legacy); got != legacy {
 		t.Errorf("Flatten changed legacy text:\n got %q\nwant %q", got, legacy)
 	}
+}
+
+// Asking what a verb takes is not an error. It used to exit 2 with
+// "flag: help requested", which is how the flags' own descriptions — the only
+// place that says what --path or --env mean — stayed invisible.
+func TestHelpIsNotAnError(t *testing.T) {
+	c := testHelpCommand()
+	var out, errOut strings.Builder
+	if code := c.run([]string{"go", "--help"}, &out, &errOut); code != 0 {
+		t.Errorf("--help exited %d, want 0", code)
+	}
+	if !strings.Contains(out.String(), "what it is for") {
+		t.Errorf("--help should print the verb's own usage, got %q", out.String())
+	}
+}
+
+// Verbs share a usage — build, wasm, check, run and workerd are all stage's —
+// so help for one must not answer with all five.
+func TestHelpShowsOnlyTheVerbAsked(t *testing.T) {
+	shared := "### Doing\n\n- `x go`\n  what it is for\n- `x stop`\n  something else\n"
+	c := Command{Name: "x", Verbs: map[string]Verb{
+		"go":   {Usage: shared, Run: func(string, []string, io.Writer, io.Writer) error { return ErrHelp }},
+		"stop": {Usage: shared, Run: func(string, []string, io.Writer, io.Writer) error { return ErrHelp }},
+	}}
+	var out, errOut strings.Builder
+	c.run([]string{"go", "--help"}, &out, &errOut)
+	if strings.Contains(out.String(), "something else") {
+		t.Errorf("help for `go` leaked `stop`: %q", out.String())
+	}
+}
+
+// Entry finds a verb's own list item, and says so when the usage is legacy
+// plain text that has no items to find.
+func TestEntryFindsOneVerbOrNothing(t *testing.T) {
+	md := "### Doing\n\n- `x go`\n  what it is for\n- `x stop`\n  something else\n"
+	if got := Entry(md, "x", "go"); got != "- `x go`\n  what it is for\n" {
+		t.Errorf("Entry: got %q", got)
+	}
+	if got := Entry(md, "x", "missing"); got != "" {
+		t.Errorf("a verb not named should give nothing, got %q", got)
+	}
+	if got := Entry("x go    what it is for\n", "x", "go"); got != "" {
+		t.Errorf("legacy plain text has no items, got %q", got)
+	}
+}
+
+func testHelpCommand() Command {
+	return Command{Name: "x", Verbs: map[string]Verb{
+		"go": {
+			Usage: "### Doing\n\n- `x go`\n  what it is for\n",
+			Run:   func(string, []string, io.Writer, io.Writer) error { return ErrHelp },
+		},
+	}}
 }

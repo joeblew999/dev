@@ -74,6 +74,17 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	err := v.Run(verb, rest, stdout, stderr)
+	if errors.Is(err, ErrHelp) {
+		// The flag package has printed each flag and what it means; this adds
+		// what the verb is for. Together they are the whole of what a person
+		// needs, and neither is an error.
+		usage := v.Usage
+		if entry := Entry(usage, c.Name, verb); entry != "" {
+			usage = entry
+		}
+		fmt.Fprintf(stdout, "\n%s", Flatten(usage))
+		return 0
+	}
 	var uerr *UsageError
 	if errors.As(err, &uerr) {
 		fmt.Fprintf(stderr, "error: %v\n\n%s", err, Flatten(v.Usage))
@@ -262,6 +273,9 @@ func (c Command) skill(verb string, args []string, stdout, stderr io.Writer) err
 	var check Bool
 	fs.Var(&check, "check", "fail when any copy is stale; write nothing")
 	rest, err := ParseInterleaved(fs, args)
+	if errors.Is(err, ErrHelp) {
+		return err
+	}
 	if err != nil {
 		return Usagef("%s: %v", verb, err)
 	}

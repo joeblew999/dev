@@ -68,6 +68,22 @@ description = "Regenerate skills/dev/SKILL.md, and the copy Claude Code reads he
 depends = ["build"]
 run = ".bin/dev skill"
 
+[tasks.help]
+description = "What a verb takes (mise run help check): its flags, and what it is for"
+depends = ["build"]
+# The flags and what each one means come from the FlagSet the verb registers,
+# so they cannot drift from the code; the description under them is that
+# verb's own usage.md entry. Neither is a hand-kept copy of the other.
+#
+# A deploy verb (url, deploy, logs, smoke, delete) reads DIR before it knows
+# which cloud it is talking to, and its flags differ per cloud, so those need
+# a real command directory: mise run help url cmd/proxy.
+usage = '''
+arg "<verb>" help="the verb to explain"
+arg "[dir]" help="the command directory it would act on" default="."
+'''
+run = '.bin/dev "$usage_verb" "$usage_dir" --help'
+
 [tasks.release]
 description = "Publish a release, the same locally and in GitHub Actions: <version> here, the pushed tag there"
 depends = ["build"]

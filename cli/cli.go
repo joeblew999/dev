@@ -7,6 +7,7 @@ package cli
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -58,6 +59,13 @@ func (b *Bool) Set(s string) error {
 	return nil
 }
 
+// ErrHelp is what a verb returns when it was asked for help rather than run.
+// The flag package has already printed the flags and what each one means, so
+// the command prints the verb's own usage after it and exits 0: asking what a
+// verb takes is not an error, and reporting it as one is how the flags'
+// descriptions stayed invisible.
+var ErrHelp = flag.ErrHelp
+
 // DirAnd parses "DIR [flags and positionals in any order]": the directory a
 // command acts on comes first; positional is how many positionals follow, or
 // -1 for any number. Flags may come anywhere, because mise appends what the
@@ -68,6 +76,9 @@ func DirAnd(fs *flag.FlagSet, args []string, positional int) (dir string, rest [
 		return "", nil, Usagef("%s: the directory comes first", fs.Name())
 	}
 	rest, err = ParseInterleaved(fs, args[1:])
+	if errors.Is(err, flag.ErrHelp) {
+		return "", nil, ErrHelp
+	}
 	if err != nil {
 		return "", nil, Usagef("%s: %v", fs.Name(), err)
 	}

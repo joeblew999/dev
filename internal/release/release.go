@@ -15,6 +15,7 @@ package release
 import (
 	"bytes"
 	_ "embed"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -51,6 +52,9 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	}
 	dir := args[0]
 	rest, err := cli.ParseInterleaved(fs, args[1:])
+	if errors.Is(err, cli.ErrHelp) {
+		return err
+	}
 	if err != nil {
 		return cli.Usagef("release: %v", err)
 	}

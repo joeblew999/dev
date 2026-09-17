@@ -19,6 +19,11 @@ command.
 
 ## Verbs
 
+`<cmd> <verb> --help` says what one verb takes: its flags and what each one
+means, read from the flags the verb registers, so they cannot drift from the
+code. Here, `mise run help <verb>`.
+
+
 The directory a verb acts on comes first; flags may follow anywhere, and
 everything after a bare `--` goes to the program being run.
 
