@@ -16,8 +16,7 @@ func testCommand() Command {
 	return Command{
 		Name:    "tool",
 		Version: "1.2.3",
-		Head:    "---\nname: tool\n---\n\n# tool\n\n",
-		Tail:    "## Rules\n\n- one\n",
+		Skill:   "---\nname: tool\n---\n\n# tool\n\n\n<!-- verbs -->\n## Rules\n\n- one\n",
 		Verbs: map[string]Verb{
 			"build": {Run: func(verb string, args []string, stdout, stderr io.Writer) error {
 				_, err := stdout.Write([]byte("built\n"))

@@ -150,22 +150,21 @@ func equal(a, b []string) bool {
 	return true
 }
 
-// The bug this check exists for: tail.md shipped `NAME<TAB>OWNER` unfenced,
+// The bug this check exists for: the manual shipped `NAME<TAB>OWNER` unfenced,
 // so every rendered copy of the manual showed "NAMEOWNER" and lost the fact
 // that the lines are tab-separated. Nothing caught it.
 func TestCheckUsageCatchesBareAngleBracketsInProse(t *testing.T) {
 	c := Command{
 		Name:  "x",
 		Verbs: map[string]Verb{"go": {Usage: "- `x go`\n  fine\n"}},
-		Head:  "---\nname: x\n---\n\n# x\n\nprose\n",
-		Tail:  "- A task printing NAME<TAB>OWNER lines\n",
+		Skill: "---\nname: x\n---\n\n# x\n\nprose\n\n<!-- verbs -->\n- A task printing NAME<TAB>OWNER lines\n",
 	}
 	var f fakeTB
 	CheckUsage(&f, c)
 	if len(f.errs) != 1 {
 		t.Fatalf("want exactly the tail problem, got %v", f.errs)
 	}
-	if !strings.Contains(f.errs[0], "x tail:") || !strings.Contains(f.errs[0], "HTML tag") {
+	if !strings.Contains(f.errs[0], "x skill.md:") || !strings.Contains(f.errs[0], "HTML tag") {
 		t.Errorf("message should name the prose and why: %q", f.errs[0])
 	}
 }
@@ -176,8 +175,7 @@ func TestFrontmatterIsNotChecked(t *testing.T) {
 	c := Command{
 		Name:  "x",
 		Verbs: map[string]Verb{"go": {Usage: "- `x go`\n  fine\n"}},
-		Head:  "---\nname: x\ndescription: a <thing> in metadata\n---\n\n# x\n",
-		Tail:  "",
+		Skill: "---\nname: x\ndescription: a <thing> in metadata\n---\n\n# x\n\n<!-- verbs -->\n",
 	}
 	var f fakeTB
 	CheckUsage(&f, c)
@@ -192,8 +190,7 @@ func TestProseMayUseMarkdownFlattenCannotRead(t *testing.T) {
 	c := Command{
 		Name:  "x",
 		Verbs: map[string]Verb{"go": {Usage: "- `x go`\n  fine\n"}},
-		Head:  "# x\n\n| a | b |\n|---|---|\n\nsee [docs](http://x), *emphasised*\n",
-		Tail:  "> a note\n\n1. a numbered list\n",
+		Skill: "# x\n\n| a | b |\n|---|---|\n\nsee [docs](http://x), *emphasised*\n\n<!-- verbs -->\n> a note\n\n1. a numbered list\n",
 	}
 	var f fakeTB
 	CheckUsage(&f, c)

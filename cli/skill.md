@@ -50,7 +50,9 @@ is made from the flags.
   `Usage`, which is that section's prose, and the manual prints it once.
 - `Default` — the verb run when none is given. A server uses this, so
   `hello` alone serves. Empty means the index is printed instead.
-- `Head`, `Tail` — the manual's prose before and after the verbs.
+- `Skill` — the manual a person writes: frontmatter, prose, and a `VerbMarker`
+  line where the rendered verbs belong. One document, because it is one
+  document; with no marker they go last.
 - `Order` — the manual's reading order, verb names, each standing for the
   group that shares its usage. Empty means verb-name order.
 - `Version` — what `<cmd> version` prints; a release sets it through
@@ -108,9 +110,9 @@ which that repo's own agents read. `dev build` runs it after every build.
 Never edit a `SKILL.md`; it is written from the verbs.
 
 What a person writes is markdown beside the code it describes, which is the
-whole rule: `usage.md` in each package for its verbs, `head.md` and `tail.md`
-beside the command's own main.go for the prose around them, and a library's
-own manual in that library's directory. Embedded with `//go:embed`. Files rather than Go string constants, because a Go raw string
+whole rule: `usage.md` in each package for its verbs, `skill.md` beside the
+command's own main.go for the manual around them, and a library's own manual
+in that library's directory. Embedded with `//go:embed`. Files rather than Go string constants, because a Go raw string
 is backtick-delimited and so cannot hold inline code.
 
 A `usage.md` holds no verbs and no flags — those are rendered under it. It
@@ -203,8 +205,8 @@ code. A verb is one list item: the signature its first line, the description
 its continuation. That is the subset the terminal rendering reads — the same
 text has to work with no renderer at all.
 
-`head.md` and `tail.md` only ever reach the manual, never a terminal, so they
-may use all of markdown. Two rules hold everywhere:
+A `skill.md` only ever reaches the manual, never a terminal, so it may use all
+of markdown. Two rules hold everywhere:
 
 - Write every `<placeholder>` in backticks. Unfenced, a markdown renderer
   takes `<app>` or `NAME<TAB>OWNER` for an HTML tag and the reader never sees

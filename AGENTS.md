@@ -49,8 +49,7 @@ This file says only what is about developing the tool itself.
   passthrough — and every other repo on the stack builds its commands on it,
   so a change there reaches them all. Everything else lives under `internal/`.
 - **The prose is markdown beside the code it describes**, always: a package's
-  verbs in its own `usage.md`, the manual's surrounding prose in `head.md` and
-  `tail.md` beside `main.go`, a library's manual in that library's directory.
+  verbs in its own `usage.md`, the manual around them in `skill.md` beside `main.go`, a library's manual in that library's directory.
   All compiled in by `go:embed`. A file added there goes in `mise.toml`'s
   build `sources`, or editing it leaves the binary stale while mise reports it
   fresh.

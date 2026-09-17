@@ -19,18 +19,15 @@ import (
 	"github.com/joeblew999/dev/internal/stage"
 )
 
-// The prose around the verbs in the generated manual: head.md before them,
-// tail.md after. Beside main.go, because main.go is the command they
-// describe — the same rule that puts each package's usage.md beside its
+// skill.md is the manual a person writes: the prose, with a marker line where
+// the rendered verbs go. Beside main.go, because main.go is the command it
+// describes — the same rule that puts each package's usage.md beside its
 // verbs. Markdown files, not string consts, so prose
 // edits stay prose; go:embed compiles them into the binary, so `dev skill`
 // works anywhere and the rendered manual ships via release.
 
-//go:embed head.md
-var skillHead string
-
-//go:embed tail.md
-var skillTail string
+//go:embed skill.md
+var skillDoc string
 
 // cliSkill is the manual for the library rather than for dev's verbs, so it
 // lives in cli/ beside what it documents. main.go only embeds it, because a
@@ -66,8 +63,7 @@ var dev = cli.Command{
 		"release": {Run: release.Run, Args: "DIR [VERSION]", Flags: release.Flags, Desc: "build for every platform, sign it, and publish it to GitHub", Usage: release.Usage},
 		"deps":    {Run: deps.Run, Subs: deps.Subs, Usage: deps.Usage},
 	},
-	Head: skillHead,
-	Tail: skillTail,
+	Skill: skillDoc,
 
 	Skills: map[string]string{"cli": cliSkill},
 

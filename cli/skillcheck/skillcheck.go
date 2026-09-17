@@ -71,9 +71,10 @@ func Mentioned(md string) []string {
 	return out
 }
 
-// exported is every name a package offers a caller: its functions, its types,
-// and its structs' fields, because a skill says a field as readily as a
-// function and both are things the package either has or does not.
+// exported is every name a package offers a caller: its functions, types,
+// struct fields, constants and package variables. A skill names any of them as
+// readily as it names a function, and each is a thing the package either has
+// or does not.
 func exported(t TB, dir string) map[string]bool {
 	pkgs, err := parser.ParseDir(token.NewFileSet(), dir, func(fi os.FileInfo) bool {
 		return !strings.HasSuffix(fi.Name(), "_test.go")
@@ -91,6 +92,13 @@ func exported(t TB, dir string) map[string]bool {
 			case *ast.TypeSpec:
 				have[d.Name.Name] = true
 			case *ast.Field:
+				for _, name := range d.Names {
+					have[name.Name] = true
+				}
+			case *ast.ValueSpec:
+				// Constants and package variables: a skill names one as
+				// readily as a function, and VerbMarker went unfound until
+				// this case existed.
 				for _, name := range d.Names {
 					have[name.Name] = true
 				}

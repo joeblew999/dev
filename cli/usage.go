@@ -115,16 +115,15 @@ var inlineCode = regexp.MustCompile("`[^`]*`")
 //
 // The two are held to different rules, because they are read differently. A
 // verb's usage is rendered twice — as markdown in the manual and as flattened
-// text in a terminal — so it must stay inside the subset Flatten reads. Head
-// and Tail only ever reach the manual, so fences, tables and emphasis are
-// fine there and are not checked.
+// text in a terminal — so it must stay inside the subset Flatten reads. The
+// skill prose only ever reaches the manual, so fences, tables and emphasis
+// are fine there and are not checked.
 //
 // What applies to both is the angle-bracket rule, because that is a markdown
-// rendering bug rather than a flattening one, and prose is where it bit:
-// tail.md shipped `NAME<TAB>OWNER` unfenced, so every rendered copy of the
-// manual showed "NAMEOWNER" and lost the fact that the lines are
-// tab-separated. Nothing caught it, which is why Head and Tail are checked
-// here at all.
+// rendering bug rather than a flattening one, and prose is where it bit: the
+// manual once shipped `NAME<TAB>OWNER` unfenced, so every rendered copy showed
+// "NAMEOWNER" and lost the fact that the lines are tab-separated. Nothing
+// caught it, which is why the prose is checked here at all.
 func CheckUsage(t TB, c Command) {
 	t.Helper()
 	verbs := c.all()
@@ -133,10 +132,8 @@ func CheckUsage(t TB, c Command) {
 			t.Errorf("%s %s usage: %s", c.Name, name, problem)
 		}
 	}
-	for _, prose := range []struct{ what, md string }{{"head", c.Head}, {"tail", c.Tail}} {
-		for _, problem := range angleProblems(blankFrontmatter(prose.md)) {
-			t.Errorf("%s %s: %s", c.Name, prose.what, problem)
-		}
+	for _, problem := range angleProblems(blankFrontmatter(c.Skill)) {
+		t.Errorf("%s skill.md: %s", c.Name, problem)
 	}
 }
 
