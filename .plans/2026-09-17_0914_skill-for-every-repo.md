@@ -2,8 +2,8 @@
 
 **File:** `dev/.plans/2026-09-17_0914_skill-for-every-repo.md` — refer to this plan by that name.
 
-**Status:** in progress, steps 1–5 done in the working tree (uncommitted),
-steps 6–7 not started · **Created:** 2026-09-17 09:14 · **Rewritten:** 2026-09-17
+**Status:** in progress, steps 1–5 done, committed and pushed 2026-09-17
+(`ddb1fad`); steps 6–7 not started, and both are outside this repo · **Created:** 2026-09-17 09:14 · **Rewritten:** 2026-09-17
 **Finished:** — · **Results recorded:** 2026-09-17 (K1–K6, K8–K9; K7 pending step 6)
 **Affects:** this repo (`internal/cli` becomes importable, `main.go` loses its
 dispatch loop and its generator) and every command in a repo that pins `dev` —
@@ -227,6 +227,29 @@ and its test is `func TestSkill(t *testing.T) { cli.CheckSkill(t, app) }`.
 7. **Release and pin.** `mise run release <version>` here; gsxui bumps its pin
    and adds the `require`. Nothing lands in gsxui until the tool is released.
    **Not started.**
+
+## What step 6 now inherits (2026-09-17, later)
+
+The usage-as-markdown work (`.plans/done/2026-09-17_1207_usage-as-markdown.md`)
+landed after steps 1–5, so the port `stylegen` does is not quite the one
+written above:
+
+- A verb's usage is a `usage.md` beside the code, embedded with `//go:embed`,
+  not a `Usage` string const. `Head`/`Tail` likewise — `head.md`, `tail.md`.
+- The command's test calls `cli.CheckUsage` beside `cli.CheckSkill`.
+- gsxui's build task must name that markdown in `sources` and the manual's
+  three copies in `outputs`, or editing prose leaves the binary stale while
+  mise reports it fresh.
+- `Command.Order` exists if `stylegen` ever has enough verbs to want one.
+
+None of this blocks the port; `stylegen` can keep plain-text usage and it will
+be fenced in the manual exactly as before. It is the shape to port *into* when
+the port happens.
+
+**Step 7 is the gate.** gsxui cannot `require github.com/joeblew999/dev` until
+a version is published — a real `mise run release <version>`, not a snapshot —
+because the Go module proxy resolves the require from a pushed tag. Nothing in
+step 6 lands in gsxui before that.
 
 ## Checks (record results in the plan)
 
