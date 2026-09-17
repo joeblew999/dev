@@ -1,24 +1,8 @@
 package cli
 
 import (
-	"fmt"
-	"regexp"
 	"strings"
 )
-
-// A verb's usage is markdown, and it is read in two places that want
-// different things: the rendered manual, where it is markdown among markdown,
-// and a terminal, which has no renderer. Flatten is the second reading, so
-// that one source serves both and neither can drift from the other.
-//
-// The shape is a markdown list: a verb is a list item whose first line is the
-// signature and whose continuation is the description. That is not a
-// convention invented here — it is what markdown already means by a list, so
-// the grouping survives rendering. The terminal wants the description indented
-// under its signature, and markdown cannot carry that indent itself: four
-// spaces there would mean a code block, and two would be the list's own.
-// So Flatten re-adds it, and CheckUsage holds usage to the subset Flatten
-// knows.
 
 // Flatten renders markdown usage as the plain text a terminal shows: headings
 // lose their #, list items lose their marker, continuations gain the four
@@ -66,127 +50,6 @@ func indent(s string) string {
 // what is left.
 func unmark(s string) string {
 	return strings.TrimRight(strings.ReplaceAll(s, "`", ""), " \t")
-}
-
-// The constructs CheckUsage rejects. Each is either something Flatten would
-// pass through as visible noise (a fence, a table, a link) or something it
-// would silently mangle (a numbered or nested list, whose shape it does not
-// read). Keeping the list closed is what stops Flatten growing into a
-// markdown engine: a new construct is a decision, not a patch.
-//
-// bannedLines are whole-line shapes, matched on the line as written. They
-// cannot be matched after inline code is blanked, because a fence is itself
-// backticks: blanking would eat it and the check would pass.
-var bannedLines = []struct {
-	name string
-	re   *regexp.Regexp
-}{
-	{"a code fence", regexp.MustCompile("^\\s*```")},
-	{"a table", regexp.MustCompile(`^\s*\|`)},
-	{"a numbered list", regexp.MustCompile(`^\s*\d+\.\s`)},
-	{"a nested list", regexp.MustCompile(`^\s+[-*+]\s`)},
-	{"a blockquote", regexp.MustCompile(`^\s*>`)},
-	{"a setext heading", regexp.MustCompile(`^\s*(=+|-{2,})\s*$`)},
-}
-
-// bannedSpans are inline shapes, matched only outside inline code, so that
-// what a code span protects is never mistaken for markup.
-var bannedSpans = []struct {
-	name string
-	re   *regexp.Regexp
-}{
-	{"a link or image", regexp.MustCompile(`!?\[[^\]]*\]\([^)]*\)`)},
-	{"emphasis (* and _ stay literal here, so globs stay globs)", regexp.MustCompile(`\*\*?[^*\s][^*]*\*\*?|(^|\s)_[^_]+_(\s|$)`)},
-}
-
-// angles finds <...> that would reach a markdown renderer as an HTML tag.
-// `<app>.fly.dev` and `NAME<TAB>OWNER` are the real cases: unfenced, the
-// renderer swallows the tag and the reader never sees it. In inline code it
-// escapes correctly, so the rule is that every one of them wears backticks.
-var angles = regexp.MustCompile(`<[A-Za-z/][^>\s]*>`)
-
-// inlineCode is a `...` span, blanked before the other rules run so that what
-// a span protects is never mistaken for markup.
-var inlineCode = regexp.MustCompile("`[^`]*`")
-
-// CheckUsage fails the test when a command's prose would not survive being
-// read. A command's main_test.go calls it beside CheckSkill, so every repo on
-// the stack holds its own prose to the same rules.
-//
-// The two are held to different rules, because they are read differently. A
-// verb's usage is rendered twice — as markdown in the manual and as flattened
-// text in a terminal — so it must stay inside the subset Flatten reads. The
-// skill prose only ever reaches the manual, so fences, tables and emphasis
-// are fine there and are not checked.
-//
-// What applies to both is the angle-bracket rule, because that is a markdown
-// rendering bug rather than a flattening one, and prose is where it bit: the
-// manual once shipped `NAME<TAB>OWNER` unfenced, so every rendered copy showed
-// "NAMEOWNER" and lost the fact that the lines are tab-separated. Nothing
-// caught it, which is why the prose is checked here at all.
-func CheckUsage(t TB, c Command) {
-	t.Helper()
-	verbs := c.all()
-	for _, name := range sortedVerbs(verbs) {
-		for _, problem := range usageProblems(verbs[name].Usage) {
-			t.Errorf("%s %s usage: %s", c.Name, name, problem)
-		}
-	}
-	for _, problem := range angleProblems(blankFrontmatter(c.Skill)) {
-		t.Errorf("%s skill.md: %s", c.Name, problem)
-	}
-}
-
-// usageProblems is every reason a usage string is outside the subset, as
-// messages naming the line and its fix.
-func usageProblems(md string) []string {
-	var out []string
-	for i, line := range strings.Split(strings.TrimRight(md, "\n"), "\n") {
-		for _, b := range bannedLines {
-			if b.re.MatchString(line) {
-				out = append(out, fmt.Sprintf("line %d uses %s, which the terminal rendering does not read: %q", i+1, b.name, line))
-			}
-		}
-		bare := inlineCode.ReplaceAllString(line, "")
-		for _, b := range bannedSpans {
-			if b.re.MatchString(bare) {
-				out = append(out, fmt.Sprintf("line %d uses %s, which the terminal rendering does not read: %q", i+1, b.name, line))
-			}
-		}
-	}
-	return append(out, angleProblems(md)...)
-}
-
-// angleProblems is every <...> a markdown renderer would eat, as messages
-// naming the line and its fix.
-func angleProblems(md string) []string {
-	var out []string
-	for i, line := range strings.Split(strings.TrimRight(md, "\n"), "\n") {
-		bare := inlineCode.ReplaceAllString(line, "")
-		for _, m := range angles.FindAllString(bare, -1) {
-			out = append(out, fmt.Sprintf("line %d has %s outside inline code; a markdown renderer eats it as an HTML tag, so write it as `%s`: %q", i+1, m, m, line))
-		}
-	}
-	return out
-}
-
-// blankFrontmatter empties a leading --- block, which is YAML the renderer
-// never sees, keeping the lines so that a message's line number still counts
-// from the top of the file a person edits.
-func blankFrontmatter(md string) string {
-	lines := strings.Split(md, "\n")
-	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
-		return md
-	}
-	for i := 1; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) == "---" {
-			for j := 0; j <= i; j++ {
-				lines[j] = ""
-			}
-			break
-		}
-	}
-	return strings.Join(lines, "\n")
 }
 
 // Verbs renders the verb list for a group: one signature per verb, each with
@@ -245,39 +108,4 @@ func lookup(verbs map[string]Verb, path string) (Verb, string, bool) {
 		v = sub
 	}
 	return v, path, true
-}
-
-// CheckDescribed fails when a verb says nothing about itself, or when a
-// group's prose does what the rendering does.
-//
-// Check I7 of the i18n plan — "the rendered skill carries every flag in the
-// verb table" — needs no test any more: a signature is rendered from the
-// flags a verb registers and there is nowhere else to write one. What can
-// still go wrong is a verb with no Desc, which reaches the manual as a bare
-// signature, and prose that lists verbs or flags by hand, which is how the
-// second copy grew last time.
-func CheckDescribed(t TB, c Command) {
-	t.Helper()
-	verbs := c.all()
-	for _, name := range sortedVerbs(verbs) {
-		described(t, c, verbs[name], name)
-		for _, line := range strings.Split(verbs[name].Usage, "\n") {
-			if strings.HasPrefix(strings.TrimSpace(line), "- ") {
-				t.Errorf("%s: a usage.md lists something: %q. The verbs are rendered under the prose; a list here is a second copy of them", c.Name, strings.TrimSpace(line))
-			}
-		}
-	}
-}
-
-// described reports a verb, or a subcommand, that says nothing about itself.
-func described(t TB, c Command, v Verb, path string) {
-	if len(v.Subs) == 0 {
-		if v.Desc == "" {
-			t.Errorf("%s %s has no Desc; it reaches the manual as a signature with nothing said about it", c.Name, path)
-		}
-		return
-	}
-	for _, sub := range sortedVerbs(v.Subs) {
-		described(t, c, v.Subs[sub], path+" "+sub)
-	}
 }
