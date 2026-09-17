@@ -215,6 +215,25 @@ of markdown. Two rules hold everywhere:
   `**/*.go` and `secrets:*`, and a flattener that unwound emphasis would turn
   the first into `/*.go`.
 
+## If your command stopped compiling
+
+Breaking a consumer is allowed here: the tool says what is wrong and the repo
+that broke fixes itself. So these are the errors this version produces and
+what each one means.
+
+- `unknown field Head` / `unknown field Tail` — a command's manual is one
+  document now, not a prose-before and a prose-after. Join your `head.md` and
+  `tail.md` into a `skill.md` with a `<!-- verbs -->` line where they met, and
+  set `Skill:` instead of `Head:` and `Tail:`.
+- `undefined: cli.Entry` — it read a verb's item out of a usage.md, and a
+  usage.md has no items any more. Whatever called it wants `cli.Verbs` or
+  nothing.
+- A verb prints with no flags in its signature — give it `Flags`, the func
+  that registers them, and `Args` for its positionals. It had them in prose
+  before; now it declares them.
+- A verb prints as a bare signature with nothing under it — give it `Desc`.
+  `cli.CheckDescribed` fails on this, so add that test and it tells you which.
+
 ## Porting a command that predates this
 
 Usage that is plain text rather than markdown is fenced in the manual, exactly
