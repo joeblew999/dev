@@ -55,3 +55,30 @@ func TestBinariesComeFromTheRepoConfig(t *testing.T) {
 		t.Errorf("create args name one binary: %s", got)
 	}
 }
+
+// A tag this module path cannot carry must be refused before it is made.
+// Go requires a module at v2 or above to say so in its path, and it does not
+// warn: it refuses the consumer's require line, in their repo, after the tag
+// is published and unfixable. This repo published v2.0.0 and v3.0.0 before
+// anything checked.
+func TestMajorVersionMustFitTheModulePath(t *testing.T) {
+	for _, tag := range []string{"v2.0.0", "v3.1.4", "v10.0.0"} {
+		err := majorFits(tag, "github.com/joeblew999/dev")
+		if err == nil {
+			t.Errorf("%s was allowed; this module path may only carry v0 and v1", tag)
+			continue
+		}
+		if !strings.Contains(err.Error(), "may only carry v0 and v1") {
+			t.Errorf("%s: the error should say why: %v", tag, err)
+		}
+	}
+	// And a path that does say so carries its own major fine.
+	if err := majorFits("v3.0.0", "github.com/joeblew999/dev/v3"); err != nil {
+		t.Errorf("a /v3 path should carry v3: %v", err)
+	}
+	for _, tag := range []string{"v0.5.1", "v1.3.0", "v1.99.0"} {
+		if err := majorFits(tag, "github.com/joeblew999/dev"); err != nil {
+			t.Errorf("%s should be allowed: %v", tag, err)
+		}
+	}
+}

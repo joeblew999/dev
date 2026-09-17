@@ -277,6 +277,9 @@ func (r *release) publish(version string) error {
 	if !strings.HasPrefix(tag, "v") {
 		tag = "v" + tag
 	}
+	if err := majorFitsModule(tag); err != nil {
+		return err
+	}
 	if status, err := out("git", "status", "--porcelain"); err != nil {
 		return err
 	} else if status != "" {
@@ -338,4 +341,56 @@ func (r *release) publish(version string) error {
 	}
 	fmt.Printf("published %s %s: https://github.com/%s/releases/tag/%s\n", r.name, tag, r.slug, tag)
 	return nil
+}
+
+// majorFitsModule refuses a tag the module path cannot carry.
+//
+// Go requires a module released at v2 or above to say so in its path:
+// github.com/owner/thing/v3. A path without that suffix may only carry v0 and
+// v1 tags, and the toolchain does not warn about a v3 tag — it refuses to
+// parse the require line, in the consumer's repo, long after the tag is
+// published and unfixable.
+//
+// This repo published v2.0.0 and v3.0.0 before anything checked, and found
+// out when a consumer could not import them. Nothing here can unpublish a
+// tag, so the check is before one is made.
+func majorFitsModule(tag string) error {
+	var major int
+	if _, err := fmt.Sscanf(tag, "v%d.", &major); err != nil || major < 2 {
+		return nil
+	}
+	path, err := modulePath()
+	if err != nil {
+		return err
+	}
+	return majorFits(tag, path)
+}
+
+// majorFits is the rule itself, given the path, so a test can ask it without
+// a go.mod to read.
+func majorFits(tag, path string) error {
+	var major int
+	if _, err := fmt.Sscanf(tag, "v%d.", &major); err != nil || major < 2 {
+		return nil
+	}
+	want := fmt.Sprintf("/v%d", major)
+	if strings.HasSuffix(path, want) {
+		return nil
+	}
+	return fmt.Errorf("%s cannot be released as %s: a module path without %s may only carry v0 and v1 tags, and Go refuses the require line rather than warning.\nEither release it as v1.x, or rename the module to %s%s and every import of it",
+		path, tag, want, path, want)
+}
+
+// modulePath is what this repo's go.mod calls itself.
+func modulePath() (string, error) {
+	data, err := os.ReadFile("go.mod")
+	if err != nil {
+		return "", fmt.Errorf("reading go.mod to check the version: %w", err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "module "); ok {
+			return strings.TrimSpace(rest), nil
+		}
+	}
+	return "", fmt.Errorf("go.mod names no module")
 }
