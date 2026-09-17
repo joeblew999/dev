@@ -98,16 +98,17 @@ func (c Command) all() map[string]Verb {
 	return m
 }
 
-// ownUsageTemplate is the usage of skill and version. It is markdown like
-// every other verb's, but a template rather than a plain file: it names the
-// binary and the three paths, which only the command knows.
+// usageTemplate is the usage of skill and version: this package's own
+// usage.md, named as every package on the stack names it. It is a template
+// rather than a plain file because it has to say the binary's name and the
+// three paths, which only the command knows.
 
-//go:embed own_usage.md
-var ownUsageTemplate string
+//go:embed usage.md
+var usageTemplate string
 
 // ownUsage is the usage of skill and version, in the shape the others use.
 func (c Command) ownUsage() string {
-	return fmt.Sprintf(ownUsageTemplate, c.Name,
+	return fmt.Sprintf(usageTemplate, c.Name,
 		filepath.Join(ShippedDir, c.Name, SkillFile),
 		filepath.Join(ClaudeDir, c.Name, SkillFile),
 		filepath.Join(AgentsDir, c.Name, SkillFile))
