@@ -13,9 +13,14 @@
   an API call belongs in the `dev` tool (`github.com/joeblew999/dev`), with a
   test, never in a shell script behind a task.
 - **Every error names its fix.**
-- **Secret values live only in fnox** (`mise run secrets:set`) and in the
-  deployed app (`mise run secrets:push`). Cloud credentials come from fnox;
-  tasks wrap `fnox exec --`.
+- **Secret values live only in fnox** (`mise run secrets:set`), in the
+  deployed app (`mise run secrets:push`) and, for what CI must do with a
+  credential, in the repo's Actions secrets (`mise run secrets:ci`). Cloud
+  credentials come from fnox; tasks wrap `fnox exec --`.
+- **Releases are signed with one long-lived key** (`mise run release --keygen`
+  makes it once: into fnox, its public half into `packslip.pub`). Consumers
+  pin that public key on the tool; mise remembers a project's signer and
+  refuses another until `mise packslip forget` says so.
 - **hk owns the checks.** `mise run lint` runs them; the pre-commit hook and
   the Claude Code Stop hook run the same, so `hk run check` must stay cheap.
   The expensive, login-gated `session:verify` is bound to pre-push only.

@@ -82,7 +82,8 @@ dev init [DIR] [--name NAME] [--pin VERSION]
 dev release DIR [VERSION] [--snapshot] [--name NAME]
     publish a GitHub Release of the command in DIR: tag VERSION (vX.Y.Z; in CI
     the pushed tag), build every platform with goreleaser, sign the packslip
-    manifest, upload. Signed with the key in fnox (PACKSLIP_SIGNING_KEY),
+    manifest, upload; the release workflow runs the same on demand. Signed
+    with the key in fnox (PACKSLIP_SIGNING_KEY),
     which --keygen makes once, with its public half in packslip.pub for
     consumers to pin (mise: pubkey = "..."). --snapshot builds, signs with a
     throwaway key and verifies, publishing nothing. NAME is the binary's name; default the

@@ -25,7 +25,8 @@ import (
 const Usage = `dev release DIR [VERSION] [--snapshot] [--name NAME]
     publish a GitHub Release of the command in DIR: tag VERSION (vX.Y.Z; in CI
     the pushed tag), build every platform with goreleaser, sign the packslip
-    manifest, upload. Signed with the key in fnox (PACKSLIP_SIGNING_KEY),
+    manifest, upload; the release workflow runs the same on demand. Signed
+    with the key in fnox (PACKSLIP_SIGNING_KEY),
     which --keygen makes once, with its public half in packslip.pub for
     consumers to pin (mise: pubkey = "..."). --snapshot builds, signs with a
     throwaway key and verifies, publishing nothing. NAME is the binary's name; default the
@@ -385,29 +386,15 @@ func snapshotVersion(describe string) (version, tag string) {
 	return version, "v" + version
 }
 
-// publish tags, builds, signs and uploads. In CI the tag is GITHUB_REF_NAME
-// and goreleaser publishes with the workflow's token; locally the tag is
-// version, the key is ephemeral, and gh uploads.
+// publish tags, pushes the tag, builds, signs and uploads: one path, run by
+// a developer or by the release workflow on demand with a version. The key
+// comes from fnox or, in CI, from the Actions secret; never a throwaway one,
+// since consumers pin its public half. Nothing runs on a tag push, so a
+// release is published exactly once.
 func (r *release) publish(version string) error {
 	defer r.cleanup()
-	if tag := os.Getenv("GITHUB_REF_NAME"); tag != "" {
-		if err := run("goreleaser", "release", "--clean", "--config", r.config); err != nil {
-			return err
-		}
-		// The same key a local release uses, from the Actions secret, so
-		// consumers pin one public key; without it, the workflow's identity.
-		key, cleanup, err := signingKey()
-		if err != nil {
-			return err
-		}
-		defer cleanup()
-		if err := r.create(strings.TrimPrefix(tag, "v"), os.Getenv("GITHUB_SHA"), tag, key, false); err != nil {
-			return err
-		}
-		return run("gh", "release", "upload", tag, "dist/packslip.sigstore.json", "--clobber")
-	}
 	if version == "" {
-		return fmt.Errorf("give the version to release, vX.Y.Z (CI takes it from the pushed tag)")
+		return fmt.Errorf("give the version to release, vX.Y.Z")
 	}
 	tag := version
 	if !strings.HasPrefix(tag, "v") {

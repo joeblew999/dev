@@ -1,15 +1,18 @@
 name: Release
 
+# On demand, with a version, for a large body of work; day to day a release
+# is `mise run release <version>` on a developer's machine. Nothing runs on a
+# tag push: a release is published exactly once, by whoever runs the task.
 on:
-  push:
-    tags:
-      - "*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 1.2.0"
+        required: true
 
 permissions:
-  contents: write       # Upload the packslip bundle.
-  id-token: write       # Sign the packslip with the workflow's identity.
-  attestations: write   # Publish provenance for the matched files.
+  contents: write       # Tag, create the release, upload the bundle.
+  id-token: write       # Log the signature.
 
 jobs:
   release:
@@ -23,13 +26,10 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v4.3.0
 
-      # The same task a developer runs; the workflow only supplies the
-      # signing identity packslip needs.
+      # The same task a developer runs, signed with the same key from the
+      # Actions secret (mise run secrets:ci PACKSLIP_SIGNING_KEY sets it).
       - name: Build, sign, publish
-        run: mise run release
+        run: mise run release ${{ inputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # The same signing key a local release uses (dev release --keygen
-          # sets it), so consumers pin one public key. Unset: the workflow's
-          # own identity signs instead.
           PACKSLIP_SIGNING_KEY: ${{ secrets.PACKSLIP_SIGNING_KEY }}

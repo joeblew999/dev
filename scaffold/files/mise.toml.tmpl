@@ -102,12 +102,17 @@ description = "store a secret in fnox and push it: <name|owner> [--generate] [--
 raw = true
 run = 'dev secrets set {{vars.worker}} --names "$(mise run secrets:list)"'
 
+[tasks."secrets:ci"]
+description = "give this repo's GitHub Actions a secret from fnox: <name>... (PACKSLIP_SIGNING_KEY for signed releases)"
+raw = true
+run = "dev secrets ci"
+
 [tasks."secrets:push"]
 description = "push every secret the project needs from fnox, naming any missing"
 run = "mise run secrets:list | dev secrets push {{vars.worker}}"
 
 [tasks.release]
-description = "publish a GitHub Release: <version> locally, the pushed tag in CI"
+description = "publish a GitHub Release: <version> locally, the pushed tag in CI (signed with the key in fnox; --keygen makes it)"
 raw = true
 run = "dev release cmd/__NAME__"
 
