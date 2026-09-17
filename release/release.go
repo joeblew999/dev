@@ -39,9 +39,10 @@ Needs goreleaser, packslip and gh, and a clean tree to publish.
 // Run is `dev release DIR [VERSION]`.
 func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	fs := cli.Flags(verb, stderr)
-	var snapshot, keygen cli.Bool
+	var snapshot, keygen, rotate cli.Bool
 	fs.Var(&snapshot, "snapshot", "build, sign with a throwaway key and verify; publish nothing")
 	fs.Var(&keygen, "keygen", "make the signing key: into fnox, its public half into packslip.pub and the repo's Actions secret")
+	fs.Var(&rotate, "rotate", "with --keygen: replace the key that exists, and say what every consumer must do")
 	name := fs.String("name", "", "the binary's name (default: the repo's)")
 	if len(args) == 0 || args[0] == "" || strings.HasPrefix(args[0], "-") {
 		return cli.Usagef("release: the command directory comes first")
@@ -63,7 +64,7 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	if keygen {
-		return Keygen(stdout)
+		return Keygen(stdout, bool(rotate))
 	}
 	if snapshot {
 		return r.snapshot()
@@ -118,9 +119,10 @@ func Pubkey(dir string) string {
 // Actions secret (through gh, on stdin), the public half into packslip.pub
 // for consumers to pin. It refuses when fnox already has one, since every
 // consumer pins that one's public half.
-func Keygen(out io.Writer) error {
-	if v, _ := fnox.Get(SigningKeyEnv); v != "" {
-		return fmt.Errorf("%s is already in fnox and consumers pin its public key (%s); to rotate, remove it from fnox first", SigningKeyEnv, pubFile)
+func Keygen(out io.Writer, rotate bool) error {
+	had := Pubkey(".")
+	if v, _ := fnox.Get(SigningKeyEnv); v != "" && !rotate {
+		return fmt.Errorf("%s is already in fnox and consumers pin its public key (%s); to replace it: dev release . --keygen --rotate", SigningKeyEnv, pubFile)
 	}
 	tmp, err := keygen("packslip-new.key")
 	if err != nil {
@@ -146,6 +148,9 @@ func Keygen(out io.Writer) error {
 		return fmt.Errorf("the key is in fnox and %s is written, but not in the repo's Actions secrets: %w; retry with: dev secrets ci %s", pubFile, err, SigningKeyEnv)
 	}
 	fmt.Fprintf(out, "signing key made: %s in fnox and in this repo's Actions secrets; commit %s.\nConsumers pin its public key:\n  \"packslip:github.com/<owner>/<repo>\" = { version = \"X.Y.Z\", pubkey = \"%s\" }\n", SigningKeyEnv, pubFile, Pubkey("."))
+	if rotate && had != "" {
+		fmt.Fprintf(out, "rotated from %s. The key signs every repo you release, so in each: dev secrets ci %s, commit its new %s.\nEvery consumer, on every machine: the new pubkey in its pin, then once: mise packslip forget packslip:github.com/<owner>/<repo>\n", had[:12]+"...", SigningKeyEnv, pubFile)
+	}
 	return nil
 }
 

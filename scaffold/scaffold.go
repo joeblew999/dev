@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -30,7 +31,9 @@ const Usage = `dev init [DIR] [--name NAME] [--pin VERSION]
     and go.work. NAME defaults to DIR's name; the module path comes from the
     git remote, or example.com without one. VERSION is the dev release to
     pin, with the public key its releases are signed with (--pubkey); default
-    this binary's own. Existing files are left alone and named.
+    this binary's own; the other pins are the releases mise knows today. An
+    existing file is left alone and named; a repo with a module at the root
+    gets no workspace or nested module, and an existing command is kept.
     Then: mise trust && mise install && mise run test
 `
 
@@ -95,12 +98,32 @@ func Init(out io.Writer, dir, name, pin, pubkey string) error {
 	}
 	replace := strings.NewReplacer("__NAME__", name, "__DEV__", devPin, "__MODULE__", module, "__SLUG__", slug)
 
-	var written, kept []string
+	// An existing repo keeps its shape: one with a module at the root gets no
+	// go.work and no nested module, and a command that exists is not
+	// rewritten. A new repo gets the first command and the workspace.
+	rootModule := exists(filepath.Join(dir, "go.mod"))
+	cmdExists := exists(filepath.Join(dir, "cmd", name))
+	skip := func(rel string) string {
+		switch {
+		case rootModule && rel == "go.work":
+			return "a module at the root needs no go.work"
+		case rootModule && strings.HasSuffix(rel, "/go.mod"):
+			return "a module at the root holds the command"
+		case cmdExists && strings.HasPrefix(rel, "cmd/"):
+			return "the command exists"
+		}
+		return ""
+	}
+	var written, kept, skipped []string
 	err = fs.WalkDir(files, "files", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
 		rel := strings.TrimSuffix(strings.TrimPrefix(path, "files/"), ".tmpl")
+		if why := skip(replace.Replace(rel)); why != "" {
+			skipped = append(skipped, replace.Replace(rel)+" ("+why+")")
+			return nil
+		}
 		target := filepath.Join(dir, filepath.FromSlash(replace.Replace(rel)))
 		if _, err := os.Stat(target); err == nil {
 			kept = append(kept, target)
@@ -109,6 +132,9 @@ func Init(out io.Writer, dir, name, pin, pubkey string) error {
 		data, err := files.ReadFile(path)
 		if err != nil {
 			return err
+		}
+		if rel == "mise.toml" {
+			data = []byte(currentPins(string(data)))
 		}
 		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 			return err
@@ -132,11 +158,47 @@ func Init(out io.Writer, dir, name, pin, pubkey string) error {
 	for _, k := range kept {
 		fmt.Fprintln(out, "kept ", k, "(exists; compare it with what dev init would write)")
 	}
+	for _, s := range skipped {
+		fmt.Fprintln(out, "not written:", s)
+	}
 	if len(written) == 0 {
 		return fmt.Errorf("nothing written: every file exists already")
 	}
 	fmt.Fprintf(out, "\n%s is on the stack, pinned to dev %s, module %s.\nNext, in %s:\n  mise trust && mise install && mise run test\n", name, pin, module, dir)
 	return nil
+}
+
+func exists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+// pinLine is an exact packslip pin in the template mise.toml.
+var pinLine = regexp.MustCompile(`(?m)^("packslip:[^"]+") = "(\d+\.\d+\.\d+)"`)
+
+// currentPins moves every exact packslip pin in the template to the release
+// mise knows today, so a new repo starts current, not at whatever the
+// template said when this dev was built. The dev pin itself is this binary's
+// version and is left alone. A pin mise cannot resolve keeps the template's.
+func currentPins(mise string) string {
+	return pinLine.ReplaceAllStringFunc(mise, func(line string) string {
+		m := pinLine.FindStringSubmatch(line)
+		tool := strings.Trim(m[1], `"`)
+		if strings.Contains(tool, "joeblew999/dev") {
+			return line
+		}
+		if v := latest(tool); v != "" {
+			return m[1] + ` = "` + v + `"`
+		}
+		return line
+	})
+}
+
+// latest asks mise for a tool's newest release, "" when it cannot say. A
+// variable so tests can replace it.
+var latest = func(tool string) string {
+	out, err := exec.Command("mise", "latest", tool).Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // slugOf is owner/repo from dir's git remote, "" without one.

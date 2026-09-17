@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -65,6 +66,17 @@ func Verify(out io.Writer, update bool) error {
 	}
 
 	allowed, recordedBy, err := sessionLock()
+	if errors.Is(err, errNoLock) {
+		// The first verify in a repo, at its first push: nothing is allowed
+		// yet, so what the session has now is what it allows. Recorded, not
+		// refused, so day one has no manual step.
+		if err := writeSessionLock(seen, current); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "%s did not exist; it now allows the %d skills this first session reports (Claude Code %s). Commit it.\n", sessionLockPath(), len(seen), current)
+		fmt.Fprint(out, indent(strings.Join(seen, "\n")))
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -112,6 +124,9 @@ func Verify(out io.Writer, update bool) error {
 	fmt.Fprint(out, indent(strings.Join(seen, "\n")))
 	return nil
 }
+
+// errNoLock is the first verify in a repo: verify records the lock then.
+var errNoLock = errors.New("no session lock yet")
 
 // claudeVersion is Claude Code's own version, "" when it cannot be read. A
 // change in it is the one legitimate way the built-in skills change.
@@ -237,8 +252,7 @@ const versionLine = "# claude "
 func sessionLock() (names []string, recordedBy string, err error) {
 	data, err := os.ReadFile(sessionLockPath())
 	if os.IsNotExist(err) {
-		return nil, "", fmt.Errorf("%s does not exist yet; record what this session is allowed with: %s --update",
-			sessionLockPath(), verifyCmd())
+		return nil, "", fmt.Errorf("%w: %s", errNoLock, sessionLockPath())
 	}
 	if err != nil {
 		return nil, "", err

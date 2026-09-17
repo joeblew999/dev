@@ -54,7 +54,7 @@ func TestKeygenStoresTheSecretAndPublishesThePublicHalf(t *testing.T) {
 	t.Cleanup(func() { fnox.Get, fnox.Set, secrets.CI = oldGet, oldSet, oldCI })
 
 	var out bytes.Buffer
-	if err := Keygen(&out); err != nil {
+	if err := Keygen(&out, false); err != nil {
 		t.Fatal(err)
 	}
 	if stored[SigningKeyEnv] == "" || ci[SigningKeyEnv] != stored[SigningKeyEnv] {
@@ -70,7 +70,18 @@ func TestKeygenStoresTheSecretAndPublishesThePublicHalf(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(os.TempDir(), "packslip-new.key")); err == nil {
 		t.Error("the temporary secret key was left behind")
 	}
-	if err := Keygen(&out); err == nil || !strings.Contains(err.Error(), "already in fnox") {
+	if err := Keygen(&out, false); err == nil || !strings.Contains(err.Error(), "--rotate") {
 		t.Errorf("a second keygen replaced the key consumers pin: %v", err)
+	}
+	before := stored[SigningKeyEnv]
+	out.Reset()
+	if err := Keygen(&out, true); err != nil {
+		t.Fatal(err)
+	}
+	if stored[SigningKeyEnv] == before || ci[SigningKeyEnv] != stored[SigningKeyEnv] {
+		t.Error("rotation did not replace the key everywhere")
+	}
+	if !strings.Contains(out.String(), "mise packslip forget") {
+		t.Errorf("rotation did not say what consumers must do:\n%s", out.String())
 	}
 }
