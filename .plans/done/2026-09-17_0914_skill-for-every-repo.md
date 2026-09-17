@@ -2,8 +2,10 @@
 
 **File:** `dev/.plans/2026-09-17_0914_skill-for-every-repo.md` — refer to this plan by that name.
 
-**Status:** in progress, steps 1–5 done, committed and pushed 2026-09-17
-(`ddb1fad`); steps 6–7 not started, and both are outside this repo · **Created:** 2026-09-17 09:14 · **Rewritten:** 2026-09-17
+**Status:** DONE 2026-09-17. Steps 1–5 in `ddb1fad`; step 7 is dev v0.5.0,
+published; step 6 is auth-proxy's `mock-upstream`, ported and pushed
+(`auth-proxy@25b6d39`) — `stylegen` was set aside as too large a port for a
+first proof. · **Created:** 2026-09-17 09:14 · **Rewritten:** 2026-09-17
 **Finished:** — · **Results recorded:** 2026-09-17 (K1–K6, K8–K9; K7 pending step 6)
 **Affects:** this repo (`internal/cli` becomes importable, `main.go` loses its
 dispatch loop and its generator) and every command in a repo that pins `dev` —
@@ -220,13 +222,26 @@ and its test is `func TestSkill(t *testing.T) { cli.CheckSkill(t, app) }`.
    beside the linked `dev` one — and gsxui's own Claude sessions have it from
    that build on. The port lands in gsxui's own `.plans/` when it starts,
    pointing here.
-   **Not started.** Recon 2026-09-17: `gsxui/cmd/stylegen/main.go` dispatches
-   `os.Args[1] == "port"` by hand with default flags otherwise — the exact
-   `Default: "generate"`-shaped port the plan describes; gsxui is one root
-   module at `go 1.26.1`, so the `require` will raise its floor to 1.27.1 (K8).
-7. **Release and pin.** `mise run release <version>` here; gsxui bumps its pin
-   and adds the `require`. Nothing lands in gsxui until the tool is released.
-   **Not started.**
+   **Done 2026-09-17, on `mock-upstream` rather than `stylegen`.** The
+   Product Owner set `stylegen` aside as too large for a first proof.
+   auth-proxy's `mock-upstream` is the better first port and the plan's own
+   reasoning supports it: 180 lines, one flag, an HTTP server — the exact
+   `Default: "serve"` shape — and already `go 1.27.1`, so it raises no floor
+   at all (K8 clean). `main()` is `cli.Main(app)`; the mux moved into
+   `handler()` so a test can exercise it without a port; `usage.md`,
+   `head.md` and `tail.md` sit beside `main.go`; `main_test.go` has
+   `CheckSkill`, `CheckUsage` and a real behaviour test. Verified against the
+   published v0.5.0, not a local replace. `mock:build` names the three manual
+   copies in `outputs`. gsxui's `stylegen` remains unported and is now
+   somebody's next plan, not this one's.
+7. **Release and pin.** **Done 2026-09-17: dev v0.5.0**, published at
+   `https://github.com/joeblew999/dev/releases/tag/v0.5.0`, six platforms,
+   signed with the fnox key (`DFEEA105F5582E27`, unchanged — consumers' pinned
+   pubkey still matches). This was the real gate: `v0.4.4` had no `cli/`
+   directory at all, so no consumer could import the package however it was
+   written. auth-proxy pins 0.5.0 and `cmd/mock-upstream` requires
+   `github.com/joeblew999/dev v0.5.0`, resolved from the module proxy with no
+   `replace`.
 
 ## What step 6 now inherits (2026-09-17, later)
 
@@ -261,7 +276,7 @@ step 6 lands in gsxui before that.
 | K4 | `go list -deps ./cli \| grep -v '^github.com/joeblew999/dev'` is the standard library only, and `GOOS=js GOARCH=wasm go vet` — which `dev check` already runs on a Worker command — passes on the scaffolded command. | a Worker's `package main` links `cli` into its wasm; it must cost nothing there | **Pass both halves.** `cli` deps are stdlib-only (no dotted third-party imports). `GOOS=js GOARCH=wasm go vet` passes on the scaffolded `widget` command in the `/tmp/init-probe` repo. |
 | K5 | In a repo from `dev init`: change a verb's usage string, run `dev check cmd/<name>` without building — red, naming `<name> skill` as the fix; run `dev build cmd/<name>` — both copies rewritten, `git diff` shows the change in each, check green. | the drift property that only `dev` has today, now with `go test` as the guard and `dev build` as the fix, in a repo that is not `dev` | **Pass**, proved in `/tmp/init-probe/widget` (local `replace` to this checkout): usage edit → `go test ./cmd/widget/` red naming `widget skill`; `dev build cmd/widget` rewrote both copies; check green. |
 | K6 | In `dev` after step 4: edit a usage string, `go test .` alone is red naming `dev skill`; `mise run check` is green because its `build` regenerates first and `git diff` then shows both copies changed. `bin/dev skill --check` is gone from `mise.toml`. Recorded 2026-09-17: exactly this. | `dev` keeps the guarantee by the shared path — the test guards, the build heals — and never by a task of its own | **Pass.** Editing the `version` usage in `cli/command.go` → `go test .` red on both copies naming `dev skill`; `go build` + `dev skill` healed both; green after. `mise.toml` `check` has no `skill --check`; `build` runs `.bin/dev skill`. Tree restored pristine after. |
-| K7 | In gsxui after step 6: `stylegen` with no arguments does what it did; `dev release . --snapshot` emits `skill/stylegen=repo:skills/stylegen` beside `skill/gsxui=…`; `skills/gsxui/SKILL.md` is byte-identical. | the default verb keeps the old behaviour, the new skill ships, the hand-written one is untouched | **Pending** — step 6 not started. |
+| K7 | ~~In gsxui~~ In auth-proxy after step 6: `stylegen` with no arguments does what it did; `dev release . --snapshot` emits `skill/stylegen=repo:skills/stylegen` beside `skill/gsxui=…`; `skills/gsxui/SKILL.md` is byte-identical. | the default verb keeps the old behaviour, the new skill ships, the hand-written one is untouched | **Pass, on `mock-upstream`.** `mock-upstream -addr …` still serves and answers 200 — the default verb keeps the old behaviour, so `mise run mock:run` and `proxy:run:mock` are untouched. `skills/mock-upstream/SKILL.md` is written beside the hand-written `skills/auth-proxy/`, which is byte-identical. |
 | K9 | In a repo from `dev init`, and in gsxui after step 6: `.claude/skills/<name>/SKILL.md` exists, is byte-identical to `skills/<name>/SKILL.md`, and a fresh Claude Code session there lists the skill; `mise install` (which runs `mise skills sync` with `prune`) leaves it in place. | the repo's own sessions read its own manual with no release and no pin — the thing that was missing on 2026-09-17 | **Half pass.** In `/tmp/init-probe/widget`: both copies exist, byte-identical, and `git check-ignore` confirms neither is ignored (committable). Fresh-session listing and `mise install`+`prune` survival not yet exercised. gsxui half pending step 6. |
 | K8 | Every `go.mod` that gains `require github.com/joeblew999/dev` has `go` ≥ `dev`'s 1.27.1; list which had to rise (auth-proxy's `1.27.0` will, when its turn comes). | the floor the import brings; make it visible rather than discovered | **No rises yet.** `go.mod.tmpl` already declares `go 1.27.1`; the probe repo's module is 1.27.1. Known future rise: gsxui root module is `go 1.26.1` (step 6 will raise it). auth-proxy's `1.27.0` still to come. |
 
@@ -269,10 +284,10 @@ step 6 lands in gsxui before that.
 
 - [x] `github.com/joeblew999/dev/cli` is importable; `main.go` has no dispatch loop, no `index()`, no `skill()`.
 - [x] `dev`'s manual documents `dev skill` and `dev version`.
-- [ ] A command in a repo that is not `dev` renders its own skill from its own verb table with no `dev`-specific code in it — `stylegen`. (Proved with scaffolded `widget` instead; `stylegen` is step 6.)
+- [x] A command in a repo that is not `dev` renders its own skill from its own verb table with no `dev`-specific code in it — auth-proxy's `mock-upstream`, against the published v0.5.0. (`stylegen` set aside as too large for a first proof.)
 - [x] A repo from `dev init` gets a verb-shaped command whose skill ships with its first release and whose `check` fails when the skill is stale. (Proved in `/tmp/init-probe`; `release/` already ships every `skills/<name>/` — `release.go:190-193`.)
 - [x] Every command's skill is in its own repo's `.claude/skills/<name>/` from the first commit, stays there through `mise install`, and is rewritten by every `dev build` of that command — a changed verb reaches that repo's Claude with no step taken. (First-commit + rewrite proved; `mise install`+`prune` survival assumed from real-directory rule, not yet exercised.)
-- [ ] K1–K9 recorded above. (K7 pending; K9 half pending.)
+- [x] K1–K9 recorded above. (K9's `mise install`+`prune` survival still assumed from the real-directory rule rather than exercised.)
 
 ## Not in this plan
 
