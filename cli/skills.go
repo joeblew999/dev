@@ -1,0 +1,106 @@
+package cli
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+)
+
+// skills is `<cmd> skills`: what every agent in this repo can read, and where
+// each one came from.
+//
+// A skill arrives one of two ways and they are easy to confuse. The repo's own
+// commands write theirs, committed, real directories. A tool the repo pins
+// ships its own, and mise links those in per developer, gitignored. Told
+// apart by whether the entry is a symlink, which is the same thing mise's
+// prune uses to decide what it may remove.
+//
+// It reads the directories rather than asking an agent what it loaded,
+// because an agent is told what is available and cannot enumerate it. The
+// directory is the fact.
+func (c Command) skills(verb string, args []string, stdout, stderr io.Writer) error {
+	if HelpRequested(args) {
+		return ErrHelp
+	}
+	if len(args) > 0 {
+		return Usagef("%s skills takes no arguments", c.Name)
+	}
+	root, err := root(".")
+	if err != nil {
+		return err
+	}
+	seen := map[string][]string{}
+	for _, dir := range []string{ClaudeDir, AgentsDir} {
+		found := read(filepath.Join(root, dir))
+		fmt.Fprintf(stdout, "%s\n", dir)
+		if len(found) == 0 {
+			fmt.Fprintf(stdout, "  (none)\n")
+		}
+		for _, s := range found {
+			fmt.Fprintf(stdout, "  %-22s %s\n", s.name, s.from)
+			seen[s.name] = append(seen[s.name], dir)
+		}
+		fmt.Fprintln(stdout)
+	}
+	// An agent reads one of these directories and not the other, so a skill in
+	// one alone is a skill that agent cannot see. Worth saying, because mise
+	// syncs a pinned tool's skills into .claude and nowhere else.
+	var only []string
+	for name, dirs := range seen {
+		if len(dirs) == 1 {
+			only = append(only, name+" is in "+dirs[0]+" only")
+		}
+	}
+	sort.Strings(only)
+	for _, line := range only {
+		fmt.Fprintf(stdout, "%s\n", line)
+	}
+	return nil
+}
+
+// skill is one entry of an agent's skills directory.
+type skillEntry struct{ name, from string }
+
+// read lists a skills directory, saying where each entry came from.
+func read(dir string) []skillEntry {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var out []skillEntry
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		out = append(out, skillEntry{e.Name(), source(filepath.Join(dir, e.Name()))})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].name < out[j].name })
+	return out
+}
+
+// source is where a skill came from: a symlink is a tool this repo pins, and
+// the version is in the path mise linked to. Anything else the repo wrote.
+func source(path string) string {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return "unreadable"
+	}
+	if fi.Mode()&os.ModeSymlink == 0 {
+		return "this repo"
+	}
+	target, err := os.Readlink(path)
+	if err != nil {
+		return "a pinned tool"
+	}
+	// mise links into <install>/<tool>/<version>/skills/<name>.
+	parts := strings.Split(filepath.ToSlash(target), "/")
+	for i, p := range parts {
+		if p == "skills" && i >= 2 {
+			return "pinned: " + parts[i-2] + " " + parts[i-1]
+		}
+	}
+	return "a pinned tool"
+}

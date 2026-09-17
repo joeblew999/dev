@@ -55,6 +55,17 @@ run = [
   ".bin/dev skill",
 ]
 
+[tasks.dead]
+description = "Code nothing reaches, so a refactor can see what it left behind"
+# A report, never a gate. Dead code is normal mid-refactor and failing a build
+# over it only teaches people to delete things they are about to need. But
+# nothing else says it: go vet and the compiler are both silent on a function
+# no one calls, exported or not, which is how an unused one sat in cli after
+# the signatures stopped needing it.
+#
+# -test counts a test as a caller, so a helper only tests use is not reported.
+run = "deadcode -test ./..."
+
 [tasks.lint]
 description = "hk checks: gofmt, vet, tidy, whitespace, secrets"
 run = "hk check --all"

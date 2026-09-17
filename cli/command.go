@@ -212,6 +212,7 @@ func (c Command) all() map[string]Verb {
 	}
 	own := c.ownUsage()
 	m["skill"] = Verb{Run: c.skill, Args: "[--check]", Desc: "rewrite the manual from the verbs, in all three places it is read", Usage: own}
+	m["skills"] = Verb{Run: c.skills, Desc: "list what every agent in this repo can read, and where each came from", Usage: own}
 	m["version"] = Verb{Run: c.version, Desc: "print the version, to tell a release from a local build", Usage: own}
 	return m
 }

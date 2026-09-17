@@ -112,7 +112,7 @@ func TestEmptyOrderRendersAlphabetically(t *testing.T) {
 	c := Command{Name: "x", Verbs: map[string]Verb{
 		"zebra": {Usage: "z\n"}, "alpha": {Usage: "a\n"}, "middle": {Usage: "m\n"},
 	}}
-	if got, want := c.manualOrder(c.all()), []string{"alpha", "middle", "skill", "version", "zebra"}; !equal(got, want) {
+	if got, want := c.manualOrder(c.all()), []string{"alpha", "middle", "skill", "skills", "version", "zebra"}; !equal(got, want) {
 		t.Errorf("empty Order: got %v, want %v", got, want)
 	}
 }
@@ -122,7 +122,7 @@ func TestOrderLeadsAndTheRestFollow(t *testing.T) {
 	c := Command{Name: "x", Order: []string{"zebra", "alpha"}, Verbs: map[string]Verb{
 		"zebra": {Usage: "z\n"}, "alpha": {Usage: "a\n"}, "middle": {Usage: "m\n"},
 	}}
-	if got, want := c.manualOrder(c.all()), []string{"zebra", "alpha", "middle", "skill", "version"}; !equal(got, want) {
+	if got, want := c.manualOrder(c.all()), []string{"zebra", "alpha", "middle", "skill", "skills", "version"}; !equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
@@ -133,7 +133,7 @@ func TestOrderIgnoresUnknownVerbs(t *testing.T) {
 	c := Command{Name: "x", Order: []string{"gone", "alpha"}, Verbs: map[string]Verb{
 		"alpha": {Usage: "a\n"}, "middle": {Usage: "m\n"},
 	}}
-	if got, want := c.manualOrder(c.all()), []string{"alpha", "middle", "skill", "version"}; !equal(got, want) {
+	if got, want := c.manualOrder(c.all()), []string{"alpha", "middle", "skill", "skills", "version"}; !equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }

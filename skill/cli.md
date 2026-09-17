@@ -160,6 +160,18 @@ func TestDescribed(t *testing.T)  { cli.CheckDescribed(t, app) }
 - `CheckDescribed` fails when a verb has no `Desc`, and when a `usage.md`
   lists verbs instead of explaining them.
 
+## Seeing what an agent can read
+
+`<cmd> skills` lists both agent directories and says where each entry came
+from: a real directory the repo wrote, or a symlink mise made from a tool the
+repo pins. It reads the directories rather than asking an agent what it
+loaded, because an agent is told what is available and cannot enumerate it —
+the directory is the fact.
+
+It also says when a skill is in one directory and not the other, which is a
+skill that agent cannot see. mise syncs a pinned tool's skills into
+`.claude/skills` and nowhere else, so that happens by default.
+
 ## Holding a skill to the code it documents
 
 A verb's signature cannot drift — `cli` renders it from the flags. A skill

@@ -127,6 +127,8 @@ Every command built on this verb system gets these two without writing them.
 
 - `dev skill [--check]`
   rewrite the manual from the verbs, in all three places it is read
+- `dev skills`
+  list what every agent in this repo can read, and where each came from
 - `dev version`
   print the version, to tell a release from a local build
 
