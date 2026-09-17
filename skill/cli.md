@@ -160,6 +160,29 @@ func TestDescribed(t *testing.T)  { cli.CheckDescribed(t, app) }
 - `CheckDescribed` fails when a verb has no `Desc`, and when a `usage.md`
   lists verbs instead of explaining them.
 
+## Holding a skill to the code it documents
+
+A verb's signature cannot drift — `cli` renders it from the flags. A skill
+that explains a library is prose, and prose drifts. This one did, twice in a
+day: it showed a field before the code had it and named a function after the
+code lost it.
+
+```go
+func TestSkillNames(t *testing.T) {
+    skillcheck.Names(t, mySkill, "internal/thing")
+}
+```
+
+`skillcheck.Names` fails when the skill names a function, type or struct field
+no listed package has. Telling an identifier from a placeholder is the whole
+trick: a name needs a lowercase letter in it to count, so `Desc` is checked
+and `DIR` is not, with no list of exceptions to keep.
+
+It is `github.com/joeblew999/dev/cli/skillcheck`, a package of its own because
+it parses Go and `go/parser` is 66 packages. `cli` is linked into every
+command built on it, a Worker's wasm included, so what only a test needs
+stays out of it.
+
 ## The markdown a usage.md may use
 
 Headings, `- ` list items with two-space continuations, paragraphs and inline
