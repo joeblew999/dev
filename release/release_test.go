@@ -26,3 +26,20 @@ func TestSnapshotVersionIsAlwaysSemver(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateNamesEveryArtifactsDownloadURL(t *testing.T) {
+	r := &release{slug: "acme/tool", name: "tool", skills: []string{"skill/tool=repo:skills/tool"}}
+	got := strings.Join(r.createArgs("1.2.3", "abc", "v1.2.3", "", false, []string{"dist/tool_1.2.3_linux_amd64.tar.gz"}), " ")
+	for _, want := range []string{
+		"--url-base https://github.com/acme/tool/releases/download/v1.2.3/ ",
+		"--notes-url https://github.com/acme/tool/releases/tag/v1.2.3 ",
+		"--resource skill/tool=repo:skills/tool dist/tool_1.2.3_linux_amd64.tar.gz",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("create args lack %q:\n%s", want, got)
+		}
+	}
+	if !strings.Contains(strings.Join(r.createArgs("0.0.0-x", "abc", "v0.0.0-x", "k", true, nil), " "), "--key k --no-log") {
+		t.Error("a snapshot did not sign with the throwaway key unlogged")
+	}
+}

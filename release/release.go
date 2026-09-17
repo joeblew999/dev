@@ -183,14 +183,29 @@ func keygen(name string) (string, error) {
 
 // create signs dist/*.tar.gz into dist/packslip.sigstore.json.
 func (r *release) create(version, commit, tag, key string, noLog bool) error {
+	matches, err := filepath.Glob("dist/*.tar.gz")
+	if err != nil || len(matches) == 0 {
+		return fmt.Errorf("no dist/*.tar.gz to sign; goreleaser built nothing")
+	}
+	return run("packslip", r.createArgs(version, commit, tag, key, noLog, matches)...)
+}
+
+// createArgs is the packslip create command line. The download URL of every
+// artifact is the GitHub Release's, said explicitly: packslip infers nothing
+// from --source-repo, and a manifest without URLs is one mise cannot install
+// from (found the hard way on v0.1.0 of this tool).
+func (r *release) createArgs(version, commit, tag, key string, noLog bool, artifacts []string) []string {
+	repo := "https://github.com/" + r.slug
 	args := []string{"create",
 		"--project", "github.com/" + r.slug,
 		"--version", version,
 		"--out", "dist",
 		"--bin", r.name,
-		"--source-repo", "https://github.com/" + r.slug,
+		"--source-repo", repo,
 		"--commit", commit,
 		"--tag", tag,
+		"--url-base", repo + "/releases/download/" + tag + "/",
+		"--notes-url", repo + "/releases/tag/" + tag,
 	}
 	if key != "" {
 		args = append(args, "--key", key)
@@ -201,11 +216,7 @@ func (r *release) create(version, commit, tag, key string, noLog bool) error {
 	for _, s := range r.skills {
 		args = append(args, "--resource", s)
 	}
-	matches, err := filepath.Glob("dist/*.tar.gz")
-	if err != nil || len(matches) == 0 {
-		return fmt.Errorf("no dist/*.tar.gz to sign; goreleaser built nothing")
-	}
-	return run("packslip", append(args, matches...)...)
+	return append(args, artifacts...)
 }
 
 // snapshot builds the artifacts, signs the manifest with a throwaway key and
