@@ -10,7 +10,7 @@ goreleaser = "latest"
 packslip = "latest"
 gh = "latest"
 "go:golang.org/x/tools/cmd/deadcode" = "latest"   # what `mise run dead` reports
-"go:honnef.co/go/tools/cmd/staticcheck" = "latest"   # what `mise run lint` runs after hk
+"go:honnef.co/go/tools/cmd/staticcheck" = "latest"   # an hk step: every commit, and lint
 
 [hooks]
 postinstall = { task = "bootstrap" }
@@ -75,10 +75,11 @@ description = "hk checks: gofmt, vet, tidy, staticcheck, whitespace, secrets"
 run = "hk check --all"
 
 [tasks.check]
-description = "vet, tests (which hold the skill to the verbs), and a snapshot release builds and signs"
+description = "tests (which hold the skill to the verbs), and a snapshot release builds and signs"
 depends = ["build"]
+# No vet here: hk.pkl runs it, on every commit and in lint. Running it again
+# was the same check declared in two files, and test ran it twice.
 run = [
-  "go vet ./...",
   "go test ./...",
   ".bin/dev release . --snapshot",
 ]
