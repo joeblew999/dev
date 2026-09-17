@@ -30,7 +30,9 @@ run = "dev build cmd/proxy"
 run = "dev deploy cmd/proxy"
 ```
 
-Run `dev` with no arguments for every verb.
+Run `dev` with no arguments for every verb. `dev init` writes the stack into a
+new repo; `github.com/joeblew999/hello-stack` is exactly that and nothing
+else, the reference hello world.
 
 ## Working on it
 
