@@ -1,15 +1,8 @@
 ### Secrets
 
-- secrets set
-  store a secret in fnox and push it to the app in DIR; `--generate` makes a
-  random value instead of prompting, `--if-missing` leaves an existing one
-  alone. With `--names`, the project's `NAME<TAB>OWNER` lines, an owner such as
-  a provider name resolves to its secret
-- secrets ci
-  give the repo's GitHub Actions each named secret from fnox (gh secret set,
-  the value on stdin), for what CI must do with a credential: sign a
-  release with the shared key, deploy to Fly as upstream's workflow does
-- secrets push
-  read `NAME<TAB>OWNER` lines on stdin and push each secret from fnox to the
-  app in DIR; a missing one prints TEMPLATE with `{provider}` filled in, and
-  any problem makes the exit code 1
+A secret lives in fnox and nowhere else. These move it from there to wherever
+it is needed — the deployed app, GitHub Actions — and its value never appears
+as a command argument, so it cannot end up in a shell history or a log.
+
+Which secrets an app needs is the repo's business, not the tool's: a repo
+supplies a task that lists them, and these work from that list.

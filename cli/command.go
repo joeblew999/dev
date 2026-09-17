@@ -38,7 +38,8 @@ type Verb struct {
 	Run   Runner
 	Args  string              // the positionals: "DIR", "URL", "DIR [VERSION]"
 	Flags func(*flag.FlagSet) // registers them; Run calls it too, so there is one registration
-	Usage string              // what the verb is for; the signature is rendered
+	Desc  string              // one line: what this verb is for, next to the flags it takes
+	Usage string              // the group's prose: why these verbs exist, what they share
 	Subs  map[string]Verb     // secrets set, deps list: each with its own Args and Flags
 }
 
@@ -162,9 +163,9 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 		// The flag package has printed each flag and what it means; this adds
 		// what the verb is for. Together they are the whole of what a person
 		// needs, and neither is an error.
-		usage := WithSignatures(v.Usage, c.Name, verbs)
-		if entry := helpEntry(usage, c.Name, verb, rest); entry != "" {
-			usage = entry
+		usage := one(c.Name, verbs, helpPath(verb, rest))
+		if usage == "" {
+			usage = one(c.Name, verbs, verb)
 		}
 		fmt.Fprintf(stdout, "\n%s", Flatten(usage))
 		return 0
@@ -181,12 +182,11 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// helpEntry is the usage for what was actually asked about: the verb, or the
-// subcommand under it when there is one. It tries the longest path first and
-// shortens, because a verb's arguments and its subcommands look alike from
-// here — "secrets push" is a subcommand, "check ." is a verb and a directory,
-// and only the usage knows which. Whichever it names is the one that matches.
-func helpEntry(usage, name, verb string, rest []string) string {
+// helpPath is what a help request is about: the verb, and any subcommand
+// after it. A verb's arguments and its subcommands look alike from here —
+// "secrets push" is a subcommand, "check ." is a verb and a directory — so
+// the caller tries this and falls back to the verb alone.
+func helpPath(verb string, rest []string) string {
 	path := verb
 	for _, arg := range rest {
 		if arg == "--" || strings.HasPrefix(arg, "-") {
@@ -194,17 +194,7 @@ func helpEntry(usage, name, verb string, rest []string) string {
 		}
 		path += " " + arg
 	}
-	for path != "" {
-		if entry := Entry(usage, name, path); entry != "" {
-			return entry
-		}
-		cut := strings.LastIndex(path, " ")
-		if cut < 0 {
-			return ""
-		}
-		path = path[:cut]
-	}
-	return ""
+	return path
 }
 
 // all is the table plus the two verbs every command has.
@@ -214,8 +204,8 @@ func (c Command) all() map[string]Verb {
 		m[name] = v
 	}
 	own := c.ownUsage()
-	m["skill"] = Verb{Run: c.skill, Args: "[--check]", Usage: own}
-	m["version"] = Verb{Run: c.version, Usage: own}
+	m["skill"] = Verb{Run: c.skill, Args: "[--check]", Desc: "rewrite the manual from the verbs, in all three places it is read", Usage: own}
+	m["version"] = Verb{Run: c.version, Desc: "print the version, to tell a release from a local build", Usage: own}
 	return m
 }
 
@@ -268,70 +258,81 @@ func (c Command) manualOrder(verbs map[string]Verb) []string {
 	return names
 }
 
-// usages is every distinct usage, in the manual's order, each once.
-func (c Command) usages() []string {
+// group is one section of a manual: the prose a person wrote for it, and the
+// verbs that share that prose, in the order the manual reads them.
+type group struct {
+	prose string
+	paths []string
+}
+
+// groups are the manual's sections. Verbs that share a Usage share a section —
+// build, wasm, check, run and workerd are all stage's — and each appears once.
+func (c Command) groups() []group {
 	verbs := c.all()
-	names := c.manualOrder(verbs)
-	seen := map[string]bool{}
-	var out []string
-	for _, name := range names {
+	var out []group
+	at := map[string]int{}
+	for _, name := range c.manualOrder(verbs) {
 		u := verbs[name].Usage
-		if !seen[u] {
-			seen[u] = true
-			out = append(out, u)
+		i, seen := at[u]
+		if !seen {
+			at[u] = len(out)
+			out = append(out, group{prose: u})
+			i = len(out) - 1
 		}
+		out[i].paths = append(out[i].paths, name)
 	}
 	return out
 }
 
-// index is what the binary prints with no verb: every usage, flattened,
+// index is what the binary prints with no verb: every section, flattened,
 // because a terminal has no markdown renderer.
 func (c Command) index() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s: every verb. `%s <verb> --help` says what one takes.\n\n", c.Name, c.Name)
-	for _, u := range c.usages() {
-		b.WriteString(Flatten(WithSignatures(u, c.Name, c.all())))
+	for _, g := range c.groups() {
+		b.WriteString(Flatten(c.section(g)))
 		b.WriteString("\n")
 	}
 	return b.String()
 }
 
-// render is the manual: Head, every usage, Tail. Markdown usage goes in as
-// the markdown it is, so its headings, inline code and lists are the manual's
-// own. Plain text is fenced, as every usage was before this package read
-// markdown.
-//
-// That is what keeps a repo that has not ported yet correct. Its usage is
-// hand-aligned columns with no markdown in it, and unfenced a renderer
-// collapses the alignment, runs every verb into one paragraph and eats any
-// `<placeholder>` as an HTML tag — a manual quietly made worse by upgrading.
-// Fencing legacy text means a repo ports when it chooses rather than when it
-// bumps a pin.
+// section is a group as the manual shows it: the prose a person wrote, then
+// the verbs, rendered. The prose says why the group exists; nothing in it
+// names a verb or a flag, because those are below it and generated.
+func (c Command) section(g group) string {
+	prose := strings.TrimRight(g.prose, "\n")
+	verbs := Verbs(c.Name, c.all(), g.paths)
+	if prose == "" {
+		return verbs
+	}
+	return prose + "\n\n" + verbs
+}
+
+// render is the manual: Head, every section, Tail.
 func (c Command) render() string {
 	var b strings.Builder
-	b.WriteString(c.Head)
-	for _, u := range c.usages() {
-		u = WithSignatures(u, c.Name, c.all())
-		if isMarkdown(u) {
-			b.WriteString(strings.TrimRight(u, "\n") + "\n\n")
-		} else {
-			b.WriteString("```\n" + u + "```\n\n")
-		}
+	b.WriteString(withProvenance(c.Head, c.Name))
+	for _, g := range c.groups() {
+		b.WriteString(strings.TrimRight(c.section(g), "\n") + "\n\n")
 	}
 	b.WriteString(c.Tail)
 	return b.String()
 }
 
-// isMarkdown reports whether a usage string uses the markdown shape — a
-// heading or a list item. Anything else is the plain text this package took
-// before, and is rendered the way that text has always been rendered.
-func isMarkdown(usage string) bool {
-	for _, line := range strings.Split(usage, "\n") {
-		if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "#") {
-			return true
-		}
+// withProvenance puts a line under a manual's frontmatter saying what wrote
+// it and from what. A generated file that does not say it is generated is a
+// file someone edits, and the edit is gone at the next build with nothing to
+// say it ever happened.
+func withProvenance(head, name string) string {
+	note := "<!-- Generated by `" + name + " skill` from the verbs and the prose beside them.\n" +
+		"     Never edit this file. Signatures come from each verb's Args and Flags,\n" +
+		"     the line under one from its Desc, and the prose from a usage.md,\n" +
+		"     head.md and tail.md. `go test` fails when this copy is stale. -->\n\n"
+	lines := strings.SplitN(head, "---\n", 3)
+	if len(lines) == 3 && strings.TrimSpace(lines[0]) == "" {
+		return "---\n" + lines[1] + "---\n\n" + note + strings.TrimLeft(lines[2], "\n")
 	}
-	return false
+	return note + head
 }
 
 // paths are the manual's copies: the one the release ships, and the ones

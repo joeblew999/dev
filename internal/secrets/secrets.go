@@ -37,9 +37,9 @@ var Usage string
 // registers the same ones — so `dev secrets push --help` and the manual show
 // the same flags because they are the same registration.
 var Subs = map[string]cli.Verb{
-	"set":  {Args: "DIR NAME|OWNER", Flags: SetFlags},
-	"push": {Args: "DIR", Flags: PushFlags},
-	"ci":   {Args: "NAME..."},
+	"set":  {Args: "DIR NAME|OWNER", Flags: SetFlags, Desc: "store one secret and push it to the app, in a single step"},
+	"push": {Args: "DIR", Flags: PushFlags, Desc: "push every secret an app needs, read as a list on stdin"},
+	"ci":   {Args: "NAME...", Desc: "give GitHub Actions the secrets it needs to sign and deploy"},
 }
 
 // EnvFlag is the environment every secrets subcommand pushes to.

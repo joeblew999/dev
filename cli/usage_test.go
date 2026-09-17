@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"flag"
 	"io"
 	"strings"
 	"testing"
@@ -201,30 +202,6 @@ func TestProseMayUseMarkdownFlattenCannotRead(t *testing.T) {
 	}
 }
 
-// A repo that has not ported still holds plain text in its Usage. Unfenced,
-// markdown collapses its column alignment, runs every verb into one paragraph
-// and eats `<app>` as an HTML tag — a manual made worse by bumping a pin. So
-// legacy text is fenced, exactly as it was before this package read markdown.
-func TestLegacyPlainTextUsageStaysFenced(t *testing.T) {
-	legacy := "hello serve [--addr HOST:PORT]    answer /health\nhello ping DIR                    reach <app>.fly.dev\n"
-	c := Command{Name: "hello", Verbs: map[string]Verb{"serve": {Usage: legacy}}, Head: "# hello\n\n", Tail: "## Rules\n"}
-	got := c.render()
-	if !strings.Contains(got, "```\n"+legacy+"```") {
-		t.Errorf("legacy usage must be fenced, got:\n%s", got)
-	}
-}
-
-// Ported usage is markdown and must not be fenced, or its headings and lists
-// would show as literal text.
-func TestMarkdownUsageIsNotFenced(t *testing.T) {
-	c := Command{Name: "hello", Verbs: map[string]Verb{
-		"serve": {Usage: "### Serving\n\n- `hello serve`\n  answer `/health`\n"},
-	}}
-	if got := c.render(); strings.Contains(got, "```\n### Serving") {
-		t.Errorf("markdown usage must not be fenced, got:\n%s", got)
-	}
-}
-
 // Flatten must leave legacy text alone: the terminal showed it correctly
 // before and has to keep doing so while a repo is unported.
 func TestFlattenLeavesLegacyTextUnchanged(t *testing.T) {
@@ -249,41 +226,11 @@ func TestHelpIsNotAnError(t *testing.T) {
 	}
 }
 
-// Verbs share a usage — build, wasm, check, run and workerd are all stage's —
-// so help for one must not answer with all five.
-func TestHelpShowsOnlyTheVerbAsked(t *testing.T) {
-	shared := "### Doing\n\n- `x go`\n  what it is for\n- `x stop`\n  something else\n"
-	c := Command{Name: "x", Verbs: map[string]Verb{
-		"go":   {Usage: shared, Run: func(string, []string, io.Writer, io.Writer) error { return ErrHelp }},
-		"stop": {Usage: shared, Run: func(string, []string, io.Writer, io.Writer) error { return ErrHelp }},
-	}}
-	var out, errOut strings.Builder
-	c.run([]string{"go", "--help"}, &out, &errOut)
-	if strings.Contains(out.String(), "something else") {
-		t.Errorf("help for `go` leaked `stop`: %q", out.String())
-	}
-}
-
-// Entry finds a verb's own list item, and says so when the usage is legacy
-// plain text that has no items to find.
-func TestEntryFindsOneVerbOrNothing(t *testing.T) {
-	md := "### Doing\n\n- `x go`\n  what it is for\n- `x stop`\n  something else\n"
-	if got := Entry(md, "x", "go"); got != "- `x go`\n  what it is for\n" {
-		t.Errorf("Entry: got %q", got)
-	}
-	if got := Entry(md, "x", "missing"); got != "" {
-		t.Errorf("a verb not named should give nothing, got %q", got)
-	}
-	if got := Entry("x go    what it is for\n", "x", "go"); got != "" {
-		t.Errorf("legacy plain text has no items, got %q", got)
-	}
-}
-
 func testHelpCommand() Command {
 	return Command{Name: "x", Verbs: map[string]Verb{
 		"go": {
-			Usage: "### Doing\n\n- `x go`\n  what it is for\n",
-			Run:   func(string, []string, io.Writer, io.Writer) error { return ErrHelp },
+			Desc: "what it is for",
+			Run:  func(string, []string, io.Writer, io.Writer) error { return ErrHelp },
 		},
 	}}
 }
@@ -317,48 +264,6 @@ func TestTopLevelHelpAnswersRatherThanCorrects(t *testing.T) {
 	}
 }
 
-// Subcommands share their parent's usage, so help for one must find that one.
-// "secrets" used to match "secrets set" and answer the wrong question.
-func TestEntryMatchesWholeWordsOnly(t *testing.T) {
-	md := "### Secrets\n\n" +
-		"- `x secrets set DIR NAME`\n  store one\n" +
-		"- `x secrets push DIR [--fix T]`\n  push them\n" +
-		"- `x check DIR`\n  check it\n" +
-		"- `x deps list`\n  list them\n"
-	for path, want := range map[string]string{
-		"secrets set":  "store one",
-		"secrets push": "push them",
-		"check":        "check it",
-		"deps list":    "list them",
-	} {
-		if got := Entry(md, "x", path); !strings.Contains(got, want) {
-			t.Errorf("Entry(%q) = %q, want it to contain %q", path, got, want)
-		}
-	}
-	// A parent names its children, not itself: answering "secrets" with the
-	// first child would be answering a question nobody asked.
-	if got := Entry(md, "x", "secrets"); got != "" {
-		t.Errorf("Entry(\"secrets\") should match no single item, got %q", got)
-	}
-	// And a path must not match mid-word.
-	if got := Entry(md, "x", "chec"); got != "" {
-		t.Errorf("Entry(\"chec\") should not match \"check\", got %q", got)
-	}
-}
-
-// A verb's arguments and its subcommands look alike from the outside — "check
-// ." is a directory, "secrets push" is a subcommand — so the lookup tries the
-// longest path and shortens until the usage says which it was.
-func TestHelpEntryPrefersTheLongestPathThatExists(t *testing.T) {
-	md := "- `x secrets push DIR`\n  push them\n- `x check DIR`\n  check it\n"
-	if got := helpEntry(md, "x", "secrets", []string{"push", "--help"}); !strings.Contains(got, "push them") {
-		t.Errorf("subcommand: got %q", got)
-	}
-	if got := helpEntry(md, "x", "check", []string{".", "--help"}); !strings.Contains(got, "check it") {
-		t.Errorf("verb with a directory: got %q", got)
-	}
-}
-
 // Everything after a bare -- belongs to the program being run, so its --help
 // is not ours to answer.
 func TestHelpRequestedStopsAtTheDoubleDash(t *testing.T) {
@@ -367,5 +272,44 @@ func TestHelpRequestedStopsAtTheDoubleDash(t *testing.T) {
 	}
 	if HelpRequested([]string{"DIR", "--", "--help"}) {
 		t.Error("--help after -- belongs to the program being run")
+	}
+}
+
+// A verb's line is rendered from its own Desc, beside the signature rendered
+// from its Args and Flags. Nothing is read out of a usage.md to find it, so
+// the two cannot disagree about which verb they describe.
+func TestVerbsRendersSignatureAndDescription(t *testing.T) {
+	c := Command{Name: "x", Verbs: map[string]Verb{
+		"go": {Args: "DIR", Desc: "do the thing", Flags: func(fs *flag.FlagSet) {
+			fs.String("mode", "", "the `MODE` to use")
+		}},
+	}}
+	got := Verbs("x", c.all(), []string{"go"})
+	want := "- `x go DIR [--mode MODE]`\n  do the thing\n"
+	if got != want {
+		t.Errorf("Verbs:\n got %q\nwant %q", got, want)
+	}
+}
+
+// A group's prose explains why its verbs exist; it must not list them, or the
+// list becomes a second copy of what is rendered under it.
+func TestProseMayNotListVerbs(t *testing.T) {
+	c := Command{Name: "x", Verbs: map[string]Verb{
+		"go": {Desc: "do it", Usage: "### Doing\n\n- go\n  do it\n"},
+	}}
+	var f fakeTB
+	CheckDescribed(&f, c)
+	if len(f.errs) == 0 {
+		t.Error("a usage.md listing a verb should fail")
+	}
+}
+
+// A verb with nothing said about it reaches the manual as a bare signature.
+func TestVerbMustSayWhatItIsFor(t *testing.T) {
+	c := Command{Name: "x", Verbs: map[string]Verb{"go": {Args: "DIR"}}}
+	var f fakeTB
+	CheckDescribed(&f, c)
+	if len(f.errs) == 0 {
+		t.Error("a verb with no Desc should fail")
 	}
 }

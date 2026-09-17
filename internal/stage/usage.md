@@ -1,13 +1,9 @@
 ### Stages
 
-- build
-  npm ci when stale, vite build, gsx generate, go build to `.bin/<dir>`, its
-  skill if it is a `cli.Command`
-- wasm
-  the Worker's wasm for the environment (`build/tinygo` means TinyGo)
-- check
-  gsx fmt, vet, test, the workerd round trip, the browser probe
-- run
-  `.bin/<dir>` under fnox, replacing this process
-- workerd
-  the Worker on local workerd (wrangler dev)
+Every command goes through the same stages, whatever it is made of. A stage
+reads the directory to decide what applies — a Go main, a package.json, gsx
+sources, a wrangler.toml — so the same verb works on a plain command, a
+Worker and a UI without being told which it is.
+
+Run them through their mise tasks rather than by hand, so what you run
+locally is what CI runs.

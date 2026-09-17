@@ -27,8 +27,8 @@ var Usage string
 // Subs are deps' subcommands. Neither takes a flag, so each declares only
 // that it takes none; cli renders `dev deps list` from the names alone.
 var Subs = map[string]cli.Verb{
-	"list":    {},
-	"upgrade": {},
+	"list":    {Desc: "show which Go dependencies have newer versions, across every module"},
+	"upgrade": {Desc: "walk through those upgrades and pick the ones you want"},
 }
 
 func Run(verb string, args []string, stdout, stderr io.Writer) error {

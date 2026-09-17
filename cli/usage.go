@@ -246,34 +246,41 @@ func endsOnAWord(rest string) bool {
 	return !(next[0] >= 'a' && next[0] <= 'z')
 }
 
-// WithSignatures replaces each list item's first line with the signature
-// rendered from that verb's own Args and Flags. A usage.md therefore names a
-// verb and describes it; what it takes is never typed there.
+// Verbs renders the verb list for a group: one signature per verb, each with
+// its own one-line Desc under it. Nothing here is written by hand — the
+// signature comes from Args and Flags, the line from Desc — so a usage.md
+// carries only the prose that explains why the group exists.
 //
-//   - check
-//     gsx fmt, vet, test, the workerd round trip
-//
-// becomes
-//
-//   - `dev check DIR [--path P] [--expect TEXT]`
-//     gsx fmt, vet, test, the workerd round trip
-//
-// An item naming something that is not a verb is left alone, so prose and a
-// usage still written the old way both survive untouched.
-func WithSignatures(md, name string, verbs map[string]Verb) string {
-	lines := strings.Split(md, "\n")
-	for i, line := range lines {
-		if !strings.HasPrefix(line, "- ") {
-			continue
-		}
-		path := strings.TrimSpace(strings.Trim(line[2:], "`"))
-		v, sub, ok := lookup(verbs, path)
+// paths are the verbs this group covers, in the order the manual reads them.
+func Verbs(name string, verbs map[string]Verb, paths []string) string {
+	var b strings.Builder
+	for _, path := range paths {
+		v, _, ok := lookup(verbs, path)
 		if !ok {
 			continue
 		}
-		lines[i] = "- `" + v.Signature(name, sub) + "`"
+		if len(v.Subs) > 0 {
+			for _, sub := range sortedVerbs(v.Subs) {
+				b.WriteString(one(name, verbs, path+" "+sub))
+			}
+			continue
+		}
+		b.WriteString(one(name, verbs, path))
 	}
-	return strings.Join(lines, "\n")
+	return b.String()
+}
+
+// one is a single verb as the manual shows it: its signature, then its line.
+func one(name string, verbs map[string]Verb, path string) string {
+	v, _, ok := lookup(verbs, path)
+	if !ok {
+		return ""
+	}
+	out := "- `" + v.Signature(name, path) + "`\n"
+	if v.Desc != "" {
+		out += "  " + v.Desc + "\n"
+	}
+	return out
 }
 
 // lookup finds the verb a path names, following Subs for "secrets push", and
@@ -297,34 +304,37 @@ func lookup(verbs map[string]Verb, path string) (Verb, string, bool) {
 	return v, path, true
 }
 
-// CheckFlags is check I7 of the i18n plan, made a test: every flag a verb
-// registers appears in the rendered manual, and every flag the manual shows
-// is registered.
+// CheckDescribed fails when a verb says nothing about itself, or when a
+// group's prose does what the rendering does.
 //
-// It cannot fail while a signature is rendered from the same registration the
-// parser uses — that is the point of rendering it. It exists for the case
-// that undid the first attempt: a verb whose usage still writes its own
-// signature by hand. Then the two are separate again, and this is what says
-// so rather than a person reading both.
-func CheckFlags(t TB, c Command) {
+// Check I7 of the i18n plan — "the rendered skill carries every flag in the
+// verb table" — needs no test any more: a signature is rendered from the
+// flags a verb registers and there is nowhere else to write one. What can
+// still go wrong is a verb with no Desc, which reaches the manual as a bare
+// signature, and prose that lists verbs or flags by hand, which is how the
+// second copy grew last time.
+func CheckDescribed(t TB, c Command) {
 	t.Helper()
 	verbs := c.all()
 	for _, name := range sortedVerbs(verbs) {
-		check(t, c, verbs, name, verbs[name])
-	}
-}
-
-// check holds one verb, then each of its subcommands, to its own manual.
-func check(t TB, c Command, verbs map[string]Verb, path string, v Verb) {
-	rendered := WithSignatures(v.Usage, c.Name, verbs)
-	if entry := Entry(rendered, c.Name, path); entry != "" {
-		for _, f := range v.flagSpecs() {
-			if !strings.Contains(entry, f) {
-				t.Errorf("%s %s registers %s and the manual does not show it; the signature is rendered from the flags, so a usage.md that writes its own is the only way this happens", c.Name, path, f)
+		described(t, c, verbs[name], name)
+		for _, line := range strings.Split(verbs[name].Usage, "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "- ") {
+				t.Errorf("%s: a usage.md lists something: %q. The verbs are rendered under the prose; a list here is a second copy of them", c.Name, strings.TrimSpace(line))
 			}
 		}
 	}
+}
+
+// described reports a verb, or a subcommand, that says nothing about itself.
+func described(t TB, c Command, v Verb, path string) {
+	if len(v.Subs) == 0 {
+		if v.Desc == "" {
+			t.Errorf("%s %s has no Desc; it reaches the manual as a signature with nothing said about it", c.Name, path)
+		}
+		return
+	}
 	for _, sub := range sortedVerbs(v.Subs) {
-		check(t, c, verbs, path+" "+sub, v.Subs[sub])
+		described(t, c, v.Subs[sub], path+" "+sub)
 	}
 }
