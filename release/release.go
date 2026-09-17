@@ -353,11 +353,14 @@ func (r *release) publish(version string) error {
 	if err := run("goreleaser", "release", "--clean", "--config", r.config, "--release-notes", notes.Name()); err != nil {
 		return err
 	}
+	// A local release signs with a throwaway key, and the signature goes to
+	// the transparency log: mise refuses a bundle with no log entry. (A
+	// snapshot is never installed, so only it signs unlogged.)
 	key, err := keygen("packslip-local.key")
 	if err != nil {
 		return err
 	}
-	if err := r.create(strings.TrimPrefix(tag, "v"), commit, tag, key, true); err != nil {
+	if err := r.create(strings.TrimPrefix(tag, "v"), commit, tag, key, false); err != nil {
 		return err
 	}
 	// goreleaser created the release when it published; upload into it, or
