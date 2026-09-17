@@ -8,6 +8,7 @@ package stage
 
 import (
 	_ "embed"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -334,6 +335,22 @@ func Check(out io.Writer, path, reqPath, expect string) error {
 //go:embed usage.md
 var Usage string
 
+// EnvFlag, CheckFlags and the rest are each verb's flags, registered in one
+// place. main.go hands them to cli, which renders the signature from them;
+// Run calls the same function and reads the values back by name. One
+// registration, so a flag cannot exist without appearing in the manual.
+
+// EnvFlag is the wrangler environment, taken by wasm and workerd.
+func EnvFlag(fs *flag.FlagSet) {
+	fs.String("env", "", "wrangler environment `NAME`")
+}
+
+// CheckFlags are what `check` requests and expects of the smoke check.
+func CheckFlags(fs *flag.FlagSet) {
+	fs.String("path", "/", "the path `P` the smoke check and the browser probe request")
+	fs.String("expect", "", "the `TEXT` the smoke check's body must contain")
+}
+
 // Run is every stage verb. DIR comes first; flags may follow anywhere.
 func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	fs := cli.Flags(verb, stderr)
@@ -345,20 +362,19 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 		}
 		return Build(stdout, dir, false, "")
 	case "wasm":
-		env := fs.String("env", "", "wrangler environment")
+		EnvFlag(fs)
 		dir, _, err := cli.DirAnd(fs, args, 0)
 		if err != nil {
 			return err
 		}
-		return Build(stdout, dir, true, *env)
+		return Build(stdout, dir, true, cli.Value(fs, "env"))
 	case "check":
-		path := fs.String("path", "/", "what the smoke check and the browser probe request")
-		expect := fs.String("expect", "", "text the smoke check's body must contain")
+		CheckFlags(fs)
 		dir, _, err := cli.DirAnd(fs, args, 0)
 		if err != nil {
 			return err
 		}
-		return Check(stdout, dir, *path, *expect)
+		return Check(stdout, dir, cli.Value(fs, "path"), cli.Value(fs, "expect"))
 	case "run":
 		dir, rest, err := cli.DirAnd(fs, args, -1)
 		if err != nil {
@@ -366,12 +382,12 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 		}
 		return Exec(dir, false, "", rest)
 	case "workerd":
-		env := fs.String("env", "", "wrangler environment")
+		EnvFlag(fs)
 		dir, rest, err := cli.DirAnd(fs, args, -1)
 		if err != nil {
 			return err
 		}
-		return Exec(dir, true, *env, rest)
+		return Exec(dir, true, cli.Value(fs, "env"), rest)
 	}
 	return cli.Usagef("stage: unknown verb %q", verb)
 }

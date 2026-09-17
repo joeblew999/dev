@@ -44,11 +44,11 @@ var cliSkill string
 var dev = cli.Command{
 	Name: "dev",
 	Verbs: map[string]cli.Verb{
-		"build":   {Run: stage.Run, Usage: stage.Usage},
-		"wasm":    {Run: stage.Run, Usage: stage.Usage},
-		"check":   {Run: stage.Run, Usage: stage.Usage},
-		"run":     {Run: stage.Run, Usage: stage.Usage},
-		"workerd": {Run: stage.Run, Usage: stage.Usage},
+		"build":   {Run: stage.Run, Args: "DIR", Usage: stage.Usage},
+		"wasm":    {Run: stage.Run, Args: "DIR", Flags: stage.EnvFlag, Usage: stage.Usage},
+		"check":   {Run: stage.Run, Args: "DIR", Flags: stage.CheckFlags, Usage: stage.Usage},
+		"run":     {Run: stage.Run, Args: "DIR [-- ARGS]", Usage: stage.Usage},
+		"workerd": {Run: stage.Run, Args: "DIR [-- ARGS]", Flags: stage.EnvFlag, Usage: stage.Usage},
 		"deploy":  {Run: app.Run, Usage: app.Usage},
 		"url":     {Run: app.Run, Usage: app.Usage},
 		"logs":    {Run: app.Run, Usage: app.Usage},

@@ -245,3 +245,54 @@ func endsOnAWord(rest string) bool {
 	// lowercase word, and means this path names its parent, not it.
 	return !(next[0] >= 'a' && next[0] <= 'z')
 }
+
+// WithSignatures replaces each list item's first line with the signature
+// rendered from that verb's own Args and Flags. A usage.md therefore names a
+// verb and describes it; what it takes is never typed there.
+//
+//   - check
+//     gsx fmt, vet, test, the workerd round trip
+//
+// becomes
+//
+//   - `dev check DIR [--path P] [--expect TEXT]`
+//     gsx fmt, vet, test, the workerd round trip
+//
+// An item naming something that is not a verb is left alone, so prose and a
+// usage still written the old way both survive untouched.
+func WithSignatures(md, name string, verbs map[string]Verb) string {
+	lines := strings.Split(md, "\n")
+	for i, line := range lines {
+		if !strings.HasPrefix(line, "- ") {
+			continue
+		}
+		path := strings.TrimSpace(strings.Trim(line[2:], "`"))
+		v, sub, ok := lookup(verbs, path)
+		if !ok {
+			continue
+		}
+		lines[i] = "- `" + v.Signature(name, sub) + "`"
+	}
+	return strings.Join(lines, "\n")
+}
+
+// lookup finds the verb a path names, following Subs for "secrets push", and
+// returns it with the path as the signature should print it.
+func lookup(verbs map[string]Verb, path string) (Verb, string, bool) {
+	parts := strings.Fields(path)
+	if len(parts) == 0 {
+		return Verb{}, "", false
+	}
+	v, ok := verbs[parts[0]]
+	if !ok {
+		return Verb{}, "", false
+	}
+	for _, p := range parts[1:] {
+		sub, ok := v.Subs[p]
+		if !ok {
+			return Verb{}, "", false
+		}
+		v = sub
+	}
+	return v, path, true
+}

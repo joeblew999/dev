@@ -34,11 +34,11 @@ everything after a bare `--` goes to the program being run.
   skill if it is a `cli.Command`
 - `dev wasm DIR [--env NAME]`
   the Worker's wasm for the environment (`build/tinygo` means TinyGo)
-- `dev check DIR [--path P] [--expect TEXT]`
+- `dev check DIR [--expect TEXT] [--path P]`
   gsx fmt, vet, test, the workerd round trip, the browser probe
 - `dev run DIR [-- ARGS]`
   `.bin/<dir>` under fnox, replacing this process
-- `dev workerd DIR [--env NAME]`
+- `dev workerd DIR [-- ARGS] [--env NAME]`
   the Worker on local workerd (wrangler dev)
 
 ### Deploying

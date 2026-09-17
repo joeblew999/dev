@@ -19,16 +19,16 @@ func testCommand() Command {
 		Head:    "---\nname: tool\n---\n\n# tool\n\n",
 		Tail:    "## Rules\n\n- one\n",
 		Verbs: map[string]Verb{
-			"build": {func(verb string, args []string, stdout, stderr io.Writer) error {
+			"build": {Run: func(verb string, args []string, stdout, stderr io.Writer) error {
 				_, err := stdout.Write([]byte("built\n"))
 				return err
-			}, stage},
-			"check": {func(verb string, args []string, stdout, stderr io.Writer) error {
+			}, Usage: stage},
+			"check": {Run: func(verb string, args []string, stdout, stderr io.Writer) error {
 				if len(args) == 0 {
 					return Usagef("check: the directory comes first")
 				}
 				return errors.New("boom")
-			}, stage},
+			}, Usage: stage},
 		},
 	}
 }

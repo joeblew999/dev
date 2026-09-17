@@ -160,3 +160,22 @@ func Confirm(stdin io.Reader, out io.Writer, prompt string) bool {
 	answer := strings.ToLower(strings.TrimSpace(line))
 	return answer == "y" || answer == "yes"
 }
+
+// Value is a parsed flag's value by name, for a verb that registers its flags
+// through a func rather than holding each pointer. The registration is one
+// place so that cli can render a signature from it; reading back by name is
+// what that costs, and it costs nothing at the call site.
+//
+// An unregistered name gives "", because a verb asking for a flag it never
+// registered is a bug in the verb, not a condition to handle at runtime.
+func Value(fs *flag.FlagSet, name string) string {
+	if f := fs.Lookup(name); f != nil {
+		return f.Value.String()
+	}
+	return ""
+}
+
+// Given reports whether a bool flag registered by name is set.
+func Given(fs *flag.FlagSet, name string) bool {
+	return Value(fs, name) == "true"
+}
