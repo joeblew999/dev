@@ -2,7 +2,7 @@ package session
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/BurntSushi/toml"
 )
@@ -74,6 +74,6 @@ func (p pins) names() []string {
 	for name := range p.Source {
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	return names
 }

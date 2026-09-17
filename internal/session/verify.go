@@ -8,7 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 )
@@ -159,7 +159,7 @@ func sessionSkills() ([]string, string, error) {
 			names = append(names, name)
 		}
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	return names, string(answer), nil
 }
 
@@ -203,7 +203,7 @@ func arrivalAdvice(arrived []string) string {
 		for plugin := range plugins {
 			names = append(names, plugin)
 		}
-		sort.Strings(names)
+		slices.Sort(names)
 		return fmt.Sprintf("these came from the %s plugin(s); add them to blocked_plugins in %s, then: %s",
 			strings.Join(names, ", "), pinsFile, syncCmd)
 	}
@@ -232,7 +232,7 @@ func lockedSkillNames() ([]string, error) {
 			names = append(names, name)
 		}
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	return names, nil
 }
 
@@ -271,7 +271,7 @@ func parseSessionLock(data string) (names []string, recordedBy string) {
 			names = append(names, line)
 		}
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	return names, recordedBy
 }
 

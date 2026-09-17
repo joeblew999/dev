@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -126,7 +126,7 @@ func created(before, after []byte) ([]string, error) {
 		}
 		out = append(out, line)
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out, nil
 }
 

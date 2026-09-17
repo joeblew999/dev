@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -204,7 +204,7 @@ func writeLocal(path, key, value string) error {
 	for k := range env {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	var b strings.Builder
 	b.WriteString("# Written by `dev url` from the Cloudflare account in fnox. Gitignored: it is\n")
 	b.WriteString("# this clone's. After switching accounts: dev url DIR --deployed --refresh\n")

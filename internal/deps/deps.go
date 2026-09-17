@@ -8,7 +8,7 @@ import (
 	"io/fs"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"slices"
 
 	"github.com/joeblew999/dev/cli"
 )
@@ -75,6 +75,6 @@ func Modules(root string) ([]string, error) {
 		}
 		return nil
 	})
-	sort.Strings(dirs)
+	slices.Sort(dirs)
 	return dirs, err
 }

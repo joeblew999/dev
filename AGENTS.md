@@ -85,6 +85,24 @@ and green first.
 - **`mise run dead` is a report, not a gate.** Dead code is normal mid-refactor;
   the point is to see what a change left behind, not to fail on it.
 
+## Modern Go
+
+This module is `go 1.27`, so write 1.22–1.27 Go and not the workarounds that
+predate it.
+
+- `for i := range n`, not `for i := 0; i < n; i++`.
+- No `v := v` before a closure or goroutine: loop variables stopped being
+  shared in 1.22.
+- `slices` and `maps` for sorting, searching, cloning and comparing — not
+  `sort` and not a hand-written loop. `slices.Sort`, `slices.SortFunc`,
+  `slices.Contains`, `slices.Equal`.
+- The built-in `min` and `max`.
+- `net/http`'s own `ServeMux` with `"GET /thing/{id}"` and `r.PathValue("id")`;
+  no third-party router.
+- `log/slog` for structured logging; no logrus, no zap.
+- `iter.Seq` and `iter.Seq2` for a collection worth ranging over.
+- `errors.Join` to accumulate, `fmt.Errorf("...: %w", err)` to wrap.
+
 ## Layout
 
 | Path | Owns |

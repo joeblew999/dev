@@ -12,7 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 )
@@ -119,7 +119,7 @@ func pinnedSkills() (skillFiles, error) {
 		}
 	}
 
-	sort.Strings(lock)
+	slices.Sort(lock)
 	files[lockFile] = []byte(strings.Join(lock, "\n") + "\n")
 	return files, nil
 }
@@ -185,7 +185,8 @@ func removeEmptyDirs(dir string) {
 		}
 		return nil
 	})
-	sort.Sort(sort.Reverse(sort.StringSlice(dirs)))
+	// Deepest first, so a directory is removed after what it holds.
+	slices.SortFunc(dirs, func(a, b string) int { return strings.Compare(b, a) })
 	for _, d := range dirs {
 		_ = os.Remove(d)
 	}
@@ -208,7 +209,7 @@ func diffFiles(have, want skillFiles) []string {
 			diff = append(diff, "unexpected: "+name)
 		}
 	}
-	sort.Strings(diff)
+	slices.Sort(diff)
 	return diff
 }
 

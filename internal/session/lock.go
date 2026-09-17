@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -54,7 +54,7 @@ func diffLocked(have skillFiles, want map[string]string) []string {
 			diff = append(diff, "missing: "+name)
 		}
 	}
-	sort.Strings(diff)
+	slices.Sort(diff)
 	return diff
 }
 
@@ -79,7 +79,7 @@ func lockSkill(name, source string, files skillFiles) string {
 			names = append(names, file)
 		}
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	for _, file := range names {
 		lines = append(lines, fmt.Sprintf("%s\t%s", file, hashFile(files[file])))
 	}
@@ -95,6 +95,6 @@ func sortedFiles(files skillFiles) []string {
 		}
 		names = append(names, file)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	return names
 }

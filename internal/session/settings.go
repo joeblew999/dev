@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 	"reflect"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -106,7 +106,7 @@ func diffSettings(have, want map[string]any) []string {
 			diff = append(diff, "changed: "+key)
 		}
 	}
-	sort.Strings(diff)
+	slices.Sort(diff)
 	return diff
 }
 
@@ -158,7 +158,7 @@ func checkPortablePaths() error {
 		}
 	}
 	if len(bad) > 0 {
-		sort.Strings(bad)
+		slices.Sort(bad)
 		return fmt.Errorf("a command is named by absolute path, so it only works on the machine that wrote it:\n%sname it bare (\"mise\", not \"/opt/homebrew/bin/mise\") so PATH finds it in every clone",
 			indent(strings.Join(bad, "\n")))
 	}

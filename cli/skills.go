@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -54,7 +54,7 @@ func (c Command) skills(call Call) error {
 			only = append(only, name+" is in "+dirs[0]+" only")
 		}
 	}
-	sort.Strings(only)
+	slices.Sort(only)
 	for _, line := range only {
 		fmt.Fprintf(call.Stdout, "%s\n", line)
 	}
@@ -77,7 +77,7 @@ func readSkills(dir string) []skillEntry {
 		}
 		out = append(out, skillEntry{e.Name(), source(filepath.Join(dir, e.Name()))})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].name < out[j].name })
+	slices.SortFunc(out, func(a, b skillEntry) int { return strings.Compare(a.name, b.name) })
 	return out
 }
 
@@ -162,6 +162,6 @@ func mirror(root string, out io.Writer) error {
 	// A mirror is written per developer from the versions that repo pins, the
 	// same as the links it mirrors, so it is ignored for the same reason. The
 	// code that writes it is the code that ignores it.
-	sort.Strings(made)
+	slices.Sort(made)
 	return Ignore(root, made...)
 }
