@@ -9,6 +9,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"io"
 	"log"
@@ -30,8 +31,6 @@ var app = cli.Command{
 
 func main() { cli.Main(app) }
 
-const usage = `__NAME__ serve [--addr HOST:PORT]         answer /health and / on the address (default 127.0.0.1:8080)
-`
 
 // serve is `__NAME__ serve`, the default verb: the HTTP server.
 func serve(verb string, args []string, stdout, stderr io.Writer) error {
@@ -64,26 +63,19 @@ func handler() http.Handler {
 	return mux
 }
 
-// head and tail are the manual's prose: what a person writes. The verbs
-// between them are rendered from app, so the manual cannot drift from the
-// binary; `dev build cmd/__NAME__` rewrites it, `go test` holds it.
-const head = `---
-name: __NAME__
-description: Run and talk to __NAME__, this repo's command. Use before starting or calling it by hand: mise run __NAME__:run serves it, and the verbs below are what the binary itself does.
----
+// usage, head and tail are the manual: the verbs' own usage, and the prose
+// around them. Markdown files beside this one, not string constants, because
+// a Go raw string is backtick-delimited and so cannot hold inline code —
+// which is what keeps a `<placeholder>` from reaching a markdown renderer as
+// an HTML tag. The verbs between head and tail are rendered from app, so the
+// manual cannot drift from the binary; `dev build cmd/__NAME__` rewrites it
+// and `go test` holds it.
 
-# __NAME__
+//go:embed usage.md
+var usage string
 
-The first command of this repo, an HTTP server answering /health. Run it
-through its tasks — ` + "`mise run __NAME__:run`" + ` serves it, ` + "`mise run __NAME__:check`" + `
-vets and tests it — never by hand.
+//go:embed head.md
+var head string
 
-## Verbs
-
-`
-
-const tail = `## Rules
-
-- This file is written from the verbs by ` + "`__NAME__ skill`" + `, never by hand;
-  ` + "`dev build cmd/__NAME__`" + ` rewrites it and ` + "`go test`" + ` fails when it is stale.
-`
+//go:embed tail.md
+var tail string

@@ -22,17 +22,17 @@ Plans that are done are moved to the done sub folder.
 
 ## Issues
 
-You must raise issues to the developer as you work on a plan or code. 
+You must raise issues to the developer as you work on a plan or code.
 
 You can continue working in order to complete the task at hand, but you must provide follow ups in the plan and to the developer, so that we can ensure that issues are not forgotten.
 
-## Mise 
+## Mise
 
-Mise is for orchestrations over the code.  
+Mise is for orchestrations over the code.
 
 ## Comments
 
-Its important that the comments say why when its neeed. Rational can help use not make the same mistakes. 
+Its important that the comments say why when its neeed. Rational can help use not make the same mistakes.
 
 ## Skills
 

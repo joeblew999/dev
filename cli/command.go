@@ -1,6 +1,7 @@
 package cli
 
 import (
+	_ "embed"
 	"errors"
 	"fmt"
 	"io"
@@ -40,6 +41,14 @@ type Command struct {
 	Version string          // what `<Name> version` prints
 	Head    string          // the manual's frontmatter and prose before the verbs
 	Tail    string          // the prose after
+
+	// Order is the manual's reading order: verb names, each standing for the
+	// group that shares its usage. Verbs is a map and has no order of its
+	// own, so without this the manual is whatever alphabetical accident the
+	// verb names make — `init` fifth, when it is the first thing anyone does.
+	// Unlisted verbs follow in name order, so leaving it empty renders
+	// exactly as before it existed.
+	Order []string
 }
 
 // Main runs c as a program and exits: 0 on success, 1 on an error, 2 on a
@@ -67,7 +76,7 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 	err := v.Run(verb, rest, stdout, stderr)
 	var uerr *UsageError
 	if errors.As(err, &uerr) {
-		fmt.Fprintf(stderr, "error: %v\n\n%s", err, v.Usage)
+		fmt.Fprintf(stderr, "error: %v\n\n%s", err, Flatten(v.Usage))
 		return 2
 	}
 	if err != nil {
@@ -89,23 +98,58 @@ func (c Command) all() map[string]Verb {
 	return m
 }
 
-// ownUsage is the usage of skill and version, in the columns the others use.
+// ownUsageTemplate is the usage of skill and version. It is markdown like
+// every other verb's, but a template rather than a plain file: it names the
+// binary and the three paths, which only the command knows.
+
+//go:embed own_usage.md
+var ownUsageTemplate string
+
+// ownUsage is the usage of skill and version, in the shape the others use.
 func (c Command) ownUsage() string {
-	pad := func(s string) string { return fmt.Sprintf("%-42s", s) }
-	return pad(c.Name+" skill [--check]") + "write " + filepath.Join(ShippedDir, c.Name, SkillFile) + ",\n" +
-		pad("") + filepath.Join(ClaudeDir, c.Name, SkillFile) + ", " + filepath.Join(AgentsDir, c.Name, SkillFile) + "\n" +
-		pad("") + "from the verbs' own usage; --check fails when any is stale\n" +
-		pad(c.Name+" version") + "print the version\n"
+	return fmt.Sprintf(ownUsageTemplate, c.Name,
+		filepath.Join(ShippedDir, c.Name, SkillFile),
+		filepath.Join(ClaudeDir, c.Name, SkillFile),
+		filepath.Join(AgentsDir, c.Name, SkillFile))
 }
 
-// usages is every distinct usage, in verb-name order, each once.
-func (c Command) usages() []string {
-	verbs := c.all()
+// sortedVerbs is the table's names in order. Verbs is a map, so it has none
+// of its own; everything that walks the table walks it through here, so the
+// manual, the index and CheckUsage all agree.
+func sortedVerbs(verbs map[string]Verb) []string {
 	names := make([]string, 0, len(verbs))
 	for name := range verbs {
 		names = append(names, name)
 	}
 	sort.Strings(names)
+	return names
+}
+
+// manualOrder is the verb names in the order the manual reads them: Order
+// first, for the groups that earned a place, then the rest by name. A name in
+// Order that is not a verb is skipped rather than fatal, so renaming a verb
+// degrades to the old ordering instead of breaking the build.
+func (c Command) manualOrder(verbs map[string]Verb) []string {
+	var names []string
+	listed := map[string]bool{}
+	for _, name := range c.Order {
+		if _, ok := verbs[name]; ok && !listed[name] {
+			listed[name] = true
+			names = append(names, name)
+		}
+	}
+	for _, name := range sortedVerbs(verbs) {
+		if !listed[name] {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+// usages is every distinct usage, in the manual's order, each once.
+func (c Command) usages() []string {
+	verbs := c.all()
+	names := c.manualOrder(verbs)
 	seen := map[string]bool{}
 	var out []string
 	for _, name := range names {
@@ -118,26 +162,53 @@ func (c Command) usages() []string {
 	return out
 }
 
-// index is what the binary prints with no verb: every usage.
+// index is what the binary prints with no verb: every usage, flattened,
+// because a terminal has no markdown renderer.
 func (c Command) index() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s: verbs, by what does them:\n\n", c.Name)
 	for _, u := range c.usages() {
-		b.WriteString(u)
+		b.WriteString(Flatten(u))
 		b.WriteString("\n")
 	}
 	return b.String()
 }
 
-// render is the manual: Head, every usage in a code block, Tail.
+// render is the manual: Head, every usage, Tail. Markdown usage goes in as
+// the markdown it is, so its headings, inline code and lists are the manual's
+// own. Plain text is fenced, as every usage was before this package read
+// markdown.
+//
+// That is what keeps a repo that has not ported yet correct. Its usage is
+// hand-aligned columns with no markdown in it, and unfenced a renderer
+// collapses the alignment, runs every verb into one paragraph and eats any
+// `<placeholder>` as an HTML tag — a manual quietly made worse by upgrading.
+// Fencing legacy text means a repo ports when it chooses rather than when it
+// bumps a pin.
 func (c Command) render() string {
 	var b strings.Builder
 	b.WriteString(c.Head)
 	for _, u := range c.usages() {
-		b.WriteString("```\n" + u + "```\n\n")
+		if isMarkdown(u) {
+			b.WriteString(strings.TrimRight(u, "\n") + "\n\n")
+		} else {
+			b.WriteString("```\n" + u + "```\n\n")
+		}
 	}
 	b.WriteString(c.Tail)
 	return b.String()
+}
+
+// isMarkdown reports whether a usage string uses the markdown shape — a
+// heading or a list item. Anything else is the plain text this package took
+// before, and is rendered the way that text has always been rendered.
+func isMarkdown(usage string) bool {
+	for _, line := range strings.Split(usage, "\n") {
+		if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "#") {
+			return true
+		}
+	}
+	return false
 }
 
 // paths are the manual's copies: the one the release ships, and the ones
@@ -195,6 +266,23 @@ func (c Command) skill(verb string, args []string, stdout, stderr io.Writer) err
 	}
 	if len(rest) > 0 {
 		return Usagef("%s skill takes only --check", c.Name)
+	}
+	// Both branches below answer from prose compiled into this binary, so
+	// neither means anything if the binary is behind its sources: writing
+	// would rewrite every copy from old bytes and report success, and
+	// checking would compare that old render against equally old files and
+	// report "up to date". Refuse instead — the cost is one rebuild, and the
+	// alternative is a wrong answer nobody can see.
+	dir, err := root(".")
+	if err != nil {
+		return err
+	}
+	if changed := staleBuild(dir); changed != "" {
+		what := "write a manual"
+		if check {
+			what = "check a manual"
+		}
+		return fmt.Errorf("%s has changed since this %s was built, so it would %s from stale embedded prose; rebuild first: mise run build", rel(changed), c.Name, what)
 	}
 	want := c.render()
 	shipped, claude, agents, err := c.paths()

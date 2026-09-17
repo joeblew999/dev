@@ -126,8 +126,12 @@ run = "dev release cmd/__NAME__ --snapshot"
 
 [tasks."__NAME__:build"]
 description = ".bin/__NAME__, and its skill from its verbs"
-sources = ["cmd/__NAME__/**/*.go", "cmd/__NAME__/go.mod"]
-outputs = [".bin/__NAME__"]
+# The markdown too, not just the Go: head.md, tail.md and usage.md are
+# go:embed inputs, and a file missing here leaves the binary stale while
+# mise reports it fresh — `__NAME__ skill` then rewrites the manual from
+# the old bytes and says it succeeded.
+sources = ["cmd/__NAME__/**/*.go", "cmd/__NAME__/*.md", "cmd/__NAME__/go.mod"]
+outputs = [".bin/__NAME__", "skills/__NAME__/SKILL.md", ".claude/skills/__NAME__/SKILL.md", ".agents/skills/__NAME__/SKILL.md"]
 run = "dev build cmd/__NAME__"
 
 [tasks."__NAME__:run"]

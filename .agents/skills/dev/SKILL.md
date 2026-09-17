@@ -22,117 +22,177 @@ command.
 The directory a verb acts on comes first; flags may follow anywhere, and
 everything after a bare `--` goes to the program being run.
 
-```
-dev build DIR                             npm ci when stale, vite build, gsx generate, go build to .bin/<dir>, its skill if it is a cli.Command
-dev wasm DIR [--env NAME]                 the Worker's wasm for the environment (build/tinygo means TinyGo)
-dev check DIR [--path P] [--expect TEXT]  gsx fmt, vet, test, the workerd round trip, the browser probe
-dev run DIR [-- ARGS]                     .bin/<dir> under fnox, replacing this process
-dev workerd DIR [--env NAME]              the Worker on local workerd (wrangler dev)
-```
+### Starting a repo
 
-```
-dev url DIR [--deployed[=BOOL]] [--env NAME] [--local URL] [--refresh]
-    print the URL to talk to: the deployed app in DIR when --deployed, else
-    --local (default empty). A Worker's needs the account's workers.dev
-    subdomain: read once with the credentials in fnox, kept in gitignored
-    mise.local.toml, --refresh asking again. A Fly app's is <app>.fly.dev.
-dev deploy DIR [--env NAME] [--wait PATH] [-- FLAGS]
-    deploy what DIR holds. A Worker deploys from a throwaway copy of its
-    wrangler.toml, so the ids wrangler writes back never reach git, and says
-    what was created. A Fly app deploys with the repo root as build context,
-    FLAGS going to flyctl, created first when the account lacks it (FLY_ORG
-    names the org). With --wait, wait until it answers 200 at PATH
-dev logs DIR [--env NAME]
-    stream the deployed app's logs (wrangler tail, flyctl logs)
-dev smoke DIR [--env NAME] [--path P] [--expect TEXT] [--timeout DURATION]
-    run a Worker on local workerd with wrangler dev, request P (default /),
-    and fail unless it answers 200 with TEXT in the body
-dev wait URL [--timeout DURATION]
-    wait until URL answers 200 steadily
-dev delete DIR [--env NAME] [--name APP] [--yes]
-    remove the deployed app in DIR, or APP (one a rename or an old config left
-    behind), and for a Worker the KV namespaces wrangler provisioned for it,
-    titled <worker>-<binding>; a namespace made by hand stays. Says what will
-    go and asks, unless --yes
+- `dev init [DIR] [--name NAME] [--pin VERSION]`
+  write the stack into DIR (default `.`): `mise.toml` with the tools pinned
+  and the stack's tasks, `hk.pkl`, `session.toml`, `.mcp.json`, the Claude
+  Code settings and skill hook, the two workflows, `.gitignore`, `AGENTS.md`,
+  and a first command `cmd/NAME` (an HTTP server answering `/health`, a
+  `cli.Command` whose skill its builds write) with its module, requiring the
+  pinned dev, and `go.work`. NAME defaults to DIR's name; the module path
+  comes from the git remote, or `example.com` without one. VERSION is the dev
+  release to pin, with the public key its releases are signed with
+  (`--pubkey`); default this binary's own; the other pins are the releases
+  mise knows today. An existing file is left alone and named; a repo with a
+  module at the root gets no workspace or nested module, and an existing
+  command is kept. Then: `mise trust && mise install && mise run test`
 
-Which cloud DIR deploys to is read from it: wrangler.toml means Cloudflare
-Workers, fly.toml means Fly; --env is a wrangler environment. DEPLOY_SUFFIX
-in gitignored mise.local.toml gives a developer their own copy of every app.
-Run from the repo root; needs fnox, and wrangler or flyctl.
-```
+### Stages
 
-```
-dev deps list      list available Go module upgrades in every module, changing nothing
-dev deps upgrade   interactively upgrade Go modules in every module
-```
+- `dev build DIR`
+  npm ci when stale, vite build, gsx generate, go build to `.bin/<dir>`, its
+  skill if it is a `cli.Command`
+- `dev wasm DIR [--env NAME]`
+  the Worker's wasm for the environment (`build/tinygo` means TinyGo)
+- `dev check DIR [--path P] [--expect TEXT]`
+  gsx fmt, vet, test, the workerd round trip, the browser probe
+- `dev run DIR [-- ARGS]`
+  `.bin/<dir>` under fnox, replacing this process
+- `dev workerd DIR [--env NAME]`
+  the Worker on local workerd (wrangler dev)
 
-```
-dev init [DIR] [--name NAME] [--pin VERSION]
-    write the stack into DIR (default .): mise.toml with the tools pinned and
-    the stack's tasks, hk.pkl, session.toml, .mcp.json, the Claude Code
-    settings and skill hook, the two workflows, .gitignore, AGENTS.md, and a
-    first command cmd/NAME (an HTTP server answering /health, a cli.Command
-    whose skill its builds write) with its module, requiring the pinned dev,
-    and go.work. NAME defaults to DIR's name; the module path comes from the
-    git remote, or example.com without one. VERSION is the dev release to
-    pin, with the public key its releases are signed with (--pubkey); default
-    this binary's own; the other pins are the releases mise knows today. An
-    existing file is left alone and named; a repo with a module at the root
-    gets no workspace or nested module, and an existing command is kept.
-    Then: mise trust && mise install && mise run test
-```
+### Deploying
 
-```
-dev release DIR [VERSION] [--snapshot] [--name NAME]
-    publish a GitHub Release of the command in DIR, the same locally and in
-    GitHub Actions: VERSION here (vX.Y.Z), the pushed tag there. Build every
-    platform with goreleaser, sign the packslip manifest, upload. Signed with
-    the key in fnox (PACKSLIP_SIGNING_KEY), which --keygen makes once, with its
-    public half in packslip.pub for consumers to pin (mise: pubkey = "...").
-    --snapshot builds, signs with a throwaway key and verifies, publishing
-    nothing; check runs it. NAME is the binary's name; default the repo's.
-    Every directory under skills/ ships as a skill.
+- `dev url DIR [--deployed[=BOOL]] [--env NAME] [--local URL] [--refresh]`
+  print the URL to talk to: the deployed app in DIR when `--deployed`, else
+  `--local` (default empty). A Worker's needs the account's workers.dev
+  subdomain: read once with the credentials in fnox, kept in gitignored
+  `mise.local.toml`, `--refresh` asking again. A Fly app's is `<app>.fly.dev`.
+- `dev deploy DIR [--env NAME] [--wait PATH] [-- FLAGS]`
+  deploy what DIR holds. A Worker deploys from a throwaway copy of its
+  `wrangler.toml`, so the ids wrangler writes back never reach git, and says
+  what was created. A Fly app deploys with the repo root as build context,
+  FLAGS going to flyctl, created first when the account lacks it (`FLY_ORG`
+  names the org). With `--wait`, wait until it answers 200 at PATH
+- `dev logs DIR [--env NAME]`
+  stream the deployed app's logs (wrangler tail, flyctl logs)
+- `dev smoke DIR [--env NAME] [--path P] [--expect TEXT] [--timeout DURATION]`
+  run a Worker on local workerd with wrangler dev, request P (default `/`),
+  and fail unless it answers 200 with TEXT in the body
+- `dev wait URL [--timeout DURATION]`
+  wait until URL answers 200 steadily
+- `dev delete DIR [--env NAME] [--name APP] [--yes]`
+  remove the deployed app in DIR, or APP (one a rename or an old config left
+  behind), and for a Worker the KV namespaces wrangler provisioned for it,
+  titled `<worker>-<binding>`; a namespace made by hand stays. Says what will
+  go and asks, unless `--yes`
+
+Which cloud DIR deploys to is read from it: `wrangler.toml` means Cloudflare
+Workers, `fly.toml` means Fly; `--env` is a wrangler environment.
+`DEPLOY_SUFFIX` in gitignored `mise.local.toml` gives a developer their own
+copy of every app. Run from the repo root; needs fnox, and wrangler or flyctl.
+
+### Secrets
+
+- `dev secrets set DIR NAME|OWNER [--names LIST] [--generate] [--if-missing] [--env NAME]`
+  store a secret in fnox and push it to the app in DIR; `--generate` makes a
+  random value instead of prompting, `--if-missing` leaves an existing one
+  alone. With `--names`, the project's `NAME<TAB>OWNER` lines, an owner such as
+  a provider name resolves to its secret
+- `dev secrets ci NAME...`
+  give the repo's GitHub Actions each named secret from fnox (gh secret set,
+  the value on stdin), for what CI must do with a credential: sign a
+  release with the shared key, deploy to Fly as upstream's workflow does
+- `dev secrets push DIR [--env NAME] [--fix TEMPLATE]`
+  read `NAME<TAB>OWNER` lines on stdin and push each secret from fnox to the
+  app in DIR; a missing one prints TEMPLATE with `{provider}` filled in, and
+  any problem makes the exit code 1
+
+### Releasing
+
+- `dev release DIR [VERSION] [--snapshot] [--name NAME]`
+  publish a GitHub Release of the command in DIR, the same locally and in
+  GitHub Actions: VERSION here (vX.Y.Z), the pushed tag there. Build every
+  platform with goreleaser, sign the packslip manifest, upload. Signed with
+  the key in fnox (`PACKSLIP_SIGNING_KEY`), which `--keygen` makes once, with
+  its public half in `packslip.pub` for consumers to pin as their `pubkey`.
+  `--snapshot` builds, signs with a throwaway key and verifies, publishing
+  nothing; check runs it. NAME is the binary's name; default the repo's.
+  Every directory under `skills/` ships as a skill.
 
 Needs goreleaser, packslip and gh, and a clean tree to publish.
-```
 
-```
-dev secrets set DIR NAME|OWNER [--names LIST] [--generate] [--if-missing] [--env NAME]
-    store a secret in fnox and push it to the app in DIR; --generate makes a
-    random value instead of prompting, --if-missing leaves an existing one
-    alone. With --names, the project's "NAME<TAB>OWNER" lines, an owner such as
-    a provider name resolves to its secret
-dev secrets ci NAME...
-    give the repo's GitHub Actions each named secret from fnox (gh secret set,
-    the value on stdin), for what CI must do with a credential: sign a
-    release with the shared key, deploy to Fly as upstream's workflow does
-dev secrets push DIR [--env NAME] [--fix TEMPLATE]
-    read "NAME<TAB>OWNER" lines on stdin and push each secret from fnox to the
-    app in DIR; a missing one prints TEMPLATE with {provider} filled in, and
-    any problem makes the exit code 1
-```
+### Dependencies
 
-```
-dev session sync             write .claude/skills and the .claude/settings.json keys session.toml implies
-dev session check            fail when either has drifted from session.toml
-dev session verify [--update]  hold a fresh Claude Code session against SESSION.lock; --update records it
-dev session bump [source]    move a pin in session.toml to upstream HEAD
-dev session mcp              every MCP server .mcp.json declares connects
-```
+- `dev deps list`
+  list available Go module upgrades in every module, changing nothing
+- `dev deps upgrade`
+  interactively upgrade Go modules in every module
 
-```
-dev skill [--check]                       write skills/dev/SKILL.md,
-                                          .claude/skills/dev/SKILL.md, .agents/skills/dev/SKILL.md
-                                          from the verbs' own usage; --check fails when any is stale
-dev version                               print the version
-```
+### The pinned session
+
+- `dev session sync`
+  write `.claude/skills` and the `.claude/settings.json` keys `session.toml`
+  implies
+- `dev session check`
+  fail when either has drifted from `session.toml`
+- `dev session verify [--update]`
+  hold a fresh Claude Code session against `SESSION.lock`; `--update` records it
+- `dev session bump [source]`
+  move a pin in `session.toml` to upstream HEAD
+- `dev session mcp`
+  every MCP server `.mcp.json` declares connects
+
+### The tool itself
+
+- `dev skill [--check]`
+  write `skills/dev/SKILL.md`, `.claude/skills/dev/SKILL.md` and `.agents/skills/dev/SKILL.md`
+  from the verbs' own usage; `--check` fails when any is stale
+- `dev version`
+  print the version
 
 ## What a repo supplies
 
 - `[vars] worker` in mise.toml: the command whose secrets `secrets:*` manage.
 - A `check` task, what `mise run test` runs after the stack's own checks.
 - A `validate` task, what `deploy` runs first.
-- A `secrets:list` task printing NAME<TAB>OWNER lines, what `secrets:*` work from.
+- A `secrets:list` task printing `NAME<TAB>OWNER` lines, what `secrets:*` work from.
+
+## A command's manual
+
+A command's manual is rendered from its verbs, so it cannot drift from the
+binary: `<cmd> skill` writes it, `dev build` runs that, and `go test` fails
+when a copy is stale. Never edit a `SKILL.md` by hand.
+
+What a person writes is markdown beside the code: `usage.md` in each package
+for its verbs, `head.md` and `tail.md` for the prose around them. They are
+files rather than Go string constants because a Go raw string is
+backtick-delimited, so it can never hold inline code.
+
+A repo written before this keeps working: usage that is plain text rather than
+markdown is fenced in the manual, exactly as every usage was, and the terminal
+is unchanged. Port when you choose, a package at a time — move the `Usage`
+const into a `usage.md` beside it, `//go:embed usage.md`, and add
+`cli.CheckUsage` to the command's test. Two things go with the port: name the
+markdown in the build task's `sources` (mise reads `.go` by default, so a
+prose-only edit otherwise leaves the binary stale), and list the manual's
+copies in `outputs`.
+
+A command writes its manual from prose compiled into it, so what it writes is
+only as current as the binary. `<cmd> skill` and `<cmd> skill --check` refuse
+when anything they were built from has changed since, naming the file: from
+inside a stale binary both would otherwise report success — one rewriting
+every copy from old bytes, the other comparing an old render against equally
+old files. Rebuild and run them again. Only `go test` is immune, because it
+recompiles.
+
+Keep `usage.md` to headings, `- ` list items with two-space continuations,
+paragraphs and inline code. A verb is one list item: the signature its first
+line, the description its continuation. That subset is what the terminal
+rendering reads — the same text has to work with no renderer at all — and
+`cli.CheckUsage` holds it there from a test. `head.md` and `tail.md` only ever
+reach the manual, never a terminal, so they may use all of markdown. Two rules
+earn their keep:
+
+- Write every `<placeholder>` in backticks — in `usage.md`, and in `head.md`
+  and `tail.md` too. Unfenced, a markdown renderer takes `<app>` or
+  `NAME<TAB>OWNER` for an HTML tag and the reader never sees it; in inline
+  code it escapes correctly. This one shipped in this file once, which is why
+  the check covers prose and not only verbs.
+- Emphasis is banned, so `*` and `_` stay literal. Usage text says things like
+  `**/*.go` and `secrets:*`, and a flattener that unwound emphasis would turn
+  the first into `/*.go`.
 
 ## Rules the tool keeps
 

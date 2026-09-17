@@ -7,6 +7,7 @@
 package session
 
 import (
+	_ "embed"
 	"io"
 	"strings"
 
@@ -29,13 +30,13 @@ const (
 // a repo that runs the dev binary directly.
 var syncCmd = "mise run session:sync"
 
-// Usage is what dev prints for this verb.
-const Usage = `dev session sync             write .claude/skills and the .claude/settings.json keys session.toml implies
-dev session check            fail when either has drifted from session.toml
-dev session verify [--update]  hold a fresh Claude Code session against SESSION.lock; --update records it
-dev session bump [source]    move a pin in session.toml to upstream HEAD
-dev session mcp              every MCP server .mcp.json declares connects
-`
+// Usage is what dev prints for these verbs. It is markdown in a file beside
+// this one, not a string const: a Go raw string is backtick-delimited, so it
+// can never hold the inline code that keeps a `<placeholder>` from reaching a
+// markdown renderer as an HTML tag.
+
+//go:embed usage.md
+var Usage string
 
 // Run is `dev session sync|check|verify|bump|mcp`.
 func Run(verb string, args []string, stdout, stderr io.Writer) error {

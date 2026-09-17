@@ -9,6 +9,8 @@
 package main
 
 import (
+	_ "embed"
+
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/app"
 	"github.com/joeblew999/dev/internal/deps"
@@ -18,6 +20,17 @@ import (
 	"github.com/joeblew999/dev/internal/session"
 	"github.com/joeblew999/dev/internal/stage"
 )
+
+// skill holds the prose around the verbs in the generated manual: head.md
+// before them, tail.md after. Markdown files, not string consts, so prose
+// edits stay prose; go:embed compiles them into the binary, so `dev skill`
+// works anywhere and the rendered manual ships via release.
+
+//go:embed skill/head.md
+var skillHead string
+
+//go:embed skill/tail.md
+var skillTail string
 
 // dev is the whole tool: what each verb runs, and its usage. cli.Main runs it
 // and renders the manual from this table, so the manual is the code's; any
@@ -44,6 +57,11 @@ var dev = cli.Command{
 	},
 	Head: skillHead,
 	Tail: skillTail,
+
+	// The manual's reading order: start a repo, build it, ship it, then the
+	// verbs that keep it. Without this the sections fall in verb-name order,
+	// which puts init fifth — the first thing anyone does, halfway down.
+	Order: []string{"init", "build", "deploy", "secrets", "release", "deps", "session", "skill"},
 }
 
 // version and pubkey are set by the release build (-X main.version, -X
@@ -58,49 +76,3 @@ func main() {
 	dev.Version = version
 	cli.Main(dev)
 }
-
-const skillHead = `---
-name: dev
-description: Build, check, run, release and deploy the commands of a repo on the mise + fnox + hk + packslip stack. Use before running go, npm, wrangler, fly, fnox or goreleaser by hand in such a repo: a mise task names a stage of a command directory and dev does the rest. Tests and releases run the same locally and in GitHub Actions, from the same tasks.
----
-
-# dev
-
-A repo on this stack is a few commands, each its own directory and Go module:
-main.go, and beside it a worker.go and wrangler.toml if it deploys to
-Cloudflare, a fly.toml if it deploys to Fly, a package.json and .gsx sources if
-it has a UI. A repo that is one command keeps it at the root and uses ` + "`.`" + `.
-A new repo gets the whole stack from ` + "`dev init`" + `.
-Every command has the same stages, and a mise task names one:
-` + "`<cmd>:<stage>[:variant]`" + `, so ` + "`mise run proxy:deploy`" + ` runs
-` + "`dev deploy cmd/proxy`" + `. Run stages through their tasks (` + "`mise tasks`" + `
-lists them), never by hand, and never call go, npm, wrangler, fly or fnox
-directly when a task exists. Anything typed after a task name passes to the
-command.
-
-## Verbs
-
-The directory a verb acts on comes first; flags may follow anywhere, and
-everything after a bare ` + "`--`" + ` goes to the program being run.
-
-`
-
-const skillTail = `## What a repo supplies
-
-- ` + "`[vars] worker`" + ` in mise.toml: the command whose secrets ` + "`secrets:*`" + ` manage.
-- A ` + "`check`" + ` task, what ` + "`mise run test`" + ` runs after the stack's own checks.
-- A ` + "`validate`" + ` task, what ` + "`deploy`" + ` runs first.
-- A ` + "`secrets:list`" + ` task printing NAME<TAB>OWNER lines, what ` + "`secrets:*`" + ` work from.
-
-## Rules the tool keeps
-
-- Nothing personal in a committed file. Cloud credentials come from fnox; a
-  Worker's provisioned ids never reach git (deploy runs on a throwaway copy of
-  wrangler.toml); the account's workers.dev subdomain and a developer's
-  DEPLOY_SUFFIX live in gitignored mise.local.toml.
-- Secret values only ever pass through fnox and the deploy CLI, never an argument.
-- Every error names its fix.
-- Every task runs the same locally and in GitHub Actions: mise run test and
-  mise run release are what CI runs, from the one mise.toml. Local is the fast
-  path day to day; CI proves a machine nobody set up. Neither replaces the other.
-`

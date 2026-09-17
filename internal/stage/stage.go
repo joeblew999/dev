@@ -7,6 +7,7 @@
 package stage
 
 import (
+	_ "embed"
 	"fmt"
 	"io"
 	"os"
@@ -325,13 +326,13 @@ func Check(out io.Writer, path, reqPath, expect string) error {
 	return nil
 }
 
-// Usage is what dev prints for the stage verbs.
-const Usage = `dev build DIR                             npm ci when stale, vite build, gsx generate, go build to .bin/<dir>, its skill if it is a cli.Command
-dev wasm DIR [--env NAME]                 the Worker's wasm for the environment (build/tinygo means TinyGo)
-dev check DIR [--path P] [--expect TEXT]  gsx fmt, vet, test, the workerd round trip, the browser probe
-dev run DIR [-- ARGS]                     .bin/<dir> under fnox, replacing this process
-dev workerd DIR [--env NAME]              the Worker on local workerd (wrangler dev)
-`
+// Usage is what dev prints for the stage verbs. It is markdown in a file
+// beside this one, not a string const: a Go raw string is backtick-delimited,
+// so it can never hold the inline code that keeps `<dir>` from reaching a
+// markdown renderer as an HTML tag.
+
+//go:embed usage.md
+var Usage string
 
 // Run is every stage verb. DIR comes first; flags may follow anywhere.
 func Run(verb string, args []string, stdout, stderr io.Writer) error {

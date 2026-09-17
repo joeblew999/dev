@@ -23,3 +23,8 @@ func TestHealth(t *testing.T) {
 
 // TestSkill holds every copy of the manual to the verbs; dev check runs it.
 func TestSkill(t *testing.T) { cli.CheckSkill(t, app) }
+
+// TestUsage holds usage.md to the markdown subset the terminal rendering
+// reads, and catches a `<placeholder>` written without the backticks that
+// stop a renderer eating it as an HTML tag.
+func TestUsage(t *testing.T) { cli.CheckUsage(t, app) }

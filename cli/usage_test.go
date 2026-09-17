@@ -1,0 +1,235 @@
+package cli
+
+import (
+	"strings"
+	"testing"
+)
+
+// The angle-bracket rule is why CheckUsage exists, so it is tested first.
+// `<app>.fly.dev` and `NAME<TAB>OWNER` are real text from this tool's usage:
+// unfenced, a markdown renderer swallows the tag and the reader loses the
+// placeholder without any error anywhere. This test is the error.
+func TestCheckUsageCatchesBareAngleBrackets(t *testing.T) {
+	for _, line := range []string{
+		"- `dev url DIR`\n  a Fly app's is <app>.fly.dev",
+		"- `dev secrets push DIR`\n  reads NAME<TAB>OWNER lines on stdin",
+		"the namespaces are titled <worker>-<binding>",
+	} {
+		problems := usageProblems(line)
+		if len(problems) == 0 {
+			t.Errorf("no problem reported for bare angle brackets in %q", line)
+			continue
+		}
+		if !strings.Contains(problems[0], "HTML tag") {
+			t.Errorf("problem should say why it matters, got %q", problems[0])
+		}
+	}
+}
+
+// In inline code the same text escapes correctly, so it must pass.
+func TestCheckUsageAllowsAngleBracketsInCode(t *testing.T) {
+	for _, line := range []string{
+		"- `dev url DIR`\n  a Fly app's is `<app>.fly.dev`",
+		"- `dev secrets push DIR`\n  reads `NAME<TAB>OWNER` lines on stdin",
+		"the namespaces are titled `<worker>-<binding>`",
+	} {
+		if problems := usageProblems(line); len(problems) > 0 {
+			t.Errorf("%q is correct markdown but was rejected: %v", line, problems)
+		}
+	}
+}
+
+// Every construct Flatten cannot read must be refused, or the manual and the
+// terminal say different things.
+func TestCheckUsageRejectsWhatFlattenCannotRead(t *testing.T) {
+	for name, md := range map[string]string{
+		"a code fence":    "```\ndev build DIR\n```",
+		"a table":         "| verb | does |\n|---|---|",
+		"a numbered list": "1. `dev build DIR`",
+		"a nested list":   "- `dev build DIR`\n  - a sub-point",
+		"a blockquote":    "> note this",
+		"a link":          "- `dev build DIR`\n  see [the docs](http://x)",
+		"emphasis":        "- `dev build DIR`\n  this is *important*",
+		"bold":            "- `dev build DIR`\n  this is **important**",
+	} {
+		if problems := usageProblems(md); len(problems) == 0 {
+			t.Errorf("%s was accepted but Flatten cannot read it: %q", name, md)
+		}
+	}
+}
+
+// Globs are the reason emphasis is banned rather than unwound: `**/*.go` and
+// `secrets:*` are text this tool really prints, and a flattener that stripped
+// * would turn the first into "/*.go".
+func TestFlattenKeepsGlobsIntact(t *testing.T) {
+	got := Flatten("- `dev check DIR`\n  vets `**/*.go`, and `secrets:*` names the rest")
+	want := "dev check DIR\n    vets **/*.go, and secrets:* names the rest\n"
+	if got != want {
+		t.Errorf("Flatten mangled a glob:\n got %q\nwant %q", got, want)
+	}
+}
+
+// The shape the whole design rests on: a list item flattens to a signature
+// with its description indented under it, which is what the usage text looked
+// like before it was markdown.
+func TestFlattenIndentsDescriptionsUnderSignatures(t *testing.T) {
+	md := "### Deploying\n\n" +
+		"- `dev url DIR [--env NAME]`\n" +
+		"  print the URL to talk to: the deployed app in DIR,\n" +
+		"  else `--local` (default empty)\n" +
+		"- `dev logs DIR`\n" +
+		"  stream the deployed app's logs\n\n" +
+		"Run from the repo root.\n"
+	want := "Deploying\n\n" +
+		"dev url DIR [--env NAME]\n" +
+		"    print the URL to talk to: the deployed app in DIR,\n" +
+		"    else --local (default empty)\n" +
+		"dev logs DIR\n" +
+		"    stream the deployed app's logs\n\n" +
+		"Run from the repo root.\n"
+	if got := Flatten(md); got != want {
+		t.Errorf("Flatten:\n got %q\nwant %q", got, want)
+	}
+}
+
+// The rendered manual is committed and hk's trailing_whitespace reads it, so
+// Flatten must never emit a line ending in a space — including a continuation
+// that flattened to nothing but its indent.
+func TestFlattenNeverEmitsTrailingWhitespace(t *testing.T) {
+	md := "### Heading   \n\n- `dev build DIR`   \n  a description   \n  `` \n\nA paragraph   \n"
+	for i, line := range strings.Split(Flatten(md), "\n") {
+		if line != strings.TrimRight(line, " \t") {
+			t.Errorf("line %d ends in whitespace: %q", i+1, line)
+		}
+	}
+}
+
+// An empty Order must render exactly as it did before Order existed: every
+// consumer repo's command has none, so this is the compatibility guarantee.
+func TestEmptyOrderRendersAlphabetically(t *testing.T) {
+	c := Command{Name: "x", Verbs: map[string]Verb{
+		"zebra": {Usage: "z\n"}, "alpha": {Usage: "a\n"}, "middle": {Usage: "m\n"},
+	}}
+	if got, want := c.manualOrder(c.all()), []string{"alpha", "middle", "skill", "version", "zebra"}; !equal(got, want) {
+		t.Errorf("empty Order: got %v, want %v", got, want)
+	}
+}
+
+// Order puts named verbs first and leaves the rest in name order behind them.
+func TestOrderLeadsAndTheRestFollow(t *testing.T) {
+	c := Command{Name: "x", Order: []string{"zebra", "alpha"}, Verbs: map[string]Verb{
+		"zebra": {Usage: "z\n"}, "alpha": {Usage: "a\n"}, "middle": {Usage: "m\n"},
+	}}
+	if got, want := c.manualOrder(c.all()), []string{"zebra", "alpha", "middle", "skill", "version"}; !equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// A stale name in Order — a verb since renamed — must not break the build;
+// the manual just falls back to name order for it.
+func TestOrderIgnoresUnknownVerbs(t *testing.T) {
+	c := Command{Name: "x", Order: []string{"gone", "alpha"}, Verbs: map[string]Verb{
+		"alpha": {Usage: "a\n"}, "middle": {Usage: "m\n"},
+	}}
+	if got, want := c.manualOrder(c.all()), []string{"alpha", "middle", "skill", "version"}; !equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func equal(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// The bug this check exists for: tail.md shipped `NAME<TAB>OWNER` unfenced,
+// so every rendered copy of the manual showed "NAMEOWNER" and lost the fact
+// that the lines are tab-separated. Nothing caught it.
+func TestCheckUsageCatchesBareAngleBracketsInProse(t *testing.T) {
+	c := Command{
+		Name:  "x",
+		Verbs: map[string]Verb{"go": {Usage: "- `x go`\n  fine\n"}},
+		Head:  "---\nname: x\n---\n\n# x\n\nprose\n",
+		Tail:  "- A task printing NAME<TAB>OWNER lines\n",
+	}
+	var f fakeTB
+	CheckUsage(&f, c)
+	if len(f.errs) != 1 {
+		t.Fatalf("want exactly the tail problem, got %v", f.errs)
+	}
+	if !strings.Contains(f.errs[0], "x tail:") || !strings.Contains(f.errs[0], "HTML tag") {
+		t.Errorf("message should name the prose and why: %q", f.errs[0])
+	}
+}
+
+// Frontmatter is YAML the renderer never sees, and its --- would otherwise
+// read as a setext heading.
+func TestFrontmatterIsNotChecked(t *testing.T) {
+	c := Command{
+		Name:  "x",
+		Verbs: map[string]Verb{"go": {Usage: "- `x go`\n  fine\n"}},
+		Head:  "---\nname: x\ndescription: a <thing> in metadata\n---\n\n# x\n",
+		Tail:  "",
+	}
+	var f fakeTB
+	CheckUsage(&f, c)
+	if len(f.errs) != 0 {
+		t.Errorf("frontmatter should not be checked, got %v", f.errs)
+	}
+}
+
+// Head and Tail only ever reach the manual, never a terminal, so markdown
+// Flatten cannot read is still correct there.
+func TestProseMayUseMarkdownFlattenCannotRead(t *testing.T) {
+	c := Command{
+		Name:  "x",
+		Verbs: map[string]Verb{"go": {Usage: "- `x go`\n  fine\n"}},
+		Head:  "# x\n\n| a | b |\n|---|---|\n\nsee [docs](http://x), *emphasised*\n",
+		Tail:  "> a note\n\n1. a numbered list\n",
+	}
+	var f fakeTB
+	CheckUsage(&f, c)
+	if len(f.errs) != 0 {
+		t.Errorf("prose is markdown-only and may use all of it, got %v", f.errs)
+	}
+}
+
+// A repo that has not ported still holds plain text in its Usage. Unfenced,
+// markdown collapses its column alignment, runs every verb into one paragraph
+// and eats `<app>` as an HTML tag — a manual made worse by bumping a pin. So
+// legacy text is fenced, exactly as it was before this package read markdown.
+func TestLegacyPlainTextUsageStaysFenced(t *testing.T) {
+	legacy := "hello serve [--addr HOST:PORT]    answer /health\nhello ping DIR                    reach <app>.fly.dev\n"
+	c := Command{Name: "hello", Verbs: map[string]Verb{"serve": {Usage: legacy}}, Head: "# hello\n\n", Tail: "## Rules\n"}
+	got := c.render()
+	if !strings.Contains(got, "```\n"+legacy+"```") {
+		t.Errorf("legacy usage must be fenced, got:\n%s", got)
+	}
+}
+
+// Ported usage is markdown and must not be fenced, or its headings and lists
+// would show as literal text.
+func TestMarkdownUsageIsNotFenced(t *testing.T) {
+	c := Command{Name: "hello", Verbs: map[string]Verb{
+		"serve": {Usage: "### Serving\n\n- `hello serve`\n  answer `/health`\n"},
+	}}
+	if got := c.render(); strings.Contains(got, "```\n### Serving") {
+		t.Errorf("markdown usage must not be fenced, got:\n%s", got)
+	}
+}
+
+// Flatten must leave legacy text alone: the terminal showed it correctly
+// before and has to keep doing so while a repo is unported.
+func TestFlattenLeavesLegacyTextUnchanged(t *testing.T) {
+	legacy := "hello serve [--addr HOST:PORT]    answer /health\n" +
+		"hello deploy DIR\n    deploy what DIR holds, and say what was created\n"
+	if got := Flatten(legacy); got != legacy {
+		t.Errorf("Flatten changed legacy text:\n got %q\nwant %q", got, legacy)
+	}
+}

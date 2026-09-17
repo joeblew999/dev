@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -82,8 +83,12 @@ func TestDefault(t *testing.T) {
 
 type fakeTB struct{ errs []string }
 
-func (f *fakeTB) Helper()                        {}
-func (f *fakeTB) Errorf(format string, a ...any) { f.errs = append(f.errs, format) }
+func (f *fakeTB) Helper() {}
+
+// Errorf records the message, not the format string: a test asserting on
+// what a check reports needs the file and the reason, which live in the
+// arguments.
+func (f *fakeTB) Errorf(format string, a ...any) { f.errs = append(f.errs, fmt.Sprintf(format, a...)) }
 
 func TestSkillRoundTrip(t *testing.T) {
 	c := testCommand()

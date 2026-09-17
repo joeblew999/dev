@@ -14,6 +14,7 @@ package release
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"io"
 	"os"
@@ -29,18 +30,13 @@ import (
 	"github.com/joeblew999/dev/internal/secrets"
 )
 
-const Usage = `dev release DIR [VERSION] [--snapshot] [--name NAME]
-    publish a GitHub Release of the command in DIR, the same locally and in
-    GitHub Actions: VERSION here (vX.Y.Z), the pushed tag there. Build every
-    platform with goreleaser, sign the packslip manifest, upload. Signed with
-    the key in fnox (PACKSLIP_SIGNING_KEY), which --keygen makes once, with its
-    public half in packslip.pub for consumers to pin (mise: pubkey = "...").
-    --snapshot builds, signs with a throwaway key and verifies, publishing
-    nothing; check runs it. NAME is the binary's name; default the repo's.
-    Every directory under skills/ ships as a skill.
+// Usage is what dev prints for these verbs. It is markdown in a file beside
+// this one, not a string const: a Go raw string is backtick-delimited, so it
+// can never hold the inline code that keeps a `<placeholder>` from reaching a
+// markdown renderer as an HTML tag.
 
-Needs goreleaser, packslip and gh, and a clean tree to publish.
-`
+//go:embed usage.md
+var Usage string
 
 // Run is `dev release DIR [VERSION]`.
 func Run(verb string, args []string, stdout, stderr io.Writer) error {

@@ -3,6 +3,7 @@
 package deps
 
 import (
+	_ "embed"
 	"fmt"
 	"io"
 	"io/fs"
@@ -14,10 +15,13 @@ import (
 	"github.com/joeblew999/dev/cli"
 )
 
-// Usage is what dev prints for this verb.
-const Usage = `dev deps list      list available Go module upgrades in every module, changing nothing
-dev deps upgrade   interactively upgrade Go modules in every module
-`
+// Usage is what dev prints for these verbs. It is markdown in a file beside
+// this one, not a string const: a Go raw string is backtick-delimited, so it
+// can never hold the inline code that keeps a `<placeholder>` from reaching a
+// markdown renderer as an HTML tag.
+
+//go:embed usage.md
+var Usage string
 
 // Run is `dev deps list|upgrade`.
 func Run(verb string, args []string, stdout, stderr io.Writer) error {

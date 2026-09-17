@@ -32,8 +32,15 @@ run = "hk install"
 
 [tasks.build]
 description = ".bin/dev, and the skill from its verbs"
-sources = ["**/*.go", "go.mod", "go.sum"]
-outputs = [".bin/dev"]
+# Every input go:embed compiles in, not just the Go. A file missing here
+# leaves .bin/dev stale while mise reports it fresh, and `dev skill` then
+# rewrites the manual from the old bytes and says it succeeded.
+sources = [
+  "**/*.go", "go.mod", "go.sum",
+  "skill/*.md", "cli/*.md", "internal/*/usage.md",
+  "internal/scaffold/files/**/*",
+]
+outputs = [".bin/dev", "skills/dev/SKILL.md", ".claude/skills/dev/SKILL.md", ".agents/skills/dev/SKILL.md"]
 run = [
   "go build -o .bin/dev .",
   ".bin/dev skill",
