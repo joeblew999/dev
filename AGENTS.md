@@ -67,6 +67,11 @@ and green first.
 - **One file at a time, then `go build ./...`.** It takes about a second. A
   batch of edits with one build at the end says something broke and not which
   edit did it.
+- **`mise run check`, not `mise run build`.** check depends on build, so it
+  compiles, writes the manual *and* runs every test, for under two seconds
+  more. build verifies nothing — it was written as the fast inner loop, and
+  reaching for it all day is how a broken test survives until the commit
+  refuses it. Nothing here is slow enough to be worth that.
 - **Edit by exact match, not by pattern.** `stdout` → `c.Stdout` across a file
   hits function parameters too. If a change cannot be written as an exact
   replacement of text you have just read, it is too big to do in one step.
