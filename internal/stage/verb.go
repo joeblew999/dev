@@ -31,42 +31,68 @@ func CheckFlags(fs *flag.FlagSet) {
 }
 
 // Run is every stage verb. DIR comes first; flags may follow anywhere.
-func Run(verb string, args []string, stdout, stderr io.Writer) error {
-	fs := cli.Flags(verb, stderr)
-	switch verb {
-	case "build":
-		dir, _, err := cli.DirAnd(fs, args, 0)
-		if err != nil {
-			return err
-		}
-		return Build(stdout, dir, false, "")
-	case "wasm":
-		EnvFlag(fs)
-		dir, _, err := cli.DirAnd(fs, args, 0)
-		if err != nil {
-			return err
-		}
-		return Build(stdout, dir, true, cli.Value(fs, "env"))
-	case "check":
-		CheckFlags(fs)
-		dir, _, err := cli.DirAnd(fs, args, 0)
-		if err != nil {
-			return err
-		}
-		return Check(stdout, dir, cli.Value(fs, "path"), cli.Value(fs, "expect"))
-	case "run":
-		dir, rest, err := cli.DirAnd(fs, args, -1)
-		if err != nil {
-			return err
-		}
-		return Exec(dir, false, "", rest)
-	case "workerd":
-		EnvFlag(fs)
-		dir, rest, err := cli.DirAnd(fs, args, -1)
-		if err != nil {
-			return err
-		}
-		return Exec(dir, true, cli.Value(fs, "env"), rest)
+// Each verb is its own function. One function switching on the verb it was
+// called as means the verb names live here as well as in the table that
+// declares them, and two lists of the same five strings drift.
+
+// BuildVerb is `build`: the binary, and the manual when the command has verbs.
+func BuildVerb(verb string, args []string, stdout, stderr io.Writer) error {
+	dir, err := dirOnly(verb, args, stderr, nil)
+	if err != nil {
+		return err
 	}
-	return cli.Usagef("stage: unknown verb %q", verb)
+	return Build(stdout, dir, false, "")
+}
+
+// WasmVerb is `wasm`: the same command built as a Worker.
+func WasmVerb(verb string, args []string, stdout, stderr io.Writer) error {
+	fs := cli.Flags(verb, stderr)
+	EnvFlag(fs)
+	dir, _, err := cli.DirAnd(fs, args, 0)
+	if err != nil {
+		return err
+	}
+	return Build(stdout, dir, true, cli.Value(fs, "env"))
+}
+
+// CheckVerb is `check`: everything that says the command is sound.
+func CheckVerb(verb string, args []string, stdout, stderr io.Writer) error {
+	fs := cli.Flags(verb, stderr)
+	CheckFlags(fs)
+	dir, _, err := cli.DirAnd(fs, args, 0)
+	if err != nil {
+		return err
+	}
+	return Check(stdout, dir, cli.Value(fs, "path"), cli.Value(fs, "expect"))
+}
+
+// RunVerb is `run`: the built binary, under the repo's secrets.
+func RunVerb(verb string, args []string, stdout, stderr io.Writer) error {
+	fs := cli.Flags(verb, stderr)
+	dir, rest, err := cli.DirAnd(fs, args, -1)
+	if err != nil {
+		return err
+	}
+	return Exec(dir, false, "", rest)
+}
+
+// WorkerdVerb is `workerd`: the Worker on local workerd.
+func WorkerdVerb(verb string, args []string, stdout, stderr io.Writer) error {
+	fs := cli.Flags(verb, stderr)
+	EnvFlag(fs)
+	dir, rest, err := cli.DirAnd(fs, args, -1)
+	if err != nil {
+		return err
+	}
+	return Exec(dir, true, cli.Value(fs, "env"), rest)
+}
+
+// dirOnly is a verb that takes a directory and nothing else.
+func dirOnly(verb string, args []string, stderr io.Writer, flags func(*flag.FlagSet)) (string, error) {
+	fs := cli.Flags(verb, stderr)
+	if flags != nil {
+		flags(fs)
+	}
+	dir, _, err := cli.DirAnd(fs, args, 0)
+	return dir, err
 }

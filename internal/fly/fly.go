@@ -29,8 +29,6 @@ const ConfigFile = "fly.toml"
 const (
 	// FlyctlBin is the CLI every Fly verb runs through.
 	FlyctlBin = "flyctl"
-	// FnoxBin is the wrapper that supplies the account's credentials.
-	FnoxBin = "fnox"
 	// OrgEnv names the org a new app is created in.
 	OrgEnv = "FLY_ORG"
 )
@@ -239,7 +237,7 @@ func Logs(dir string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(FnoxBin, "exec", "--", FlyctlBin, "logs", "--app", app)
+	cmd := exec.Command(fnox.Bin, "exec", "--", FlyctlBin, "logs", "--app", app)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()
 }

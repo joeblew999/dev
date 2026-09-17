@@ -30,13 +30,12 @@ const BinDir = ".bin"
 // gsx generates from .gsx sources, wrangler runs the Worker locally, fnox
 // supplies secrets at run time.
 const (
-	GoBin       = "go"
-	NpmBin      = "npm"
-	NodeBin     = "node"
-	TinyGoBin   = "tinygo"
-	GsxTool     = "gsx"
-	WranglerBin = "wrangler"
-	FnoxBin     = "fnox"
+	GoBin     = "go"
+	NpmBin    = "npm"
+	NodeBin   = "node"
+	TinyGoBin = "tinygo"
+	GsxTool   = "gsx"
+	FnoxBin   = "fnox"
 )
 
 // Env keys stage sets or reads.
@@ -170,7 +169,7 @@ func Exec(path string, asWorker bool, env string, args []string) error {
 		if !d.Wrangler {
 			return fmt.Errorf("%s has no wrangler.toml; it is not a Worker", d.Path)
 		}
-		return execIn(d.Path, WranglerBin, append([]string{"dev", "--env", env}, args...)...)
+		return execIn(d.Path, cloudflare.WranglerBin, append([]string{"dev", "--env", env}, args...)...)
 	}
 	if d.WasmOnly {
 		return fmt.Errorf("%s builds only a Worker; run it with --worker", d.Path)

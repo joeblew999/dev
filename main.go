@@ -42,11 +42,11 @@ var cliSkill string
 var dev = cli.Command{
 	Name: "dev",
 	Verbs: map[string]cli.Verb{
-		"build":   {Run: stage.Run, Args: "DIR", Desc: "make the binary, and the manual when the command has verbs", Usage: stage.Usage},
-		"wasm":    {Run: stage.Run, Args: "DIR", Flags: stage.EnvFlag, Desc: "build the same command as a Worker instead, for the environment you name", Usage: stage.Usage},
-		"check":   {Run: stage.Run, Args: "DIR", Flags: stage.CheckFlags, Desc: "everything that says the command is sound; this is what CI runs", Usage: stage.Usage},
-		"run":     {Run: stage.Run, Args: "DIR [-- ARGS]", Desc: "run the built binary with the repo's secrets loaded", Usage: stage.Usage},
-		"workerd": {Run: stage.Run, Args: "DIR [-- ARGS]", Flags: stage.EnvFlag, Desc: "serve the Worker locally, the way Cloudflare will run it", Usage: stage.Usage},
+		"build":   {Run: stage.BuildVerb, Args: "DIR", Desc: "make the binary, and the manual when the command has verbs", Usage: stage.Usage},
+		"wasm":    {Run: stage.WasmVerb, Args: "DIR", Flags: stage.EnvFlag, Desc: "build the same command as a Worker instead, for the environment you name", Usage: stage.Usage},
+		"check":   {Run: stage.CheckVerb, Args: "DIR", Flags: stage.CheckFlags, Desc: "everything that says the command is sound; this is what CI runs", Usage: stage.Usage},
+		"run":     {Run: stage.RunVerb, Args: "DIR [-- ARGS]", Desc: "run the built binary with the repo's secrets loaded", Usage: stage.Usage},
+		"workerd": {Run: stage.WorkerdVerb, Args: "DIR [-- ARGS]", Flags: stage.EnvFlag, Desc: "serve the Worker locally, the way Cloudflare will run it", Usage: stage.Usage},
 		"deploy":  {Run: app.Run, Args: "DIR [-- FLAGS]", Flags: app.DeployFlags, Desc: "put the command in the cloud its directory names", Usage: app.Usage},
 		"url":     {Run: app.Run, Args: "DIR", Flags: app.URLFlags, Desc: "print the address to talk to, deployed or local", Usage: app.Usage},
 		"logs":    {Run: app.Run, Args: "DIR", Flags: app.EnvFlag, Desc: "follow the deployed app's logs as they happen", Usage: app.Usage},

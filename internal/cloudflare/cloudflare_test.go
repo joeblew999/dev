@@ -3,7 +3,6 @@ package cloudflare
 import (
 	"bytes"
 	"fmt"
-	"github.com/joeblew999/dev/internal/suffix"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/joeblew999/dev/internal/suffix"
 
 	"github.com/BurntSushi/toml"
 
