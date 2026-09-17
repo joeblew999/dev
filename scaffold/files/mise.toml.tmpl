@@ -5,7 +5,7 @@
 go = "1.27"
 # packslip: a verified manifest plus version-matched skills. Exact versions,
 # so CI and every clone get the same release; `mise up` moves them.
-"packslip:github.com/joeblew999/dev" = "__DEV__"   # the stack's tool; `dev` lists its verbs
+"packslip:github.com/joeblew999/dev" = __DEV__   # the stack's tool; `dev` lists its verbs; pubkey: what its releases are signed with
 "packslip:github.com/jdx/fnox" = "1.35.2"
 "packslip:github.com/jdx/hk" = "2.0.1"
 jq = "latest"   # .claude/hooks/skill-gate reads the tool payload with it

@@ -47,11 +47,15 @@ var verbs = map[string]struct {
 	"init":    {scaffold.Run, scaffold.Usage},
 }
 
-// version is set by the release build (-X main.version); "dev" by hand.
-var version = "dev"
+// version and pubkey are set by the release build (-X main.version, -X
+// main.pubkey): the release's version, and the public key it is signed with.
+var (
+	version = "dev"
+	pubkey  = ""
+)
 
 func main() {
-	scaffold.Version = version
+	scaffold.Version, scaffold.Pubkey = version, pubkey
 	if len(os.Args) < 2 {
 		fmt.Fprint(os.Stderr, index())
 		os.Exit(2)

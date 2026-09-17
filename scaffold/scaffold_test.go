@@ -22,11 +22,11 @@ func TestInitWritesTheStackAndRefusesToOverwrite(t *testing.T) {
 		}
 	}
 	var out bytes.Buffer
-	if err := Init(&out, dir, "", "0.2.0"); err != nil {
+	if err := Init(&out, dir, "", "0.2.0", "RWQtest"); err != nil {
 		t.Fatal(err)
 	}
 	for path, want := range map[string]string{
-		"mise.toml":                `"packslip:github.com/joeblew999/dev" = "0.2.0"`,
+		"mise.toml":                `"packslip:github.com/joeblew999/dev" = { version = "0.2.0", pubkey = "RWQtest" }`,
 		"cmd/widget/go.mod":        "module github.com/acme/widget/cmd/widget",
 		"cmd/widget/main.go":       "hello from widget",
 		"go.work":                  "./cmd/widget",
@@ -54,7 +54,7 @@ func TestInitWritesTheStackAndRefusesToOverwrite(t *testing.T) {
 	// A second run touches nothing and says so.
 	before, _ := os.ReadFile(filepath.Join(dir, "mise.toml"))
 	out.Reset()
-	err := Init(&out, dir, "", "9.9.9")
+	err := Init(&out, dir, "", "9.9.9", "")
 	if err == nil || !strings.Contains(err.Error(), "every file exists") {
 		t.Errorf("second init = %v; want a refusal", err)
 	}
@@ -68,11 +68,11 @@ func TestInitWritesTheStackAndRefusesToOverwrite(t *testing.T) {
 }
 
 func TestInitNeedsAReleaseToPin(t *testing.T) {
-	err := Init(&bytes.Buffer{}, t.TempDir(), "x", "")
+	err := Init(&bytes.Buffer{}, t.TempDir(), "x", "", "")
 	if err == nil || !strings.Contains(err.Error(), "--pin") {
 		t.Errorf("a hand-built dev pinned itself: %v", err)
 	}
-	if err := Init(&bytes.Buffer{}, t.TempDir(), "Bad_Name", "1.0.0"); err == nil || !strings.Contains(err.Error(), "--name") {
+	if err := Init(&bytes.Buffer{}, t.TempDir(), "Bad_Name", "1.0.0", ""); err == nil || !strings.Contains(err.Error(), "--name") {
 		t.Errorf("a bad name was accepted: %v", err)
 	}
 }

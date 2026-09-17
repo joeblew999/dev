@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 
 	"golang.org/x/term"
@@ -24,6 +25,10 @@ const Usage = `dev secrets set DIR NAME|OWNER [--names LIST] [--generate] [--if-
     random value instead of prompting, --if-missing leaves an existing one
     alone. With --names, the project's "NAME<TAB>OWNER" lines, an owner such as
     a provider name resolves to its secret
+dev secrets ci NAME...
+    give the repo's GitHub Actions each named secret from fnox (gh secret set,
+    the value on stdin), for what CI must do with a credential: sign a
+    release with the shared key, deploy to Fly as upstream's workflow does
 dev secrets push DIR [--env NAME] [--fix TEMPLATE]
     read "NAME<TAB>OWNER" lines on stdin and push each secret from fnox to the
     app in DIR; a missing one prints TEMPLATE with {provider} filled in, and
@@ -59,6 +64,21 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 			return err
 		}
 		return Push(os.Stdin, stdout, dir, *env, *fix)
+	case "ci":
+		if err := fs.Parse(args[1:]); err != nil || fs.NArg() == 0 {
+			return cli.Usagef("secrets ci: give the names to push")
+		}
+		for _, name := range fs.Args() {
+			v, err := fnox.Get(name)
+			if err != nil || v == "" {
+				return fmt.Errorf("%s is not in fnox; store it with: fnox set -g %s", name, name)
+			}
+			if err := CI(name, v); err != nil {
+				return err
+			}
+			fmt.Fprintf(stdout, "set %s in this repo's Actions secrets\n", name)
+		}
+		return nil
 	}
 	return cli.Usagef("secrets: unknown subcommand %q", args[0])
 }
@@ -175,6 +195,18 @@ func Push(stdin io.Reader, out io.Writer, dir, env, fix string) error {
 	}
 	if problems > 0 {
 		return fmt.Errorf("%d secret(s) not pushed", problems)
+	}
+	return nil
+}
+
+// CI sets one of the repo's GitHub Actions secrets, the value on stdin. A
+// variable so tests can replace it.
+var CI = func(name, value string) error {
+	cmd := exec.Command("gh", "secret", "set", name)
+	cmd.Stdin = strings.NewReader(value)
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("gh secret set %s failed: %w (gh must be logged in with access to this repo)", name, err)
 	}
 	return nil
 }

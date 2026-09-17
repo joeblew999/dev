@@ -17,14 +17,18 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/joeblew999/dev/fnox"
 	"github.com/joeblew999/dev/internal/cli"
+	"github.com/joeblew999/dev/secrets"
 )
 
 const Usage = `dev release DIR [VERSION] [--snapshot] [--name NAME]
     publish a GitHub Release of the command in DIR: tag VERSION (vX.Y.Z; in CI
     the pushed tag), build every platform with goreleaser, sign the packslip
-    manifest, upload. --snapshot builds, signs with a throwaway key and
-    verifies, publishing nothing. NAME is the binary's name; default the
+    manifest, upload. Signed with the key in fnox (PACKSLIP_SIGNING_KEY),
+    which --keygen makes once, with its public half in packslip.pub for
+    consumers to pin (mise: pubkey = "..."). --snapshot builds, signs with a
+    throwaway key and verifies, publishing nothing. NAME is the binary's name; default the
     repo's. Every directory under skills/ ships as a skill.
 
 Needs goreleaser, packslip and gh, and a clean tree to publish.
@@ -33,8 +37,9 @@ Needs goreleaser, packslip and gh, and a clean tree to publish.
 // Run is `dev release DIR [VERSION]`.
 func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	fs := cli.Flags(verb, stderr)
-	var snapshot cli.Bool
+	var snapshot, keygen cli.Bool
 	fs.Var(&snapshot, "snapshot", "build, sign with a throwaway key and verify; publish nothing")
+	fs.Var(&keygen, "keygen", "make the signing key: into fnox, its public half into packslip.pub and the repo's Actions secret")
 	name := fs.String("name", "", "the binary's name (default: the repo's)")
 	if len(args) == 0 || args[0] == "" || strings.HasPrefix(args[0], "-") {
 		return cli.Usagef("release: the command directory comes first")
@@ -55,10 +60,91 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if keygen {
+		return Keygen(stdout)
+	}
 	if snapshot {
 		return r.snapshot()
 	}
 	return r.publish(version)
+}
+
+// The signing key. One long-lived Ed25519 key signs every release, local or
+// CI, so a consumer pins one public key: mise's `pubkey` on the tool. The
+// secret half lives in fnox for a developer and in the repo's Actions secret
+// for CI, under the same name; the public half is committed as packslip.pub.
+const (
+	SigningKeyEnv = "PACKSLIP_SIGNING_KEY"
+	pubFile       = "packslip.pub"
+)
+
+// signingKey writes the key to a file packslip can read and returns its path,
+// "" when there is no key. The environment wins (CI); then fnox.
+func signingKey() (path string, cleanup func(), err error) {
+	seed := os.Getenv(SigningKeyEnv)
+	if seed == "" {
+		seed, _ = fnox.Get(SigningKeyEnv)
+	}
+	if seed == "" {
+		return "", func() {}, nil
+	}
+	f, err := os.CreateTemp("", "packslip-*.key")
+	if err != nil {
+		return "", func() {}, err
+	}
+	if err := os.Chmod(f.Name(), 0o600); err != nil {
+		return "", func() {}, err
+	}
+	if _, err := f.WriteString(seed); err != nil {
+		return "", func() {}, err
+	}
+	f.Close()
+	return f.Name(), func() { os.Remove(f.Name()) }, nil
+}
+
+// Pubkey is the public key line consumers pin, from packslip.pub, "" without.
+func Pubkey(dir string) string {
+	data, err := os.ReadFile(filepath.Join(dir, pubFile))
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
+}
+
+// Keygen makes the signing key once: the secret into fnox and the repo's
+// Actions secret (through gh, on stdin), the public half into packslip.pub
+// for consumers to pin. It refuses when fnox already has one, since every
+// consumer pins that one's public half.
+func Keygen(out io.Writer) error {
+	if v, _ := fnox.Get(SigningKeyEnv); v != "" {
+		return fmt.Errorf("%s is already in fnox and consumers pin its public key (%s); to rotate, remove it from fnox first", SigningKeyEnv, pubFile)
+	}
+	tmp, err := keygen("packslip-new.key")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp)
+	defer os.Remove(strings.TrimSuffix(tmp, filepath.Ext(tmp)) + ".pub")
+	seed, err := os.ReadFile(tmp)
+	if err != nil {
+		return err
+	}
+	pub, err := os.ReadFile(strings.TrimSuffix(tmp, filepath.Ext(tmp)) + ".pub")
+	if err != nil {
+		return err
+	}
+	if err := fnox.Set(SigningKeyEnv, string(seed)); err != nil {
+		return fmt.Errorf("storing %s in fnox: %w", SigningKeyEnv, err)
+	}
+	if err := os.WriteFile(pubFile, pub, 0o644); err != nil {
+		return err
+	}
+	if err := secrets.CI(SigningKeyEnv, string(seed)); err != nil {
+		return fmt.Errorf("the key is in fnox and %s is written, but not in the repo's Actions secrets: %w; retry with: dev secrets ci %s", pubFile, err, SigningKeyEnv)
+	}
+	fmt.Fprintf(out, "signing key made: %s in fnox and in this repo's Actions secrets; commit %s.\nConsumers pin its public key:\n  \"packslip:github.com/<owner>/<repo>\" = { version = \"X.Y.Z\", pubkey = \"%s\" }\n", SigningKeyEnv, pubFile, Pubkey("."))
+	return nil
 }
 
 // release is one command directory as goreleaser and packslip see it.
@@ -100,7 +186,7 @@ func newRelease(dir, name string) (*release, error) {
 		if err != nil {
 			return nil, err
 		}
-		if _, err := f.WriteString(goreleaserConfig(name, dir)); err != nil {
+		if _, err := f.WriteString(goreleaserConfig(name, dir, Pubkey("."))); err != nil {
 			return nil, err
 		}
 		f.Close()
@@ -124,9 +210,10 @@ func binaries(config []byte) []string {
 // goreleaserConfig is the one every repo on this stack would otherwise copy:
 // a static binary for the platforms developers and CI run, tar.gz archives,
 // checksums, and the release created in the repo goreleaser runs in. A main
-// with `var version string` gets the release's version; one without is
-// unaffected, since the linker ignores -X for a symbol it cannot find.
-func goreleaserConfig(name, dir string) string {
+// with `var version string` gets the release's version and one with `var
+// pubkey string` the public key consumers pin; a main without is unaffected,
+// since the linker ignores -X for a symbol it cannot find.
+func goreleaserConfig(name, dir, pubkey string) string {
 	return fmt.Sprintf(`version: 2
 project_name: %s
 builds:
@@ -138,7 +225,7 @@ builds:
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
     flags: [-trimpath, -buildvcs=false]
-    ldflags: ["-s -w -buildid= -X main.version={{ .Version }}"]
+    ldflags: ["-s -w -buildid= -X main.version={{ .Version }} -X main.pubkey=%s"]
 archives:
   - formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
@@ -152,7 +239,7 @@ changelog:
   sort: asc
   filters:
     exclude: ["^docs:", "^test:", "^ci:", "^chore:", "Merge pull request", "Merge branch"]
-`, name, name, dir, name)
+`, name, name, dir, name, pubkey)
 }
 
 // run streams a command's output; the caller sees goreleaser, packslip and gh
@@ -307,7 +394,14 @@ func (r *release) publish(version string) error {
 		if err := run("goreleaser", "release", "--clean", "--config", r.config); err != nil {
 			return err
 		}
-		if err := r.create(strings.TrimPrefix(tag, "v"), os.Getenv("GITHUB_SHA"), tag, "", false); err != nil {
+		// The same key a local release uses, from the Actions secret, so
+		// consumers pin one public key; without it, the workflow's identity.
+		key, cleanup, err := signingKey()
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+		if err := r.create(strings.TrimPrefix(tag, "v"), os.Getenv("GITHUB_SHA"), tag, key, false); err != nil {
 			return err
 		}
 		return run("gh", "release", "upload", tag, "dist/packslip.sigstore.json", "--clobber")
@@ -353,12 +447,17 @@ func (r *release) publish(version string) error {
 	if err := run("goreleaser", "release", "--clean", "--config", r.config, "--release-notes", notes.Name()); err != nil {
 		return err
 	}
-	// A local release signs with a throwaway key, and the signature goes to
-	// the transparency log: mise refuses a bundle with no log entry. (A
-	// snapshot is never installed, so only it signs unlogged.)
-	key, err := keygen("packslip-local.key")
+	// A local release signs with the long-lived key from fnox, logged: mise
+	// refuses a bundle with no log entry, and a throwaway key would need a
+	// new pin on every release. (A snapshot is never installed, so only it
+	// signs with a throwaway key, unlogged.)
+	key, cleanup, err := signingKey()
 	if err != nil {
 		return err
+	}
+	defer cleanup()
+	if key == "" {
+		return fmt.Errorf("no signing key: make one with: dev release %s --keygen (into fnox as %s, its public half into %s)", r.dir, SigningKeyEnv, pubFile)
 	}
 	if err := r.create(strings.TrimPrefix(tag, "v"), commit, tag, key, false); err != nil {
 		return err

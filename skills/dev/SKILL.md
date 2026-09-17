@@ -73,7 +73,8 @@ dev init [DIR] [--name NAME] [--pin VERSION]
     first command cmd/NAME (an HTTP server answering /health) with its module
     and go.work. NAME defaults to DIR's name; the module path comes from the
     git remote, or example.com without one. VERSION is the dev release to
-    pin; default this binary's own. Existing files are left alone and named.
+    pin, with the public key its releases are signed with (--pubkey); default
+    this binary's own. Existing files are left alone and named.
     Then: mise trust && mise install && mise run test
 ```
 
@@ -81,8 +82,10 @@ dev init [DIR] [--name NAME] [--pin VERSION]
 dev release DIR [VERSION] [--snapshot] [--name NAME]
     publish a GitHub Release of the command in DIR: tag VERSION (vX.Y.Z; in CI
     the pushed tag), build every platform with goreleaser, sign the packslip
-    manifest, upload. --snapshot builds, signs with a throwaway key and
-    verifies, publishing nothing. NAME is the binary's name; default the
+    manifest, upload. Signed with the key in fnox (PACKSLIP_SIGNING_KEY),
+    which --keygen makes once, with its public half in packslip.pub for
+    consumers to pin (mise: pubkey = "..."). --snapshot builds, signs with a
+    throwaway key and verifies, publishing nothing. NAME is the binary's name; default the
     repo's. Every directory under skills/ ships as a skill.
 
 Needs goreleaser, packslip and gh, and a clean tree to publish.
@@ -94,6 +97,10 @@ dev secrets set DIR NAME|OWNER [--names LIST] [--generate] [--if-missing] [--env
     random value instead of prompting, --if-missing leaves an existing one
     alone. With --names, the project's "NAME<TAB>OWNER" lines, an owner such as
     a provider name resolves to its secret
+dev secrets ci NAME...
+    give the repo's GitHub Actions each named secret from fnox (gh secret set,
+    the value on stdin), for what CI must do with a credential: sign a
+    release with the shared key, deploy to Fly as upstream's workflow does
 dev secrets push DIR [--env NAME] [--fix TEMPLATE]
     read "NAME<TAB>OWNER" lines on stdin and push each secret from fnox to the
     app in DIR; a missing one prints TEMPLATE with {provider} filled in, and

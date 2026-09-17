@@ -29,7 +29,8 @@ const Usage = `dev init [DIR] [--name NAME] [--pin VERSION]
     first command cmd/NAME (an HTTP server answering /health) with its module
     and go.work. NAME defaults to DIR's name; the module path comes from the
     git remote, or example.com without one. VERSION is the dev release to
-    pin; default this binary's own. Existing files are left alone and named.
+    pin, with the public key its releases are signed with (--pubkey); default
+    this binary's own. Existing files are left alone and named.
     Then: mise trust && mise install && mise run test
 `
 
@@ -38,6 +39,7 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	fs := cli.Flags(verb, stderr)
 	name := fs.String("name", "", "the first command's name (default: the directory's)")
 	pin := fs.String("pin", "", "the dev release to pin (default: this binary's version)")
+	pubkey := fs.String("pubkey", "", "the public key its releases are signed with (default: this binary's)")
 	dir, _, err := cli.DirAnd(fs, append([]string{"."}, args...), 0)
 	if err != nil {
 		return err
@@ -48,16 +50,20 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 			return err
 		}
 	}
-	return Init(stdout, dir, *name, *pin)
+	return Init(stdout, dir, *name, *pin, *pubkey)
 }
 
-// Version is this binary's release, "dev" when built by hand; main sets it.
-var Version = "dev"
+// Version is this binary's release, "dev" when built by hand, and Pubkey the
+// public key its releases are signed with, "" when none; main sets both.
+var (
+	Version = "dev"
+	Pubkey  = ""
+)
 
 var validName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
 // Init writes the stack into dir.
-func Init(out io.Writer, dir, name, pin string) error {
+func Init(out io.Writer, dir, name, pin, pubkey string) error {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return err
@@ -74,13 +80,20 @@ func Init(out io.Writer, dir, name, pin string) error {
 	if pin == "dev" {
 		return fmt.Errorf("this dev was built by hand and has no release to pin; pass --pin VERSION")
 	}
+	if pubkey == "" {
+		pubkey = Pubkey
+	}
+	devPin := fmt.Sprintf("{ version = %q, pubkey = %q }", pin, pubkey)
+	if pubkey == "" {
+		devPin = fmt.Sprintf("%q", pin)
+	}
 	slug := slugOf(abs)
 	module := "github.com/" + slug
 	if slug == "" {
 		slug = "<owner>/" + name
 		module = "example.com/" + name
 	}
-	replace := strings.NewReplacer("__NAME__", name, "__DEV__", pin, "__MODULE__", module, "__SLUG__", slug)
+	replace := strings.NewReplacer("__NAME__", name, "__DEV__", devPin, "__MODULE__", module, "__SLUG__", slug)
 
 	var written, kept []string
 	err = fs.WalkDir(files, "files", func(path string, d fs.DirEntry, err error) error {
