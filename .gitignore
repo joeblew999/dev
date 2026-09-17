@@ -1,6 +1,6 @@
-bin
+.bin
 /dev
-/dist/
+/.dist/
 # mise packslip skill links, created per developer by mise skills sync
 .claude/skills/.mise-skills.json
 .claude/skills/hk-configure
