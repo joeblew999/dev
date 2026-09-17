@@ -22,9 +22,7 @@ Claude Code session in that repo has the manual.
   `dev skill` for Claude Code: **how to use the CLI, readable right here.**
   Never edited by hand; `mise run check` fails when it drifts.
 
-Nothing here restates them. `dev init` writes the stack into a new repo;
-`github.com/joeblew999/hello-stack` is exactly that and nothing else, the
-reference hello world.
+Nothing here restates them.
 
 ## Working on it
 

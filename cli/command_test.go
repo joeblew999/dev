@@ -41,7 +41,7 @@ func TestRun(t *testing.T) {
 		stdout string
 		stderr string
 	}{
-		{nil, 2, "", "tool: verbs, by what does them:"},
+		{nil, 2, "", "tool build DIR"},
 		{[]string{"nope"}, 2, "", `unknown verb "nope"`},
 		{[]string{"build"}, 0, "built\n", ""},
 		{[]string{"check"}, 2, "", "error: check: the directory comes first\n\ntool build DIR"},

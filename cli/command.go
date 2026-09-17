@@ -212,7 +212,7 @@ func (c Command) usages() []string {
 // because a terminal has no markdown renderer.
 func (c Command) index() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s: verbs, by what does them:\n\n", c.Name)
+	fmt.Fprintf(&b, "%s: every verb. `%s <verb> --help` says what one takes.\n\n", c.Name, c.Name)
 	for _, u := range c.usages() {
 		b.WriteString(Flatten(u))
 		b.WriteString("\n")

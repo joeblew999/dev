@@ -60,7 +60,6 @@ This file says only what is about developing the tool itself.
 | `internal/release/` | one goreleaser + packslip release by convention: the repo's name, `skills/*` |
 | `internal/deps/` | Go module upgrades across a workspace |
 | `internal/fnox/` | the one way to a secret; variables so tests can replace them |
-| `internal/scaffold/` | `dev init`: the stack's files and the first command, from embedded templates |
 | `internal/gitignore/` | `.gitignore` lines the tool owns |
 | `internal/gitrepo/` | which repository a directory is in, from its git remote |
 | `internal/suffix/` | `DEPLOY_SUFFIX` |

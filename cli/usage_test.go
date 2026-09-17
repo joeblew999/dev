@@ -308,7 +308,7 @@ func TestTopLevelHelpAnswersRatherThanCorrects(t *testing.T) {
 		if got != tc.code {
 			t.Errorf("run(%v) exited %d, want %d", tc.args, got, tc.code)
 		}
-		if tc.stdout && !strings.Contains(out.String(), "verbs, by what does them") {
+		if tc.stdout && !strings.Contains(out.String(), "x go") {
 			t.Errorf("run(%v) should answer on stdout, got %q", tc.args, out.String())
 		}
 		if !tc.stdout && errOut.String() == "" {

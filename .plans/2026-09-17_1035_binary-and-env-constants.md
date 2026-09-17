@@ -1,5 +1,10 @@
 # Binaries and env names become constants
 
+
+> **2026-09-17, later:** `internal/scaffold` and the `dev init` verb were
+> deleted (`b262516`). Anything below that names either is history — read it
+> as what was true when written.
+
 **File:** `dev/.plans/2026-09-17_1035_binary-and-env-constants.md` — refer to this plan by that name.
 
 **Status:** done 2026-09-17 — all 9 steps green, full suite + skill check pass ·

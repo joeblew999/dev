@@ -266,7 +266,7 @@ func TestUpdateFlag(t *testing.T) {
 	}
 }
 
-// A repo that vendors no skills, as dev init writes one, has an empty lock,
+// A repo that vendors no skills, has an empty lock,
 // and that is not an error: there is nothing to check.
 func TestEmptyLockIsNoSkills(t *testing.T) {
 	t.Chdir(t.TempDir())
