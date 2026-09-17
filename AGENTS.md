@@ -3,69 +3,54 @@
 # AGENT instructions
 
 This is the developer tool of the stack. It is used from many repos, so it is
-
 bounded: it knows the stack's conventions and nothing about any one project.
 
-## Speaking tone
+## The stack's rules live in the dev skill
 
-You must explain things in easy to understand ways when outputting to a developer.
+[.claude/skills/dev/SKILL.md](.claude/skills/dev/SKILL.md) is generated from
+the verbs and ships to every repo that pins dev. It holds how to work on a
+repo on this stack — tone, plans, issues, mise tasks, comments, testing for
+real, committing only named files, and keeping a verb's usage true to its
+code. Load it before build, test, release or deploy, and put a rule there
+rather than here when it holds for any repo, so that fixing it once fixes it
+everywhere.
 
-## Plans
+Two of its rules are worth naming here because they are the ones most easily
+skipped, and this file is read every session while the skill is read on
+demand:
 
-You must go into .plans with date time stamps.
+- **Keep the code and its usage right.** Change a flag, an argument or a
+  behaviour and change that verb's `usage.md` in the same edit. Tests hold the
+  manual to the verbs and the markdown to its shape; nothing can check that
+  the words are true. Read the usage against the code before calling a verb
+  done.
+- **Explain things in easy to understand ways** — about the code, and about
+  what you are doing and asking. A question a developer cannot parse is a
+  question you have not finished writing.
 
-Plans must have steps that are checked off as you do each step, so that any AI can pick up where you left off.
+This file says only what is about developing the tool itself.
 
-Plans must have a DOD ( Definition of done ).
+## Developing the tool
 
-Plans that are done are moved to the done sub folder.
-
-## Issues
-
-You must raise issues to the developer as you work on a plan or code.
-
-You can continue working in order to complete the task at hand, but you must provide follow ups in the plan and to the developer, so that we can ensure that issues are not forgotten.
-
-## Mise
-
-Mise is for orchestrations over the code.
-
-## Comments
-
-Its important that the comments say why when its neeed. Rational can help use not make the same mistakes.
-
-## Skills
-
-**The stack's rules live in the dev skill**, [.claude/skills/dev/SKILL.md](.claude/skills/dev/SKILL.md) —
-generated from the verbs, shipped to every repo that pins dev, and the one
-source of what the tool does and the rules it keeps. Load it before build,
-test, release or deploy. This file says only what is about developing the
-tool itself.
-
-- **Every workflow is a mise task.** `mise tasks` lists them. `mise run test`
-  before committing.
 - **Nothing project-specific.** No project, Worker, app or provider names in
   code, tests or messages; a repo reaches the tool through directories,
   `mise.toml` vars and the three tasks it supplies (`check`, `validate`,
   `secrets:list`).
-- **The skill is generated.** `dev skill` renders `skills/dev/SKILL.md` and the
-  copy in `.claude/skills/dev/` from the verbs' usage; never edit either by
-  hand. `mise run check` fails when stale.
-- **A package is one thing, named as the tasks name it**, and every verb has
-  the one shape in `cli`: `Run(verb, args, stdout, stderr)`.
-- **Test for real before saying done.** A cloud path that could not be
-  exercised is said so plainly.
-- **Commit only files you name.** Never `git add -A`.
+- **`cli/` is the public API** — the command shape, flags, DIR and `--`
+  passthrough — and every other repo on the stack builds its commands on it,
+  so a change there reaches them all. Everything else lives under `internal/`.
+- **The prose is markdown beside the code.** Each package's verbs are
+  documented in its own `usage.md`, the manual's surrounding prose in
+  `skill/head.md` and `skill/tail.md`, all compiled in by `go:embed`. A file
+  added there goes in `mise.toml`'s build `sources`, or editing it leaves the
+  binary stale while mise reports it fresh.
 
 ## Layout
 
-`cli/` is the public API: the command shape, flags, DIR and `--` passthrough.
-Everything else the tool is made of lives under `internal/`.
-
 | Path | Owns |
 |---|---|
-| `main.go` | the verb table, usage, and `dev skill` |
-| `cli/` | the public API: every command's verbs, skill and version |
+| `main.go` | the verb table, its order, and the prose around it |
+| `cli/` | the public API: verbs, the manual, the markdown it is written in |
 | `internal/stage/` | build, wasm, check, run, workerd: one command directory, read from what it holds |
 | `internal/app/` | url, deploy, logs, smoke, wait: which cloud a directory deploys to, and the dispatch |
 | `internal/cloudflare/` | the Workers target: wrangler, the workers.dev subdomain, the throwaway deploy copy |

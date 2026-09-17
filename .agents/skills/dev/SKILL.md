@@ -104,12 +104,16 @@ copy of every app. Run from the repo root; needs fnox, and wrangler or flyctl.
 - `dev release DIR [VERSION] [--snapshot] [--name NAME]`
   publish a GitHub Release of the command in DIR, the same locally and in
   GitHub Actions: VERSION here (vX.Y.Z), the pushed tag there. Build every
-  platform with goreleaser, sign the packslip manifest, upload. Signed with
-  the key in fnox (`PACKSLIP_SIGNING_KEY`), which `--keygen` makes once, with
-  its public half in `packslip.pub` for consumers to pin as their `pubkey`.
-  `--snapshot` builds, signs with a throwaway key and verifies, publishing
-  nothing; check runs it. NAME is the binary's name; default the repo's.
-  Every directory under `skills/` ships as a skill.
+  platform with goreleaser, sign the packslip manifest, upload. NAME is the
+  binary's name; default the repo's. Every directory under `skills/` ships as
+  a skill. `--snapshot` builds, signs with a throwaway key and verifies,
+  publishing nothing; check runs it.
+- `dev release DIR --keygen [--rotate]`
+  make the signing key every release is signed with: the private half into
+  fnox (`PACKSLIP_SIGNING_KEY`) and the repo's Actions secrets, the public
+  half into `packslip.pub` for consumers to pin as their `pubkey`. With
+  `--rotate`, replace a key that already exists and say what every consumer
+  must do; without it, an existing key is left alone.
 
 Needs goreleaser, packslip and gh, and a clean tree to publish.
 
@@ -205,3 +209,39 @@ earn their keep:
 - Every task runs the same locally and in GitHub Actions: mise run test and
   mise run release are what CI runs, from the one mise.toml. Local is the fast
   path day to day; CI proves a machine nobody set up. Neither replaces the other.
+
+## Working on a repo on this stack
+
+These hold in any repo that pins dev, and ride this skill rather than each
+repo's own AGENTS.md, so that fixing one fixes them everywhere.
+
+- **Explain things in easy to understand ways.** A developer reads what you
+  write; say it plainly, and say what a thing is before you say what to do
+  about it.
+- **Keep the code and its usage right.** A verb's `usage.md` is what a person
+  and an agent both read to know what the verb does. Change a flag, an
+  argument or a behaviour and change its usage in the same edit. `go test`
+  holds the manual to the verbs and `cli.CheckUsage` holds that markdown to
+  its shape, but nothing can check that the words are *true* — that is the
+  author's job. Before calling a verb done, read its usage against its code:
+  every flag the code registers appears, and every flag the usage names
+  exists.
+- **Every workflow is a mise task.** `mise tasks` lists them; mise is for
+  orchestration over the code. `mise run test` before committing, and never
+  call go, npm, wrangler, fly, fnox or goreleaser by hand when a task exists.
+- **The manual is generated.** `<cmd> skill` renders it from the verbs; never
+  edit a `SKILL.md` by hand, and `mise run check` fails when one is stale.
+- **A package is one thing, named as the tasks name it**, and every verb has
+  the one shape in `cli`: `Run(verb, args, stdout, stderr)`.
+- **Comments say why.** The reason is what stops the same mistake twice; what
+  the code does is already on the screen.
+- **Test for real before saying done.** A path that could not be exercised —
+  a cloud deploy, a machine you do not have — is said so plainly rather than
+  assumed.
+- **Commit only files you name.** Never `git add -A`.
+- **Plans go in `.plans`** with a date-time stamp, steps checked off as each
+  is done so any agent can pick the work up, and a DOD. Finished plans move
+  to `.plans/done/`.
+- **Raise issues as you find them.** Keep working to finish the task, but
+  write the follow-up into the plan and tell the developer, so nothing is
+  quietly dropped.
