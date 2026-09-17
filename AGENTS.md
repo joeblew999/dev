@@ -70,6 +70,10 @@ and green first.
 - **Edit by exact match, not by pattern.** `stdout` → `c.Stdout` across a file
   hits function parameters too. If a change cannot be written as an exact
   replacement of text you have just read, it is too big to do in one step.
+- **A commit runs it all.** hk's pre-commit is gofmt, vet, tidy, staticcheck,
+  whitespace, secrets and large files, and `mise run lint` runs that same list
+  from `hk.pkl` — one place, so the two can never disagree. CI runs
+  `mise run test`, which is that plus the tests and a signed snapshot release.
 - **`mise run lint` says what `go vet` will not** — a function nobody calls, a
   variable a refactor left behind, a deprecated call. Every one of those lived
   in this tree until staticcheck was added to the gate.

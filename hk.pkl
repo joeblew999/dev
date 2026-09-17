@@ -10,6 +10,19 @@ local linters = new Mapping {
     ["check_merge_conflict"] = Builtins.check_merge_conflict
     ["detect_private_key"] = Builtins.detect_private_key
     ["check_added_large_files"] = Builtins.check_added_large_files
+
+    // What go vet does not say: a function nobody calls, a variable a
+    // refactor left behind, a call deprecated a year ago. Every one of those
+    // lived in this tree until this ran on commit — running it only in a task
+    // means it runs when someone remembers, which is not a check.
+    //
+    // internal/session is skipped while its verb is parked: the package is
+    // unreachable, so reporting it every commit teaches people to ignore the
+    // whole step.
+    ["staticcheck"] = new Step {
+        glob = List("**/*.go")
+        check = "staticcheck $(go list ./... | grep -v internal/session)"
+    }
 }
 
 hooks {
