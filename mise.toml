@@ -41,13 +41,18 @@ sources = [
 ]
 outputs = [".bin/dev", "./dev", "skills/dev/SKILL.md", ".claude/skills/dev/SKILL.md", ".agents/skills/dev/SKILL.md"]
 run = [
+  # dev is the one repo whose command is the tool itself, so the build lands at
+  # the root as well: ./dev is how you try a change the way a person meets it,
+  # without .bin/ in front of every line. .gitignore has carried /dev for this
+  # all along. Every other repo reaches dev through its packslip pin, not here.
+  #
+  # The copy is here rather than last on purpose. `dev skill` can fail — the
+  # stale guard refuses when a source changed under it — and if the copy ran
+  # after, a failed skill would leave ./dev behind the build that just
+  # succeeded, which is the one thing a root copy must never be.
   "go build -o .bin/dev .",
-  ".bin/dev skill",
-  # dev is the one repo whose command is the tool itself, so a copy sits at the
-  # root: ./dev is how you try a change the way a person meets it, without
-  # .bin/ in front of every line. .gitignore has carried /dev for this all
-  # along. Every other repo reaches dev through its packslip pin, not here.
   "cp .bin/dev ./dev",
+  ".bin/dev skill",
 ]
 
 [tasks.lint]
