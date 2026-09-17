@@ -1,0 +1,49 @@
+- Repo: __SLUG__
+
+# Development instructions
+
+## Rule zero: nothing to remember
+
+- **Every workflow is a mise task.** `mise tasks` lists them. Do not document or
+  rely on raw `go`, `wrangler`, `flyctl` or `fnox` commands; if a workflow is
+  missing, add a task. **A task names a stage of a command, `dev` does it:**
+  `dev build|run|check|deploy|url|logs DIR` reads the directory and knows what
+  a Go main, a package.json, gsx sources, a wrangler.toml and a fly.toml need.
+  A task is one line in `mise.toml`; anything with a branch, a loop, a parse or
+  an API call belongs in the `dev` tool (`github.com/joeblew999/dev`), with a
+  test, never in a shell script behind a task.
+- **Every error names its fix.**
+- **Secret values live only in fnox** (`mise run secrets:set`) and in the
+  deployed app (`mise run secrets:push`). Cloud credentials come from fnox;
+  tasks wrap `fnox exec --`.
+- **hk owns the checks.** `mise run lint` runs them; the pre-commit hook and
+  the Claude Code Stop hook run the same, so `hk run check` must stay cheap.
+  The expensive, login-gated `session:verify` is bound to pre-push only.
+
+## Working rules
+
+- **Nothing outside this repo.** No global Claude Code skills, plugins, memory
+  or settings, and no files left in temp or home directories.
+- **Skills are pinned, synced by mise, and proven to load.** A packslip tool's
+  skill arrives with its pin; anything else is a `[source.*]` in
+  `session.toml`. The PreToolUse hook `.claude/hooks/skill-gate` loads the
+  right one before a write; `mise run hooks:check` proves it.
+- **Use tools the way their authors document them.**
+- **Once something works, put it in mise and the plan.** No manual steps.
+- **It must work for every developer**, who all use mise and fnox. No personal
+  account IDs, URLs or paths in committed files; a developer's own copy of
+  every deployed app comes from `DEPLOY_SUFFIX` in gitignored `mise.local.toml`.
+- **Test for real before saying done**, and say plainly what could not be.
+- **Prove a hello world round trip in every topology** before building on it.
+- **Commit only files you name.** Never `git add -A`.
+
+## Layout
+
+| Path | Owns |
+|---|---|
+| `cmd/__NAME__` | the first command, its own Go module: `main.go`, and beside it a `wrangler.toml` or `fly.toml` once it deploys |
+| `go.work` | the one file at the root that knows Go: every command's module |
+| `mise.toml` | every task; the stack half is identical across repos, the project half is a line per command and stage |
+| `session.toml` | what this repo pins of its Claude Code session |
+| `.claude/skills/SESSION.lock` | every skill a session here is allowed to have; `mise run session:verify --update` records it |
+| `skills/` | any skill this repo's releases ship via packslip |

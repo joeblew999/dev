@@ -1,0 +1,35 @@
+// Command __NAME__ is the first command of this repo: an HTTP server that
+// answers /health, the hello world every topology proves before anything is
+// built on it. `mise run __NAME__:run` serves it; `mise run __NAME__:check`
+// vets and tests it. Beside it, a wrangler.toml would make it a Cloudflare
+// Worker, a fly.toml a Fly app, and `dev` would deploy either.
+package main
+
+import (
+	"flag"
+	"fmt"
+	"log"
+	"net/http"
+)
+
+func main() {
+	addr := flag.String("addr", "127.0.0.1:8080", "address to listen on")
+	flag.Parse()
+	log.Printf("__NAME__ on http://%s", *addr)
+	if err := http.ListenAndServe(*addr, handler()); err != nil {
+		log.Fatalf("listen on %s: %v (another process holds the port, or pass -addr)", *addr, err)
+	}
+}
+
+// handler is the one HTTP handler, shared by every runtime this command
+// gets: native now, a Worker or a Fly app later.
+func handler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "ok")
+	})
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "hello from __NAME__")
+	})
+	return mux
+}

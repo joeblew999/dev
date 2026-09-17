@@ -1,0 +1,38 @@
+amends "package://github.com/jdx/hk/releases/download/v2.0.1/hk@2.0.1#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.0.1/hk@2.0.1#/Builtins.pkl"
+// Using a coding agent? See https://hk.jdx.dev/agents
+
+// Only builtins whose executables come from mise.toml (go) or the shell.
+local linters = new Mapping {
+    ["go_fmt"] = Builtins.go_fmt
+    ["go_vet"] = Builtins.go_vet
+    ["gomod_tidy"] = Builtins.gomod_tidy
+    // Vendored third-party skills are upstream content; never rewrite them.
+    ["trailing_whitespace"] = (Builtins.trailing_whitespace) {
+        exclude = List(".claude/skills/**")
+    }
+    ["check_merge_conflict"] = Builtins.check_merge_conflict
+    ["detect_private_key"] = Builtins.detect_private_key
+    ["check_added_large_files"] = Builtins.check_added_large_files
+}
+
+// The linters run on commit and on demand. `hk run check` is also what the
+// Claude Code Stop hook runs after every agent turn, so it must stay cheap.
+hooks {
+    ["pre-commit"] { steps = linters }
+    ["check"] { steps = linters }
+    ["fix"] { steps = linters }
+
+    // Push time is where the expensive checks go: a real Claude Code session
+    // held against SESSION.lock, and every MCP server connecting.
+    ["pre-push"] {
+        steps {
+            ["session_verify"] {
+                check = "mise run session:verify"
+            }
+            ["mcp_check"] {
+                check = "mise run session:mcp"
+            }
+        }
+    }
+}

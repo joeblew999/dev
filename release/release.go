@@ -64,6 +64,7 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 // release is one command directory as goreleaser and packslip see it.
 type release struct {
 	dir, name, slug string
+	bins            []string // every binary the archives hold
 	skills          []string // packslip resources, one per skills/<name>
 	config          string   // the goreleaser config to use
 	cleanup         func()
@@ -80,7 +81,7 @@ func newRelease(dir, name string) (*release, error) {
 	if name == "" {
 		name = s[strings.LastIndex(s, "/")+1:]
 	}
-	r := &release{dir: dir, name: name, slug: s, cleanup: func() {}}
+	r := &release{dir: dir, name: name, slug: s, bins: []string{name}, cleanup: func() {}}
 	entries, _ := os.ReadDir("skills")
 	for _, e := range entries {
 		if e.IsDir() {
@@ -88,7 +89,13 @@ func newRelease(dir, name string) (*release, error) {
 		}
 	}
 	r.config = ".goreleaser.yml"
-	if _, err := os.Stat(r.config); err != nil {
+	if data, err := os.ReadFile(r.config); err == nil {
+		// A repo with its own config may build more than one binary; the
+		// manifest must name every one, or mise exposes only the first.
+		if bins := binaries(data); len(bins) > 0 {
+			r.bins = bins
+		}
+	} else {
 		f, err := os.CreateTemp("", "goreleaser-*.yml")
 		if err != nil {
 			return nil, err
@@ -101,6 +108,17 @@ func newRelease(dir, name string) (*release, error) {
 		r.cleanup = func() { os.Remove(f.Name()) }
 	}
 	return r, nil
+}
+
+var binaryLine = regexp.MustCompile(`(?m)^\s*binary:\s*"?([^"\s]+)"?\s*$`)
+
+// binaries is every `binary:` a goreleaser config names, in order.
+func binaries(config []byte) []string {
+	var out []string
+	for _, m := range binaryLine.FindAllSubmatch(config, -1) {
+		out = append(out, string(m[1]))
+	}
+	return out
 }
 
 // goreleaserConfig is the one every repo on this stack would otherwise copy:
@@ -118,7 +136,7 @@ builds:
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
     flags: [-trimpath, -buildvcs=false]
-    ldflags: [-s -w -buildid=]
+    ldflags: [-s -w -buildid= -X github.com/joeblew999/dev/scaffold.Version={{ .Version }}]
 archives:
   - formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
@@ -200,13 +218,17 @@ func (r *release) createArgs(version, commit, tag, key string, noLog bool, artif
 		"--project", "github.com/" + r.slug,
 		"--version", version,
 		"--out", "dist",
-		"--bin", r.name,
+	}
+	for _, b := range r.bins {
+		args = append(args, "--bin", b)
+	}
+	args = append(args,
 		"--source-repo", repo,
 		"--commit", commit,
 		"--tag", tag,
-		"--url-base", repo + "/releases/download/" + tag + "/",
-		"--notes-url", repo + "/releases/tag/" + tag,
-	}
+		"--url-base", repo+"/releases/download/"+tag+"/",
+		"--notes-url", repo+"/releases/tag/"+tag,
+	)
 	if key != "" {
 		args = append(args, "--key", key)
 	}

@@ -30,9 +30,6 @@ func lockedFiles() (map[string]string, error) {
 		}
 		files[name] = hash
 	}
-	if len(files) == 0 {
-		return nil, fmt.Errorf("%s lists no skills", lockFile)
-	}
 	return files, nil
 }
 

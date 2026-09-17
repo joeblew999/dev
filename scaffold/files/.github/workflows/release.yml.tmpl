@@ -1,0 +1,34 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+  workflow_dispatch:
+
+permissions:
+  contents: write       # Upload the packslip bundle.
+  id-token: write       # Sign the packslip with the workflow's identity.
+  attestations: write   # Publish provenance for the matched files.
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      # SSOT: every tool comes from mise.toml. No setup-go, no goreleaser
+      # action; the release task runs the pinned goreleaser.
+      - name: Install mise
+        uses: jdx/mise-action@v4.3.0
+
+      # Same tasks a developer runs locally; the workflow only provides the
+      # signing identity that packslip needs.
+      - name: Build, sign, publish
+        run: |
+          mise run release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

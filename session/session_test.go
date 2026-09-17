@@ -3,6 +3,7 @@ package session
 import (
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -262,5 +263,21 @@ func TestUpdateFlag(t *testing.T) {
 		if update, ok := updateFlag(c.args); update != c.update || ok != c.ok {
 			t.Errorf("updateFlag(%q) = %v, %v; want %v, %v", c.args, update, ok, c.update, c.ok)
 		}
+	}
+}
+
+// A repo that vendors no skills, as dev init writes one, has an empty lock,
+// and that is not an error: there is nothing to check.
+func TestEmptyLockIsNoSkills(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFile(filepath.Join(skillsDir, lockFile), ""); err != nil {
+		t.Fatal(err)
+	}
+	files, err := lockedFiles()
+	if err != nil || len(files) != 0 {
+		t.Fatalf("lockedFiles() = %v, %v; want none and no error", files, err)
 	}
 }

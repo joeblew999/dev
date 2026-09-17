@@ -17,6 +17,7 @@ import (
 	"github.com/joeblew999/dev/deps"
 	"github.com/joeblew999/dev/internal/cli"
 	"github.com/joeblew999/dev/release"
+	"github.com/joeblew999/dev/scaffold"
 	"github.com/joeblew999/dev/secrets"
 	"github.com/joeblew999/dev/session"
 	"github.com/joeblew999/dev/stage"
@@ -42,6 +43,7 @@ var verbs = map[string]struct {
 	"session": {session.Run, session.Usage},
 	"release": {release.Run, release.Usage},
 	"deps":    {deps.Run, deps.Usage},
+	"init":    {scaffold.Run, scaffold.Usage},
 }
 
 func main() {
@@ -50,6 +52,10 @@ func main() {
 		os.Exit(2)
 	}
 	verb, args := os.Args[1], os.Args[2:]
+	if verb == "version" {
+		fmt.Println(scaffold.Version)
+		return
+	}
 	if verb == "skill" {
 		if err := skill(args); err != nil {
 			fmt.Fprintln(os.Stderr, "error:", err)
@@ -157,6 +163,7 @@ A repo on this stack is a few commands, each its own directory and Go module:
 main.go, and beside it a worker.go and wrangler.toml if it deploys to
 Cloudflare, a fly.toml if it deploys to Fly, a package.json and .gsx sources if
 it has a UI. A repo that is one command keeps it at the root and uses ` + "`.`" + `.
+A new repo gets the whole stack from ` + "`dev init`" + `.
 Every command has the same stages, and a mise task names one:
 ` + "`<cmd>:<stage>[:variant]`" + `, so ` + "`mise run proxy:deploy`" + ` runs
 ` + "`dev deploy cmd/proxy`" + `. Run stages through their tasks (` + "`mise tasks`" + `
