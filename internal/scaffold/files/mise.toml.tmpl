@@ -1,0 +1,162 @@
+# Everything this project does is a task below; `mise tasks` lists them.
+# Written by `dev init`; the stack half is the same in every repo on it.
+
+[tools]
+go = "1.27"
+# packslip: a verified manifest plus version-matched skills. Exact versions,
+# so CI and every clone get the same release; `mise up` moves them.
+"packslip:github.com/joeblew999/dev" = __DEV__   # the stack's tool; `dev` lists its verbs; pubkey: what its releases are signed with
+"packslip:github.com/jdx/fnox" = "1.35.2"
+"packslip:github.com/jdx/hk" = "2.0.1"
+jq = "latest"   # .claude/hooks/skill-gate reads the tool payload with it
+goreleaser = "latest"
+packslip = "latest"
+gh = "latest"
+
+[hooks]
+postinstall = { task = "bootstrap" }
+
+# Packslip skills link into .claude/skills next to the vendored copies from
+# session.toml; mise keeps real directories, so the two never fight.
+[settings.skills]
+auto_sync = true
+prune = true
+
+# Exact packslip pins are signature-checked; the 24h wait only ever held CI.
+[settings]
+minimum_release_age_excludes = ["packslip:*"]
+
+# ------------------------------------------------------------------------------
+# Tasks. `<cmd>:<stage>[:variant]`, or a stack verb. `dev <stage> <dir>` reads
+# the directory (Go main, package.json, .gsx, wrangler.toml, fly.toml) and does
+# the rest. Anything typed after a task name goes to the command. The stack
+# half names nothing of this project; it reaches the project through [vars]
+# and three tasks the project supplies: `check` (what test runs), `validate`
+# (what deploy runs first) and `secrets:list` (NAME<TAB>OWNER lines).
+# ------------------------------------------------------------------------------
+
+[vars]
+worker = "cmd/__NAME__"   # the command whose secrets secrets:* manage
+
+# ==============================================================================
+# The stack
+# ==============================================================================
+
+[tasks.lint]
+description = "hk checks: gofmt, vet, tidy, whitespace, secrets"
+run = "hk check --all"
+
+[tasks.test]
+description = "lint, the session and hook checks, then the project's own check: the same locally and in GitHub Actions (test.yml runs exactly this)"
+run = [
+  "mise run lint",
+  "mise run session:check",
+  "mise run hooks:check",
+  "mise run check",
+]
+
+[tasks.bootstrap]
+description = "wire a fresh clone: skills, settings, git hooks (runs after mise install)"
+depends = ["session:sync"]
+run = [
+  "mise skills sync",
+  "hk install",
+]
+
+[tasks."session:sync"]
+description = "write .claude/skills and the settings.json keys from session.toml"
+run = "dev session sync"
+
+[tasks."session:check"]
+hide = true
+run = "dev session check"
+
+[tasks."session:verify"]
+description = "hold a fresh Claude Code session against SESSION.lock (pre-push; --update re-records)"
+run = "dev session verify"
+
+[tasks."session:bump"]
+description = "move a pin in session.toml to upstream HEAD (one source, or all)"
+raw = true
+run = "dev session bump"
+
+[tasks."hooks:check"]
+description = "prove the Claude Code skill hook fires on every write and no read"
+run = ".claude/hooks/skill-gate.test"
+
+[tasks."session:mcp"]
+description = "every MCP server .mcp.json declares connects"
+run = "dev session mcp"
+
+[tasks."deps:list"]
+description = "Go module upgrades available, in every module"
+run = "dev deps list"
+
+[tasks."deps:upgrade"]
+description = "upgrade Go modules interactively, in every module"
+raw = true
+run = "dev deps upgrade"
+
+[tasks."secrets:set"]
+description = "store a secret in fnox and push it: <name|owner> [--generate] [--if-missing]"
+raw = true
+run = 'dev secrets set {{vars.worker}} --names "$(mise run secrets:list)"'
+
+[tasks."secrets:ci"]
+description = "give this repo's GitHub Actions a secret from fnox: <name>... (PACKSLIP_SIGNING_KEY for signed releases)"
+raw = true
+run = "dev secrets ci"
+
+[tasks."secrets:push"]
+description = "push every secret the project needs from fnox, naming any missing"
+run = "mise run secrets:list | dev secrets push {{vars.worker}}"
+
+[tasks.release]
+description = "publish a GitHub Release, the same locally and in GitHub Actions: <version> here, the pushed tag there (signed with the key in fnox; --keygen makes it)"
+raw = true
+run = "dev release cmd/__NAME__"
+
+[tasks."release:snapshot"]
+description = "build the release, sign and verify its manifest, publish nothing"
+run = "dev release cmd/__NAME__ --snapshot"
+
+# ==============================================================================
+# This project: one command so far, the same stages for each
+# ==============================================================================
+
+[tasks."__NAME__:build"]
+description = ".bin/__NAME__, and its skill from its verbs"
+sources = ["cmd/__NAME__/**/*.go", "cmd/__NAME__/go.mod"]
+outputs = [".bin/__NAME__"]
+run = "dev build cmd/__NAME__"
+
+[tasks."__NAME__:run"]
+alias = "dev"
+description = "__NAME__ on http://127.0.0.1:8080"
+depends = ["__NAME__:build"]
+raw = true
+run = "dev run cmd/__NAME__"
+
+[tasks."__NAME__:check"]
+description = "vet and test cmd/__NAME__ (the tests hold its skill to its verbs)"
+depends = ["__NAME__:build"]
+run = "dev check cmd/__NAME__"
+
+[tasks.build]
+description = "every command"
+depends = ["__NAME__:build"]
+
+[tasks.check]
+description = "what test runs here: every command's check"
+run = "mise run __NAME__:check"
+
+# What deploy runs first, once a command has a wrangler.toml or fly.toml.
+[tasks.validate]
+hide = true
+run = "true"
+
+# NAME<TAB>OWNER lines, one per secret the deployed command needs.
+[tasks."secrets:list"]
+hide = true
+quiet = true
+run = "true"

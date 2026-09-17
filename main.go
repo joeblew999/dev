@@ -9,14 +9,14 @@
 package main
 
 import (
-	"github.com/joeblew999/dev/app"
 	"github.com/joeblew999/dev/cli"
-	"github.com/joeblew999/dev/deps"
-	"github.com/joeblew999/dev/release"
-	"github.com/joeblew999/dev/scaffold"
-	"github.com/joeblew999/dev/secrets"
-	"github.com/joeblew999/dev/session"
-	"github.com/joeblew999/dev/stage"
+	"github.com/joeblew999/dev/internal/app"
+	"github.com/joeblew999/dev/internal/deps"
+	"github.com/joeblew999/dev/internal/release"
+	"github.com/joeblew999/dev/internal/scaffold"
+	"github.com/joeblew999/dev/internal/secrets"
+	"github.com/joeblew999/dev/internal/session"
+	"github.com/joeblew999/dev/internal/stage"
 )
 
 // dev is the whole tool: what each verb runs, and its usage. cli.Main runs it

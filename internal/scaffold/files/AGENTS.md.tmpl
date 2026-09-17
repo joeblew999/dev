@@ -1,0 +1,53 @@
+- Repo: __SLUG__
+
+# Development instructions
+
+**The stack's rules live in the dev skill**, `.claude/skills/dev/SKILL.md`
+([readable on GitHub](https://github.com/joeblew999/dev/blob/main/skills/dev/SKILL.md)) —
+linked by mise from the pinned `dev` release, generated from the tool's own
+verbs, and the one source of what the tool does and the rules it keeps:
+nothing personal in git, secrets only through fnox, every error names its fix,
+tests and releases the same locally and in GitHub Actions. Load it before
+build, test, release or deploy. This file says only what is about this repo.
+
+## Rule zero: nothing to remember
+
+- **Every workflow is a mise task.** `mise tasks` lists them. Do not document or
+  rely on raw `go`, `wrangler`, `flyctl` or `fnox` commands; if a workflow is
+  missing, add a task. A task is one line in `mise.toml`; anything with a
+  branch, a loop, a parse or an API call belongs in the `dev` tool
+  (`github.com/joeblew999/dev`), with a test, never in a shell script behind a
+  task.
+- **hk owns the checks.** `mise run lint` runs them; the pre-commit hook and
+  the Claude Code Stop hook run the same, so `hk run check` must stay cheap.
+  The expensive, login-gated `session:verify` is bound to pre-push only.
+
+## Working rules
+
+- **Nothing outside this repo.** No global Claude Code skills, plugins, memory
+  or settings, and no files left in temp or home directories.
+- **Skills are pinned, synced by mise, and proven to load.** A packslip tool's
+  skill arrives with its pin; anything else is a `[source.*]` in
+  `session.toml`. The PreToolUse hook `.claude/hooks/skill-gate` loads the
+  right one before a write; `mise run hooks:check` proves it.
+- **Use tools the way their authors document them.**
+- **Once something works, put it in mise and the plan.** No manual steps.
+- **One-time, per machine:** mise lists a packslip tool's releases through
+  GitHub's API, anonymously unless it has a token, and gh keeps its token in
+  the keyring where mise cannot read it. Tell mise once, in your own global
+  settings (a project may not):
+  `mise settings set github.credential_command "gh auth token"`.
+- **Test for real before saying done**, and say plainly what could not be.
+- **Prove a hello world round trip in every topology** before building on it.
+- **Commit only files you name.** Never `git add -A`.
+
+## Layout
+
+| Path | Owns |
+|---|---|
+| `cmd/__NAME__` | the first command, its own Go module: `main.go`, and beside it a `wrangler.toml` or `fly.toml` once it deploys |
+| `go.work` | the one file at the root that knows Go: every command's module |
+| `mise.toml` | every task; the stack half is identical across repos, the project half is a line per command and stage |
+| `session.toml` | what this repo pins of its Claude Code session |
+| `.claude/skills/SESSION.lock` | every skill a session here is allowed to have; `mise run session:verify --update` records it |
+| `skills/` | any skill this repo's releases ship via packslip |
