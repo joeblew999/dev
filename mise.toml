@@ -40,10 +40,15 @@ sources = [
   "skill/*.md", "cli/*.md", "internal/*/usage.md",
   "internal/scaffold/files/**/*",
 ]
-outputs = [".bin/dev", "skills/dev/SKILL.md", ".claude/skills/dev/SKILL.md", ".agents/skills/dev/SKILL.md"]
+outputs = [".bin/dev", "./dev", "skills/dev/SKILL.md", ".claude/skills/dev/SKILL.md", ".agents/skills/dev/SKILL.md"]
 run = [
   "go build -o .bin/dev .",
   ".bin/dev skill",
+  # dev is the one repo whose command is the tool itself, so a copy sits at the
+  # root: ./dev is how you try a change the way a person meets it, without
+  # .bin/ in front of every line. .gitignore has carried /dev for this all
+  # along. Every other repo reaches dev through its packslip pin, not here.
+  "cp .bin/dev ./dev",
 ]
 
 [tasks.lint]
