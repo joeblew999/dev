@@ -15,6 +15,14 @@ gh = "latest"
 [hooks]
 postinstall = { task = "bootstrap" }
 
+# mise resolves every packslip pin through the GitHub API, and unauthenticated
+# that is 60 requests an hour for the whole machine — which is reached by
+# installing a few tools and then looks like the release does not exist.
+# gh is already logged in, so borrow its token rather than asking anyone to
+# set one. dev release does the same for goreleaser.
+[env]
+GITHUB_TOKEN = "{{ exec(command='gh auth token 2>/dev/null || true') }}"
+
 [settings.skills]
 auto_sync = true
 prune = true
