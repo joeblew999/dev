@@ -15,10 +15,7 @@ package release
 import (
 	"bytes"
 	_ "embed"
-	"errors"
-	"flag"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,63 +23,8 @@ import (
 	"strings"
 
 	"github.com/joeblew999/dev/cli"
-	"github.com/joeblew999/dev/internal/fnox"
 	"github.com/joeblew999/dev/internal/gitrepo"
-	"github.com/joeblew999/dev/internal/secrets"
 )
-
-// Usage is what dev prints for these verbs. It is markdown in a file beside
-// this one, not a string const: a Go raw string is backtick-delimited, so it
-// can never hold the inline code that keeps a `<placeholder>` from reaching a
-// markdown renderer as an HTML tag.
-
-//go:embed usage.md
-var Usage string
-
-// Run is `dev release DIR [VERSION]`.
-// Flags are what `dev release` takes. main.go hands this to cli, which renders
-// the signature from it; Run calls it and reads the values back, so the manual
-// cannot name a flag this does not register, or miss one it does.
-func Flags(fs *flag.FlagSet) {
-	fs.Var(new(cli.Bool), "snapshot", "build, sign with a throwaway key and verify; publish nothing")
-	fs.Var(new(cli.Bool), "keygen", "make the signing key: into fnox, its public half into packslip.pub and the repo's Actions secret")
-	fs.Var(new(cli.Bool), "rotate", "with --keygen: replace the key that exists, and say what every consumer must do")
-	fs.String("name", "", "the binary's `NAME` (default: the repo's)")
-}
-
-func Run(verb string, args []string, stdout, stderr io.Writer) error {
-	fs := cli.Flags(verb, stderr)
-	Flags(fs)
-	if len(args) == 0 || args[0] == "" || strings.HasPrefix(args[0], "-") {
-		return cli.Usagef("release: the command directory comes first")
-	}
-	dir := args[0]
-	rest, err := cli.ParseInterleaved(fs, args[1:])
-	if errors.Is(err, cli.ErrHelp) {
-		return err
-	}
-	if err != nil {
-		return cli.Usagef("release: %v", err)
-	}
-	if len(rest) > 1 {
-		return cli.Usagef("release: at most one VERSION")
-	}
-	version := ""
-	if len(rest) == 1 {
-		version = rest[0]
-	}
-	r, err := newRelease(dir, cli.Value(fs, "name"))
-	if err != nil {
-		return err
-	}
-	if cli.Given(fs, "keygen") {
-		return Keygen(stdout, cli.Given(fs, "rotate"))
-	}
-	if cli.Given(fs, "snapshot") {
-		return r.snapshot()
-	}
-	return r.publish(version)
-}
 
 // The signing key. One long-lived Ed25519 key signs every release, local or
 // CI, so a consumer pins one public key: mise's `pubkey` on the tool. The
@@ -96,79 +38,6 @@ const (
 	PackslipBin   = "packslip"
 	GhBin         = "gh"
 )
-
-// signingKey writes the key to a file packslip can read and returns its path,
-// "" when there is no key. The environment wins (CI); then fnox.
-func signingKey() (path string, cleanup func(), err error) {
-	seed := os.Getenv(SigningKeyEnv)
-	if seed == "" {
-		seed, _ = fnox.Get(SigningKeyEnv)
-	}
-	if seed == "" {
-		return "", func() {}, nil
-	}
-	f, err := os.CreateTemp("", "packslip-*.key")
-	if err != nil {
-		return "", func() {}, err
-	}
-	if err := os.Chmod(f.Name(), 0o600); err != nil {
-		return "", func() {}, err
-	}
-	if _, err := f.WriteString(seed); err != nil {
-		return "", func() {}, err
-	}
-	f.Close()
-	return f.Name(), func() { os.Remove(f.Name()) }, nil
-}
-
-// Pubkey is the public key line consumers pin, from packslip.pub, "" without.
-func Pubkey(dir string) string {
-	data, err := os.ReadFile(filepath.Join(dir, pubFile))
-	if err != nil {
-		return ""
-	}
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	return strings.TrimSpace(lines[len(lines)-1])
-}
-
-// Keygen makes the signing key once: the secret into fnox and the repo's
-// Actions secret (through gh, on stdin), the public half into packslip.pub
-// for consumers to pin. It refuses when fnox already has one, since every
-// consumer pins that one's public half.
-func Keygen(out io.Writer, rotate bool) error {
-	had := Pubkey(".")
-	if v, _ := fnox.Get(SigningKeyEnv); v != "" && !rotate {
-		return fmt.Errorf("%s is already in fnox and consumers pin its public key (%s); to replace it: dev release . --keygen --rotate", SigningKeyEnv, pubFile)
-	}
-	tmp, err := keygen("packslip-new.key")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp)
-	defer os.Remove(strings.TrimSuffix(tmp, filepath.Ext(tmp)) + ".pub")
-	seed, err := os.ReadFile(tmp)
-	if err != nil {
-		return err
-	}
-	pub, err := os.ReadFile(strings.TrimSuffix(tmp, filepath.Ext(tmp)) + ".pub")
-	if err != nil {
-		return err
-	}
-	if err := fnox.Set(SigningKeyEnv, string(seed)); err != nil {
-		return fmt.Errorf("storing %s in fnox: %w", SigningKeyEnv, err)
-	}
-	if err := os.WriteFile(pubFile, pub, 0o644); err != nil {
-		return err
-	}
-	if err := secrets.CI(SigningKeyEnv, string(seed)); err != nil {
-		return fmt.Errorf("the key is in fnox and %s is written, but not in the repo's Actions secrets: %w; retry with: dev secrets ci %s", pubFile, err, SigningKeyEnv)
-	}
-	fmt.Fprintf(out, "signing key made: %s in fnox and in this repo's Actions secrets; commit %s.\nConsumers pin its public key:\n  \"packslip:github.com/<owner>/<repo>\" = { version = \"X.Y.Z\", pubkey = \"%s\" }\n", SigningKeyEnv, pubFile, Pubkey("."))
-	if rotate && had != "" {
-		fmt.Fprintf(out, "rotated from %s. The key signs every repo you release, so in each: dev secrets ci %s, commit its new %s.\nEvery consumer, on every machine: the new pubkey in its pin, then once: mise packslip forget packslip:github.com/<owner>/<repo>\n", had[:12]+"...", SigningKeyEnv, pubFile)
-	}
-	return nil
-}
 
 // DistDir is where goreleaser writes and packslip signs, under a dot for the
 // reason stage.BinDir is: build output is not source. dev states it rather
@@ -296,20 +165,6 @@ func out(name string, args ...string) (string, error) {
 
 // slug is owner/repo, from the origin remote.
 func slug() (string, error) { return gitrepo.Slug(".") }
-
-// keygen mints an ephemeral signing key under dir and returns its path. packslip
-// writes the public half on the stem (foo.key -> foo.pub); a stale one refuses
-// to be overwritten, so every spelling is removed first.
-func keygen(name string) (string, error) {
-	key := filepath.Join(os.TempDir(), name)
-	os.Remove(key)
-	os.Remove(key + ".pub")
-	os.Remove(strings.TrimSuffix(key, filepath.Ext(key)) + ".pub")
-	if err := run(PackslipBin, "keygen", "--out", key); err != nil {
-		return "", err
-	}
-	return key, nil
-}
 
 // create signs DistDir/*.tar.gz into DistDir/packslip.sigstore.json.
 func (r *release) create(version, commit, tag, key string, noLog bool) error {
