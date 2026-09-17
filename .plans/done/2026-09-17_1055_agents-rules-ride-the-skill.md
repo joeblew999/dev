@@ -2,7 +2,7 @@
 
 **File:** `dev/.plans/2026-09-17_1055_agents-rules-ride-the-skill.md` — refer to this plan by that name.
 
-**Status:** draft, not started · **Created:** 2026-09-17 10:55
+**Status:** DONE 2026-09-17 14:55 · **Created:** 2026-09-17 10:55
 **Affects:** this repo only — `main.go` `skillHead`/`skillTail` gain the
 repo-wide agent rules; `dev skill` regenerates; release ships. No new
 mechanism: `release/` already ships every `skills/<name>/`, mise already
@@ -41,6 +41,24 @@ does ("The stack's rules live in the dev skill").
 - [ ] `dev skill` regenerated (three copies), `go test ./...` green.
 - [ ] Next `dev release` ships the updated skill; consumer repos get it on
   pin bump.
+
+## Results
+
+Done. The repo-wide rules are in `skill/tail.md` under "Working on a repo on
+this stack", so they render into `skills/dev/SKILL.md` and ship to every repo
+that pins dev. `AGENTS.md` keeps only what is about developing the tool: no
+project names, `cli/` as the API every other repo builds on, prose as markdown
+beside the code that must be named in the build's `sources`, and the layout.
+
+One rule is new rather than moved — **keep the code and its usage right** —
+added because `dev release --rotate` was found registered in the code and
+named in no usage at all. Tests hold the manual to the verbs and the markdown
+to its shape; nothing can check that the words are true.
+
+Two rules are deliberately in both places: that one, and the tone rule.
+`AGENTS.md` is read every session while the skill is read on demand, and both
+are rules an agent skips under pressure. That is a considered exception to
+pointing rather than restating, not an oversight.
 
 ## Work
 
