@@ -16,7 +16,7 @@ import (
 // it like any other file.
 func Flatten(md string) string {
 	var b strings.Builder
-	for _, line := range strings.Split(strings.TrimRight(md, "\n"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimRight(md, "\n"), "\n") {
 		switch {
 		case strings.TrimSpace(line) == "":
 			b.WriteString("\n")

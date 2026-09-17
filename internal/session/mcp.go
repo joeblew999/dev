@@ -38,7 +38,7 @@ var unusable = regexp.MustCompile(`(?i)needs authentication|failed to connect|âœ
 // that a fresh clone could not use.
 func Unusable(report string) []string {
 	var bad []string
-	for _, line := range strings.Split(report, "\n") {
+	for line := range strings.SplitSeq(report, "\n") {
 		if unusable.MatchString(line) {
 			bad = append(bad, strings.TrimSpace(line))
 		}

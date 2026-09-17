@@ -104,7 +104,7 @@ func runCI(c cli.Call) error {
 // name, a name maps to itself, anything else is an error naming what exists.
 func Resolve(names, arg string) (string, error) {
 	var known []string
-	for _, line := range strings.Split(names, "\n") {
+	for line := range strings.SplitSeq(names, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 0 {
 			continue

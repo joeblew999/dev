@@ -163,9 +163,7 @@ func blankFrontmatter(md string) string {
 	}
 	for i := 1; i < len(lines); i++ {
 		if strings.TrimSpace(lines[i]) == "---" {
-			for j := 0; j <= i; j++ {
-				lines[j] = ""
-			}
+			clear(lines[:i+1])
 			break
 		}
 	}
@@ -186,7 +184,7 @@ func CheckDescribed(t TB, c Command) {
 	verbs := c.all()
 	for _, name := range sortedVerbs(verbs) {
 		described(t, c, verbs[name], name)
-		for _, line := range strings.Split(verbs[name].Usage, "\n") {
+		for line := range strings.SplitSeq(verbs[name].Usage, "\n") {
 			if strings.HasPrefix(strings.TrimSpace(line), "- ") {
 				t.Errorf("%s: a usage.md lists something: %q. The verbs are rendered under the prose; a list here is a second copy of them", c.Name, strings.TrimSpace(line))
 			}

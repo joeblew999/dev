@@ -69,7 +69,7 @@ func claudeSessions(now time.Time) []session {
 	}
 
 	var sessions []session
-	for _, line := range strings.Split(string(out), "\n") {
+	for line := range strings.SplitSeq(string(out), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 3 || !isClaudeBinary(fields[2]) {
 			continue
@@ -132,9 +132,9 @@ func processCwd(pid int) string {
 	if err != nil {
 		return ""
 	}
-	for _, line := range strings.Split(string(out), "\n") {
-		if strings.HasPrefix(line, "n") {
-			return strings.TrimPrefix(line, "n")
+	for line := range strings.SplitSeq(string(out), "\n") {
+		if after, ok := strings.CutPrefix(line, "n"); ok {
+			return after
 		}
 	}
 	return ""

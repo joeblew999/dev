@@ -40,7 +40,7 @@ name = "app-live"
 func fakeAccount(t *testing.T, token, subdomain string) (calls *int) {
 	t.Helper()
 	n := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n++
 		if r.Header.Get("Authorization") != "Bearer "+token {
 			w.WriteHeader(http.StatusForbidden)
@@ -49,7 +49,7 @@ func fakeAccount(t *testing.T, token, subdomain string) (calls *int) {
 		}
 		fmt.Fprintf(w, `{"success":true,"result":{"subdomain":%q}}`, subdomain)
 	}))
-	t.Cleanup(srv.Close)
+	srv.Start()
 	old := subdomainEndpoint
 	subdomainEndpoint = srv.URL + "/accounts/%s/workers/subdomain"
 	t.Cleanup(func() { subdomainEndpoint = old })
@@ -151,13 +151,13 @@ func TestWait(t *testing.T) {
 	sleep = func(time.Duration) {}
 	t.Cleanup(func() { sleep = oldSleep })
 	n := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n++
 		if n < 3 {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
 	}))
-	defer srv.Close()
+	srv.Start()
 	var out bytes.Buffer
 	if err := Wait(&out, srv.URL, time.Minute); err != nil {
 		t.Fatal(err)
@@ -165,15 +165,15 @@ func TestWait(t *testing.T) {
 	if n != 2+stableFor || strings.Count(out.String(), "waiting for") != 2 {
 		t.Fatalf("n=%d out=%q", n, out.String())
 	}
-	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(530) }))
-	defer down.Close()
+	down := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(530) }))
+	down.Start()
 	if err := Wait(&out, down.URL, 0); err == nil || !strings.Contains(err.Error(), "did not answer 200") {
 		t.Fatalf("got %v", err)
 	}
 }
 
 func TestCheckJudgesStatusAndBody(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/ok":
 			fmt.Fprint(w, "<h1>Pick a model</h1>")
@@ -182,7 +182,7 @@ func TestCheckJudgesStatusAndBody(t *testing.T) {
 			fmt.Fprint(w, "error code: 1042")
 		}
 	}))
-	defer srv.Close()
+	srv.Start()
 	if code, _, err := check(srv.URL+"/ok", "Pick a model"); err != nil || code != 200 {
 		t.Fatalf("ok: %d %v", code, err)
 	}

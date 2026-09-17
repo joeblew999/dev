@@ -6,6 +6,7 @@ package cli
 import (
 	_ "embed"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -39,10 +40,8 @@ func (c Command) groups() []group {
 // verb that shares it. What someone who typed a verb wrongly needs to see.
 func (c Command) sectionFor(verb string) string {
 	for _, g := range c.groups() {
-		for _, path := range g.paths {
-			if path == verb {
-				return c.section(g)
-			}
+		if slices.Contains(g.paths, verb) {
+			return c.section(g)
 		}
 	}
 	return ""

@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -84,12 +85,7 @@ func importsCLI(dir string) bool {
 	if err != nil {
 		return false
 	}
-	for _, line := range strings.Split(string(out), "\n") {
-		if line == cliPath {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(strings.Split(string(out), "\n"), cliPath)
 }
 
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }

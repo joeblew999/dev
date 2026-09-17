@@ -112,7 +112,7 @@ func rewriteRefs(path string, p pins) error {
 	}
 	var out []string
 	var section string
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
 			section = strings.Trim(trimmed, "[]")

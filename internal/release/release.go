@@ -63,7 +63,11 @@ func newRelease(dir, name string) (*release, error) {
 		return nil, err
 	}
 	if name == "" {
-		name = s[strings.LastIndex(s, "/")+1:]
+		if _, last, ok := strings.CutLast(s, "/"); ok {
+			name = last
+		} else {
+			name = s
+		}
 	}
 	r := &release{dir: dir, name: name, slug: s, bins: []string{name}, cleanup: func() {}}
 	entries, _ := os.ReadDir("skills")
@@ -236,8 +240,8 @@ func (r *release) snapshot() error {
 	if err != nil {
 		return err
 	}
-	if i := strings.LastIndex(pub, " "); i >= 0 {
-		pub = pub[i+1:]
+	if _, b64, ok := strings.CutLast(pub, " "); ok {
+		pub = b64
 	}
 	pubFile := key + ".b64"
 	if err := os.WriteFile(pubFile, []byte(pub+"\n"), 0o600); err != nil {
@@ -387,7 +391,7 @@ func modulePath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("reading go.mod to check the version: %w", err)
 	}
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "module "); ok {
 			return strings.TrimSpace(rest), nil
 		}

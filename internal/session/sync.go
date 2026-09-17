@@ -158,7 +158,7 @@ func writeOwned(dir string, have, want skillFiles) error {
 // file and every skill directory it names.
 func ownedPaths(lock []byte) []string {
 	owned := []string{lockFile}
-	for _, line := range strings.Split(strings.TrimSpace(string(lock)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(lock)), "\n") {
 		if name, _, ok := strings.Cut(line, "\t"); ok && name != "" {
 			owned = append(owned, name)
 		}
@@ -222,7 +222,7 @@ func dirExists(dir string) bool {
 
 func indent(s string) string {
 	var b strings.Builder
-	for _, line := range strings.Split(strings.TrimRight(s, "\n"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimRight(s, "\n"), "\n") {
 		b.WriteString("  " + line + "\n")
 	}
 	return b.String()

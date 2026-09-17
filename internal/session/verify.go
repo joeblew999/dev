@@ -154,7 +154,7 @@ func sessionSkills() ([]string, string, error) {
 		return nil, "", fmt.Errorf("claude -p: %w", err)
 	}
 	var names []string
-	for _, line := range strings.Split(string(answer), "\n") {
+	for line := range strings.SplitSeq(string(answer), "\n") {
 		if name := strings.TrimSpace(line); name != "" {
 			names = append(names, name)
 		}
@@ -227,7 +227,7 @@ func lockedSkillNames() ([]string, error) {
 	// file row: asking a session to list cloudflare/references/kv/api.md as a
 	// skill fails every time.
 	var names []string
-	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(data)), "\n") {
 		if name, _, ok := strings.Cut(line, "\t"); ok && !strings.Contains(name, "/") {
 			names = append(names, name)
 		}
@@ -262,7 +262,7 @@ func sessionLock() (names []string, recordedBy string, err error) {
 }
 
 func parseSessionLock(data string) (names []string, recordedBy string) {
-	for _, line := range strings.Split(strings.TrimSpace(data), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(data), "\n") {
 		line = strings.TrimSpace(line)
 		switch {
 		case strings.HasPrefix(line, versionLine):

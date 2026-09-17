@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -135,8 +136,7 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "\n%s", Flatten(usage))
 		return 0
 	}
-	var uerr *UsageError
-	if errors.As(err, &uerr) {
+	if _, ok := errors.AsType[*UsageError](err); ok {
 		// The group, not just its prose. The arguments were wrong, so what is
 		// wanted is the verbs — `dev deps` used to answer "list or upgrade"
 		// and then print prose naming neither, because a usage.md stopped
@@ -156,22 +156,21 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 // "secrets push" is a subcommand, "check ." is a verb and a directory — so
 // the caller tries this and falls back to the verb alone.
 func helpPath(verb string, rest []string) string {
-	path := verb
+	var path strings.Builder
+	path.WriteString(verb)
 	for _, arg := range rest {
 		if arg == "--" || strings.HasPrefix(arg, "-") {
 			break
 		}
-		path += " " + arg
+		path.WriteString(" " + arg)
 	}
-	return path
+	return path.String()
 }
 
 // all is the table plus the two verbs every command has.
 func (c Command) all() map[string]Verb {
 	m := make(map[string]Verb, len(c.Verbs)+2)
-	for name, v := range c.Verbs {
-		m[name] = v
-	}
+	maps.Copy(m, c.Verbs)
 	own := c.ownUsage()
 	m["skill"] = Verb{Run: c.skill, Flags: checkFlag, Desc: "rewrite the manual from the verbs, in all three places it is read", Usage: own}
 	m["skills"] = Verb{Run: c.skills, Desc: "list what every agent in this repo can read, and where each came from", Usage: own}

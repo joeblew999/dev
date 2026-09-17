@@ -17,7 +17,7 @@ func lockedFiles() (map[string]string, error) {
 		return nil, fmt.Errorf("%w; run: "+syncCmd, err)
 	}
 	files := map[string]string{}
-	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(data)), "\n") {
 		name, rest, ok := strings.Cut(line, "\t")
 		if !ok {
 			continue
