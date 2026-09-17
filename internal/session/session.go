@@ -39,6 +39,17 @@ var syncCmd = "mise run session:sync"
 var Usage string
 
 // Run is `dev session sync|check|verify|bump|mcp`.
+// Subs are session's subcommands. Only verify takes a flag, and it parses it
+// by hand rather than through a FlagSet, so it is declared here as the
+// positional it really is.
+var Subs = map[string]cli.Verb{
+	"sync":   {},
+	"check":  {},
+	"verify": {Args: "[--update]"},
+	"bump":   {Args: "[source]"},
+	"mcp":    {},
+}
+
 func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	if cli.HelpRequested(args) {
 		return cli.ErrHelp

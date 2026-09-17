@@ -49,21 +49,21 @@ var dev = cli.Command{
 		"check":   {Run: stage.Run, Args: "DIR", Flags: stage.CheckFlags, Usage: stage.Usage},
 		"run":     {Run: stage.Run, Args: "DIR [-- ARGS]", Usage: stage.Usage},
 		"workerd": {Run: stage.Run, Args: "DIR [-- ARGS]", Flags: stage.EnvFlag, Usage: stage.Usage},
-		"deploy":  {Run: app.Run, Usage: app.Usage},
-		"url":     {Run: app.Run, Usage: app.Usage},
-		"logs":    {Run: app.Run, Usage: app.Usage},
-		"smoke":   {Run: app.Run, Usage: app.Usage},
-		"wait":    {Run: app.Run, Usage: app.Usage},
-		"delete":  {Run: app.Run, Usage: app.Usage},
-		"secrets": {Run: secrets.Run, Usage: secrets.Usage},
+		"deploy":  {Run: app.Run, Args: "DIR [-- FLAGS]", Flags: app.DeployFlags, Usage: app.Usage},
+		"url":     {Run: app.Run, Args: "DIR", Flags: app.URLFlags, Usage: app.Usage},
+		"logs":    {Run: app.Run, Args: "DIR", Flags: app.EnvFlag, Usage: app.Usage},
+		"smoke":   {Run: app.Run, Args: "DIR", Flags: app.SmokeFlags, Usage: app.Usage},
+		"wait":    {Run: app.Run, Args: "URL", Flags: app.WaitFlags, Usage: app.Usage},
+		"delete":  {Run: app.Run, Args: "DIR", Flags: app.DeleteFlags, Usage: app.Usage},
+		"secrets": {Run: secrets.Run, Subs: secrets.Subs, Usage: secrets.Usage},
 		// "session": {Run: session.Run, Usage: session.Usage},
 		//
 		// Not exposed for now. The manual, the index and --help are all
 		// rendered from this table, so a verb left out of it is gone from every
 		// one of them with nothing else to change. internal/session stays
 		// compiled and tested; put the line back to have the verb back.
-		"release": {Run: release.Run, Usage: release.Usage},
-		"deps":    {Run: deps.Run, Usage: deps.Usage},
+		"release": {Run: release.Run, Args: "DIR [VERSION]", Flags: release.Flags, Usage: release.Usage},
+		"deps":    {Run: deps.Run, Subs: deps.Subs, Usage: deps.Usage},
 	},
 	Head: skillHead,
 	Tail: skillTail,

@@ -162,8 +162,8 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 		// The flag package has printed each flag and what it means; this adds
 		// what the verb is for. Together they are the whole of what a person
 		// needs, and neither is an error.
-		usage := v.Usage
-		if entry := helpEntry(v.Usage, c.Name, verb, rest); entry != "" {
+		usage := WithSignatures(v.Usage, c.Name, verbs)
+		if entry := helpEntry(usage, c.Name, verb, rest); entry != "" {
 			usage = entry
 		}
 		fmt.Fprintf(stdout, "\n%s", Flatten(usage))

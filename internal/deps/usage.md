@@ -1,6 +1,6 @@
 ### Dependencies
 
-- `dev deps list`
+- deps list
   list available Go module upgrades in every module, changing nothing
-- `dev deps upgrade`
+- deps upgrade
   interactively upgrade Go modules in every module

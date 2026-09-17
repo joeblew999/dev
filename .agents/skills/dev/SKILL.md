@@ -43,29 +43,32 @@ everything after a bare `--` goes to the program being run.
 
 ### Deploying
 
-- `dev url DIR [--deployed[=BOOL]] [--env NAME] [--local URL] [--refresh]`
+- `dev url DIR [--deployed] [--env NAME] [--local URL] [--refresh]`
   print the URL to talk to: the deployed app in DIR when `--deployed`, else
   `--local` (default empty). A Worker's needs the account's workers.dev
   subdomain: read once with the credentials in fnox, kept in gitignored
   `mise.local.toml`, `--refresh` asking again. A Fly app's is `<app>.fly.dev`.
-- `dev deploy DIR [--env NAME] [--wait PATH] [-- FLAGS]`
+- `dev deploy DIR [-- FLAGS] [--env NAME] [--wait PATH]`
   deploy what DIR holds. A Worker deploys from a throwaway copy of its
   `wrangler.toml`, so the ids wrangler writes back never reach git, and says
   what was created. A Fly app deploys with the repo root as build context,
   FLAGS going to flyctl, created first when the account lacks it (`FLY_ORG`
-  names the org). With `--wait`, wait until it answers 200 at PATH
+  names the org). With `--wait`, wait until it answers 200 at that path
 - `dev logs DIR [--env NAME]`
   stream the deployed app's logs (wrangler tail, flyctl logs)
-- `dev smoke DIR [--env NAME] [--path P] [--expect TEXT] [--timeout DURATION]`
-  run a Worker on local workerd with wrangler dev, request P (default `/`),
-  and fail unless it answers 200 with TEXT in the body
-- `dev wait URL [--timeout DURATION]`
+- `dev smoke DIR [--env NAME] [--expect TEXT] [--path P] [--timeout LONG]`
+  run a Worker on local workerd with wrangler dev, request `--path`, and fail
+  unless it answers 200 with `--expect` in the body. Only a Worker is run
+  locally, so a Fly app's smoke takes none of these flags; the signature shows
+  the Worker's, and `dev smoke DIR --help` shows what that directory's cloud
+  really takes.
+- `dev wait URL [--timeout LONG]`
   wait until URL answers 200 steadily
 - `dev delete DIR [--env NAME] [--name APP] [--yes]`
-  remove the deployed app in DIR, or APP (one a rename or an old config left
-  behind), and for a Worker the KV namespaces wrangler provisioned for it,
-  titled `<worker>-<binding>`; a namespace made by hand stays. Says what will
-  go and asks, unless `--yes`
+  remove the deployed app in DIR, or `--name` (one a rename or an old config
+  left behind), and for a Worker the KV namespaces wrangler provisioned for
+  it, titled `<worker>-<binding>`; a namespace made by hand stays. Says what
+  will go and asks, unless `--yes`
 
 Which cloud DIR deploys to is read from it: `wrangler.toml` means Cloudflare
 Workers, `fly.toml` means Fly; `--env` is a wrangler environment.
@@ -74,7 +77,7 @@ copy of every app. Run from the repo root; needs fnox, and wrangler or flyctl.
 
 ### Secrets
 
-- `dev secrets set DIR NAME|OWNER [--names LIST] [--generate] [--if-missing] [--env NAME]`
+- `dev secrets set DIR NAME|OWNER [--env NAME] [--generate] [--if-missing] [--names LIST]`
   store a secret in fnox and push it to the app in DIR; `--generate` makes a
   random value instead of prompting, `--if-missing` leaves an existing one
   alone. With `--names`, the project's `NAME<TAB>OWNER` lines, an owner such as
@@ -90,19 +93,17 @@ copy of every app. Run from the repo root; needs fnox, and wrangler or flyctl.
 
 ### Releasing
 
-- `dev release DIR [VERSION] [--snapshot] [--name NAME]`
+- `dev release DIR [VERSION] [--keygen] [--name NAME] [--rotate] [--snapshot]`
   publish a GitHub Release of the command in DIR, the same locally and in
   GitHub Actions: VERSION here (vX.Y.Z), the pushed tag there. Build every
-  platform with goreleaser, sign the packslip manifest, upload. NAME is the
-  binary's name; default the repo's. Every directory under `skills/` ships as
-  a skill. `--snapshot` builds, signs with a throwaway key and verifies,
-  publishing nothing; check runs it.
-- `dev release DIR --keygen [--rotate]`
-  make the signing key every release is signed with: the private half into
-  fnox (`PACKSLIP_SIGNING_KEY`) and the repo's Actions secrets, the public
-  half into `packslip.pub` for consumers to pin as their `pubkey`. With
-  `--rotate`, replace a key that already exists and say what every consumer
-  must do; without it, an existing key is left alone.
+  platform with goreleaser, sign the packslip manifest, upload. Every
+  directory under `skills/` ships as a skill. `--snapshot` builds, signs with
+  a throwaway key and verifies, publishing nothing; check runs it.
+  `--keygen` makes the signing key: the private half into fnox
+  (`PACKSLIP_SIGNING_KEY`) and the repo's Actions secrets, the public half
+  into `packslip.pub` for consumers to pin as their `pubkey`. With
+  `--rotate` it replaces a key that already exists and says what every
+  consumer must do; without it, an existing key is left alone.
 
 Needs goreleaser, packslip and gh, and a clean tree to publish.
 

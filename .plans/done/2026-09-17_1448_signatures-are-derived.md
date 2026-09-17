@@ -1,6 +1,6 @@
 # The signature is derived; usage.md is description only
 
-**Status:** in progress — steps 1 and 2 done · **Created:** 2026-09-17
+**Status:** DONE 2026-09-17 · **Created:** 2026-09-17
 **Affects:** `cli.Verb`, every verb in this repo, every command in every repo
 that builds on `cli`.
 
@@ -69,13 +69,13 @@ the directory first and shows that cloud's truth. The manual says so.
 
 ## DOD
 
-- [ ] `Verb` carries `Args`, `Flags` and `Subs`; `Usage` is description only.
-- [ ] Every signature in the manual is rendered, none typed.
-- [ ] A test fails when a verb registers a flag the manual does not show —
+- [x] `Verb` carries `Args`, `Flags` and `Subs`; `Usage` is description only.
+- [x] Every signature in the manual is rendered, none typed.
+- [x] A test fails when a verb registers a flag the manual does not show —
       I7, implemented rather than described.
-- [ ] `--rotate` appears without anyone having typed it.
-- [ ] The five cloud verbs' exception is written where a reader meets it.
-- [ ] `mise run test` green; the cli skill says what a verb declares.
+- [x] `--rotate` appears without anyone having typed it.
+- [x] The five cloud verbs' exception is written where a reader meets it.
+- [x] `mise run test` green; the cli skill says what a verb declares.
 
 ## Work
 
@@ -87,12 +87,35 @@ the directory first and shows that cloud's truth. The manual says so.
 - [x] 2. Proved on `stage`. Its `usage.md` is descriptions only; every
       signature in it is rendered. `cli.Value(fs, name)` reads a flag back,
       which is what one registration costs at the call site.
-- [ ] 3. `Verb.Subs`, and render a subcommand's signature the same way.
-- [ ] 4. Port `secrets`, `deps`, `release`.
-- [ ] 5. The five cloud verbs, with their exception documented.
-- [ ] 6. The I7 test: every registered flag appears in the rendered manual.
-- [ ] 7. Rewrite every `usage.md` to descriptions only.
-- [ ] 8. Update the `cli` skill; `mise run test`; record results here.
+- [x] 3. `Verb.Subs`, and render a subcommand's signature the same way.
+- [x] 4. Port `secrets`, `deps`, `release`.
+- [x] 5. The five cloud verbs, with their exception documented.
+- [x] 6. The I7 test: every registered flag appears in the rendered manual.
+- [x] 7. Rewrite every `usage.md` to descriptions only.
+- [x] 8. Update the `cli` skill; `mise run test`; record results here.
+
+## Results
+
+Every signature in the manual is rendered. `mise run test` exit 0.
+
+`--rotate` was the bug this fixes, and it is now the proof: `dev release DIR
+[VERSION] [--keygen] [--name NAME] [--rotate] [--snapshot]` is printed with
+nobody having typed any of it. Putting the old hand-typed signature back makes
+`TestFlags` fail, naming `--keygen` and `--rotate` as registered and unshown —
+so the bug that went unnoticed for a day now cannot survive a test run.
+
+**The exception is one verb, not five.** The plan assumed `url`, `deploy`,
+`logs`, `smoke` and `delete` all differ by cloud. Checked verb by verb, four
+register identical flags on both; only `smoke` differs, because only a Worker
+runs locally under workerd, so a Fly app's takes none of `--path`, `--expect`
+or `--timeout`. The signature shows the Worker's set and smoke's description
+says so.
+
+**Placeholders come from the standard library.** A backquoted word in a flag's
+help names its value, which `flag.UnquoteUsage` reads and `PrintDefaults`
+strips. So one string gives `[--env NAME]` in the manual and `-env NAME` under
+`--help`, and the old hand-chosen names (`P`, `TEXT`, `NAME`) survived the
+port rather than becoming `PATH`, `EXPECT`, `ENV`.
 
 ## Issues raised
 

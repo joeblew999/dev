@@ -296,3 +296,35 @@ func lookup(verbs map[string]Verb, path string) (Verb, string, bool) {
 	}
 	return v, path, true
 }
+
+// CheckFlags is check I7 of the i18n plan, made a test: every flag a verb
+// registers appears in the rendered manual, and every flag the manual shows
+// is registered.
+//
+// It cannot fail while a signature is rendered from the same registration the
+// parser uses — that is the point of rendering it. It exists for the case
+// that undid the first attempt: a verb whose usage still writes its own
+// signature by hand. Then the two are separate again, and this is what says
+// so rather than a person reading both.
+func CheckFlags(t TB, c Command) {
+	t.Helper()
+	verbs := c.all()
+	for _, name := range sortedVerbs(verbs) {
+		check(t, c, verbs, name, verbs[name])
+	}
+}
+
+// check holds one verb, then each of its subcommands, to its own manual.
+func check(t TB, c Command, verbs map[string]Verb, path string, v Verb) {
+	rendered := WithSignatures(v.Usage, c.Name, verbs)
+	if entry := Entry(rendered, c.Name, path); entry != "" {
+		for _, f := range v.flagSpecs() {
+			if !strings.Contains(entry, f) {
+				t.Errorf("%s %s registers %s and the manual does not show it; the signature is rendered from the flags, so a usage.md that writes its own is the only way this happens", c.Name, path, f)
+			}
+		}
+	}
+	for _, sub := range sortedVerbs(v.Subs) {
+		check(t, c, verbs, path+" "+sub, v.Subs[sub])
+	}
+}

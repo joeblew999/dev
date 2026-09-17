@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	_ "embed"
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -31,34 +32,62 @@ import (
 var Usage string
 
 // Run is `dev secrets set|push`.
+// Subs are secrets' subcommands, each declaring the flags it registers.
+// main.go hands these to cli, which renders every signature from them, and Run
+// registers the same ones — so `dev secrets push --help` and the manual show
+// the same flags because they are the same registration.
+var Subs = map[string]cli.Verb{
+	"set":  {Args: "DIR NAME|OWNER", Flags: SetFlags},
+	"push": {Args: "DIR", Flags: PushFlags},
+	"ci":   {Args: "NAME..."},
+}
+
+// EnvFlag is the environment every secrets subcommand pushes to.
+func EnvFlag(fs *flag.FlagSet) {
+	fs.String("env", "", "wrangler environment `NAME` to push to")
+}
+
+// SetFlags are what `secrets set` takes.
+func SetFlags(fs *flag.FlagSet) {
+	EnvFlag(fs)
+	fs.Var(new(cli.Bool), "generate", "make a random 64-hex-character value instead of prompting")
+	fs.Var(new(cli.Bool), "if-missing", "do nothing when fnox already has the secret")
+	fs.String("names", "", "the project's `LIST` of NAME<TAB>OWNER lines, so an owner resolves to its secret")
+}
+
+// PushFlags are what `secrets push` takes.
+func PushFlags(fs *flag.FlagSet) {
+	EnvFlag(fs)
+	fs.String("fix", "mise run secrets:set {provider}", "the `TEMPLATE` to run for a secret fnox does not have")
+}
+
 func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		return cli.Usagef("secrets: set or push")
 	}
 	fs := cli.Flags("secrets "+args[0], stderr)
-	env := fs.String("env", "", "wrangler environment to push to")
+	if sub, ok := Subs[args[0]]; ok && sub.Flags != nil {
+		sub.Flags(fs)
+	} else {
+		EnvFlag(fs)
+	}
 	switch args[0] {
 	case "set":
-		var generate, ifMissing cli.Bool
-		fs.Var(&generate, "generate", "make a random 64-hex-character value instead of prompting")
-		fs.Var(&ifMissing, "if-missing", "do nothing when fnox already has the secret")
-		names := fs.String("names", "", "the project's NAME<TAB>OWNER lines, so an owner resolves to its secret")
 		dir, rest, err := cli.DirAnd(fs, args[1:], 1)
 		if err != nil {
 			return err
 		}
-		name, err := Resolve(*names, rest[0])
+		name, err := Resolve(cli.Value(fs, "names"), rest[0])
 		if err != nil {
 			return err
 		}
-		return Set(os.Stdin, stdout, stderr, name, bool(generate), bool(ifMissing), dir, *env)
+		return Set(os.Stdin, stdout, stderr, name, cli.Given(fs, "generate"), cli.Given(fs, "if-missing"), dir, cli.Value(fs, "env"))
 	case "push":
-		fix := fs.String("fix", "mise run secrets:set {provider}", "what to run for a secret fnox does not have")
 		dir, _, err := cli.DirAnd(fs, args[1:], 0)
 		if err != nil {
 			return err
 		}
-		return Push(os.Stdin, stdout, dir, *env, *fix)
+		return Push(os.Stdin, stdout, dir, cli.Value(fs, "env"), cli.Value(fs, "fix"))
 	case "ci":
 		if err := fs.Parse(args[1:]); err != nil || fs.NArg() == 0 {
 			return cli.Usagef("secrets ci: give the names to push")

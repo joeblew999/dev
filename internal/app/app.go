@@ -7,6 +7,7 @@ package app
 
 import (
 	_ "embed"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -30,17 +31,68 @@ func init() { fly.Wait = cloudflare.Wait }
 
 // Run is every deployed-app verb. DIR comes first; the target's own Run
 // reads the flags.
+// The deploy verbs' flags. Both clouds register the same ones, checked verb
+// by verb, with one exception: a Worker's smoke takes --path, --expect and
+// --timeout and a Fly app's takes none, because only the Worker is run
+// locally under workerd. The signature shows the Worker's, which is the
+// larger set, and smoke's description says so.
+//
+// This is the one place a signature cannot be the whole truth: which cloud a
+// verb is talking to is read from DIR, so it is not known until the verb
+// runs. `<verb> DIR --help` resolves the directory first and prints that
+// cloud's flags.
+
+// EnvFlag is the wrangler environment, taken by every deploy verb.
+func EnvFlag(fs *flag.FlagSet) {
+	fs.String("env", "", "wrangler environment `NAME`")
+}
+
+// URLFlags are what `url` takes.
+func URLFlags(fs *flag.FlagSet) {
+	EnvFlag(fs)
+	fs.Var(new(cli.Bool), "deployed", "the deployed app's URL; otherwise --local")
+	fs.Var(new(cli.Bool), "refresh", "ask the API again instead of reading mise.local.toml")
+	fs.String("local", "", "the `URL` to print when not --deployed")
+}
+
+// DeployFlags are what `deploy` takes.
+func DeployFlags(fs *flag.FlagSet) {
+	EnvFlag(fs)
+	fs.String("wait", "", "the `PATH` to wait for a 200 on after deploying, e.g. /health")
+}
+
+// SmokeFlags are what `smoke` takes against a Worker; a Fly app takes none.
+func SmokeFlags(fs *flag.FlagSet) {
+	EnvFlag(fs)
+	fs.String("path", "/", "the `P` to request")
+	fs.String("expect", "", "the `TEXT` the body must contain")
+	fs.Duration("timeout", 3*time.Minute, "how `LONG` wrangler dev may take to start")
+}
+
+// DeleteFlags are what `delete` takes.
+func DeleteFlags(fs *flag.FlagSet) {
+	EnvFlag(fs)
+	fs.String("name", "", "the `APP` to remove (default: the one the config deploys env to)")
+	fs.Var(new(cli.Bool), "yes", "remove without asking")
+}
+
+// WaitFlags are what `wait` takes.
+func WaitFlags(fs *flag.FlagSet) {
+	fs.Duration("timeout", 2*time.Minute, "how `LONG` to keep trying")
+}
+
 func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	if verb == "wait" {
 		fs := cli.Flags(verb, stderr)
-		timeout := fs.Duration("timeout", 2*time.Minute, "how long to keep trying")
+		WaitFlags(fs)
 		if err := fs.Parse(args); err != nil {
 			return cli.Usagef("wait: %v", err)
 		}
 		if fs.NArg() != 1 {
 			return cli.Usagef("wait needs exactly one URL")
 		}
-		return cloudflare.Wait(stdout, fs.Arg(0), *timeout)
+		d, _ := time.ParseDuration(cli.Value(fs, "timeout"))
+		return cloudflare.Wait(stdout, fs.Arg(0), d)
 	}
 	if len(args) == 0 || args[0] == "" || args[0][0] == '-' {
 		return cli.Usagef("%s: the directory comes first", verb)

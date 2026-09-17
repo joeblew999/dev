@@ -1,13 +1,13 @@
 ### The pinned session
 
-- `dev session sync`
+- session sync
   write `.claude/skills` and the `.claude/settings.json` keys `session.toml`
   implies
-- `dev session check`
+- session check
   fail when either has drifted from `session.toml`
-- `dev session verify [--update]`
+- session verify
   hold a fresh Claude Code session against `SESSION.lock`; `--update` records it
-- `dev session bump [source]`
+- session bump
   move a pin in `session.toml` to upstream HEAD
-- `dev session mcp`
+- session mcp
   every MCP server `.mcp.json` declares connects

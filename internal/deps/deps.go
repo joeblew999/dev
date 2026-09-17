@@ -24,6 +24,13 @@ import (
 var Usage string
 
 // Run is `dev deps list|upgrade`.
+// Subs are deps' subcommands. Neither takes a flag, so each declares only
+// that it takes none; cli renders `dev deps list` from the names alone.
+var Subs = map[string]cli.Verb{
+	"list":    {},
+	"upgrade": {},
+}
+
 func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	if cli.HelpRequested(args) {
 		return cli.ErrHelp

@@ -19,13 +19,28 @@ Write a command against this rather than `flag` directly, and it gets
 var app = cli.Command{
     Name:    "hello",
     Default: "serve",
-    Verbs:   map[string]cli.Verb{"serve": {Run: serve, Usage: usage}},
-    Head:    head,
-    Tail:    tail,
+    Verbs: map[string]cli.Verb{
+        "serve": {Run: serve, Args: "DIR", Flags: serveFlags, Usage: usage},
+    },
+    Head: head,
+    Tail: tail,
 }
 
 func main() { cli.Main(app) }
 ```
+
+A verb declares what only it knows and nothing that is written elsewhere:
+
+- `Args` — its positionals, `"DIR"` or `"URL"` or `"DIR [VERSION]"`.
+- `Flags` — a func that registers its flags. `cli` renders the signature from
+  it and `Run` calls the same func, so there is one registration.
+- `Usage` — what the verb is for. Never its signature: that is rendered.
+- `Subs` — its subcommands, each with its own `Args` and `Flags`.
+
+So `dev check DIR [--expect TEXT] [--path P]` is never typed. A flag cannot
+be missing from a manual, because the manual is made from the flags — and
+`cli.CheckFlags` fails the test if a usage ever writes its own signature
+again.
 
 - `Name` — the binary's name. Its manual is `skills/<Name>/SKILL.md`.
 - `Verbs` — verb name to `Verb{Run, Usage}`. Verbs that share a package share
@@ -60,7 +75,11 @@ answer to several.
 
 - `cli.Flags(name, stderr)` — a `*flag.FlagSet` that reports to stderr and
   never exits. Each flag's third argument is what `--help` prints, so write it
-  as the sentence a person needs.
+  as the sentence a person needs, and backquote the word that names its
+  value: `"wrangler environment `+"`NAME`"+`"` prints as `[--env NAME]` in the
+  manual and `-env NAME` under `--help`, from one string.
+- `cli.Value(fs, name)` and `cli.Given(fs, name)` — read a flag back by name,
+  which is what registering through a func costs at the call site.
 - `cli.ParseInterleaved(fs, args)` — flags wherever they appear, positionals
   returned, everything after a bare `--` passed through verbatim. mise appends
   what a developer typed after a task name, so flags cannot be required first.
@@ -122,14 +141,16 @@ consumer gets it on a pin bump. That is how this manual reaches you.
 ## The two tests
 
 ```go
-func TestSkill(t *testing.T) { cli.CheckSkill(t, app) }
-func TestUsage(t *testing.T) { cli.CheckUsage(t, app) }
+func TestSkill(t *testing.T)  { cli.CheckSkill(t, app) }
+func TestUsage(t *testing.T)  { cli.CheckUsage(t, app) }
+func TestFlags(t *testing.T)  { cli.CheckFlags(t, app) }
 ```
 
 - `CheckSkill` fails when any copy of the manual differs from what the verbs
   render. It recompiles, so it is the one guard a stale binary cannot fool.
 - `CheckUsage` fails when a verb's usage uses markdown the terminal rendering
   cannot read, or leaves a `<placeholder>` outside inline code.
+- `CheckFlags` fails when a verb registers a flag its manual does not show.
 
 ## The markdown a usage.md may use
 

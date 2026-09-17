@@ -16,6 +16,7 @@ import (
 	"bytes"
 	_ "embed"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -40,13 +41,19 @@ import (
 var Usage string
 
 // Run is `dev release DIR [VERSION]`.
+// Flags are what `dev release` takes. main.go hands this to cli, which renders
+// the signature from it; Run calls it and reads the values back, so the manual
+// cannot name a flag this does not register, or miss one it does.
+func Flags(fs *flag.FlagSet) {
+	fs.Var(new(cli.Bool), "snapshot", "build, sign with a throwaway key and verify; publish nothing")
+	fs.Var(new(cli.Bool), "keygen", "make the signing key: into fnox, its public half into packslip.pub and the repo's Actions secret")
+	fs.Var(new(cli.Bool), "rotate", "with --keygen: replace the key that exists, and say what every consumer must do")
+	fs.String("name", "", "the binary's `NAME` (default: the repo's)")
+}
+
 func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	fs := cli.Flags(verb, stderr)
-	var snapshot, keygen, rotate cli.Bool
-	fs.Var(&snapshot, "snapshot", "build, sign with a throwaway key and verify; publish nothing")
-	fs.Var(&keygen, "keygen", "make the signing key: into fnox, its public half into packslip.pub and the repo's Actions secret")
-	fs.Var(&rotate, "rotate", "with --keygen: replace the key that exists, and say what every consumer must do")
-	name := fs.String("name", "", "the binary's name (default: the repo's)")
+	Flags(fs)
 	if len(args) == 0 || args[0] == "" || strings.HasPrefix(args[0], "-") {
 		return cli.Usagef("release: the command directory comes first")
 	}
@@ -65,14 +72,14 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	if len(rest) == 1 {
 		version = rest[0]
 	}
-	r, err := newRelease(dir, *name)
+	r, err := newRelease(dir, cli.Value(fs, "name"))
 	if err != nil {
 		return err
 	}
-	if keygen {
-		return Keygen(stdout, bool(rotate))
+	if cli.Given(fs, "keygen") {
+		return Keygen(stdout, cli.Given(fs, "rotate"))
 	}
-	if snapshot {
+	if cli.Given(fs, "snapshot") {
 		return r.snapshot()
 	}
 	return r.publish(version)
