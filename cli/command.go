@@ -112,7 +112,11 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 	}
 	var uerr *UsageError
 	if errors.As(err, &uerr) {
-		fmt.Fprintf(stderr, "error: %v\n\n%s", err, Flatten(v.Usage))
+		// The group, not just its prose. The arguments were wrong, so what is
+		// wanted is the verbs — `dev deps` used to answer "list or upgrade"
+		// and then print prose naming neither, because a usage.md stopped
+		// carrying the verbs when they started being rendered.
+		fmt.Fprintf(stderr, "error: %v\n\n%s", err, Flatten(c.sectionFor(verb)))
 		return 2
 	}
 	if err != nil {

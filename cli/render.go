@@ -35,6 +35,19 @@ func (c Command) groups() []group {
 	return out
 }
 
+// sectionFor is the section a verb belongs to: its group's prose and every
+// verb that shares it. What someone who typed a verb wrongly needs to see.
+func (c Command) sectionFor(verb string) string {
+	for _, g := range c.groups() {
+		for _, path := range g.paths {
+			if path == verb {
+				return c.section(g)
+			}
+		}
+	}
+	return ""
+}
+
 // index is what the binary prints with no verb: every section, flattened,
 // because a terminal has no markdown renderer.
 func (c Command) index() string {
