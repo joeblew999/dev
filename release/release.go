@@ -19,6 +19,7 @@ import (
 
 	"github.com/joeblew999/dev/fnox"
 	"github.com/joeblew999/dev/internal/cli"
+	"github.com/joeblew999/dev/internal/gitrepo"
 	"github.com/joeblew999/dev/secrets"
 )
 
@@ -256,24 +257,8 @@ func out(name string, args ...string) (string, error) {
 	return strings.TrimSpace(string(raw)), err
 }
 
-// slug derives "owner/repo" from the origin remote, so no repo name is
-// written anywhere.
-func slug() (string, error) {
-	url, err := out("git", "remote", "get-url", "origin")
-	if err != nil {
-		return "", fmt.Errorf("cannot read origin remote: %w", err)
-	}
-	rest := url
-	if i := strings.Index(rest, "github.com"); i >= 0 {
-		rest = rest[i+len("github.com"):]
-	}
-	rest = strings.TrimPrefix(strings.TrimPrefix(rest, ":"), "/")
-	rest = strings.TrimSuffix(strings.TrimSuffix(rest, ".git"), "/")
-	if strings.Count(rest, "/") != 1 {
-		return "", fmt.Errorf("cannot parse owner/repo from origin %q", url)
-	}
-	return rest, nil
-}
+// slug is owner/repo, from the origin remote.
+func slug() (string, error) { return gitrepo.Slug(".") }
 
 // keygen mints an ephemeral signing key under dir and returns its path. packslip
 // writes the public half on the stem (foo.key -> foo.pub); a stale one refuses

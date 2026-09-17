@@ -18,6 +18,7 @@ import (
 	"github.com/joeblew999/dev/app"
 	"github.com/joeblew999/dev/fnox"
 	"github.com/joeblew999/dev/internal/cli"
+	"github.com/joeblew999/dev/internal/gitrepo"
 )
 
 const Usage = `dev secrets set DIR NAME|OWNER [--names LIST] [--generate] [--if-missing] [--env NAME]
@@ -202,7 +203,11 @@ func Push(stdin io.Reader, out io.Writer, dir, env, fix string) error {
 // CI sets one of the repo's GitHub Actions secrets, the value on stdin. A
 // variable so tests can replace it.
 var CI = func(name, value string) error {
-	cmd := exec.Command("gh", "secret", "set", name)
+	slug, err := gitrepo.Slug(".")
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command("gh", "secret", "set", name, "--repo", slug)
 	cmd.Stdin = strings.NewReader(value)
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {

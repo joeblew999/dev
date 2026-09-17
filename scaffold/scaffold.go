@@ -11,12 +11,12 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/joeblew999/dev/internal/cli"
+	"github.com/joeblew999/dev/internal/gitrepo"
 )
 
 //go:embed all:files
@@ -141,18 +141,9 @@ func Init(out io.Writer, dir, name, pin, pubkey string) error {
 
 // slugOf is owner/repo from dir's git remote, "" without one.
 func slugOf(dir string) string {
-	cmd := exec.Command("git", "remote", "get-url", "origin")
-	cmd.Dir = dir
-	out, err := cmd.Output()
+	slug, err := gitrepo.Slug(dir)
 	if err != nil {
 		return ""
 	}
-	url := strings.TrimSpace(string(out))
-	url = strings.TrimSuffix(url, ".git")
-	for _, prefix := range []string{"https://github.com/", "git@github.com:", "ssh://git@github.com/"} {
-		if rest, ok := strings.CutPrefix(url, prefix); ok && strings.Count(rest, "/") == 1 {
-			return rest
-		}
-	}
-	return ""
+	return slug
 }
