@@ -163,9 +163,16 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 		// The flag package has printed each flag and what it means; this adds
 		// what the verb is for. Together they are the whole of what a person
 		// needs, and neither is an error.
+		// The group's prose goes with it. Whoever is reading this is here
+		// because they are about to run one verb, and an agent does not read
+		// the manual first — so what the flags mean is half of it, and why
+		// this family of verbs behaves as it does is the other half.
 		usage := one(c.Name, verbs, helpPath(verb, rest))
 		if usage == "" {
 			usage = one(c.Name, verbs, verb)
+		}
+		if prose := strings.TrimRight(v.Usage, "\n"); prose != "" {
+			usage = prose + "\n\n" + usage
 		}
 		fmt.Fprintf(stdout, "\n%s", Flatten(usage))
 		return 0
