@@ -123,7 +123,9 @@ func binaries(config []byte) []string {
 
 // goreleaserConfig is the one every repo on this stack would otherwise copy:
 // a static binary for the platforms developers and CI run, tar.gz archives,
-// checksums, and the release created in the repo goreleaser runs in.
+// checksums, and the release created in the repo goreleaser runs in. A main
+// with `var version string` gets the release's version; one without is
+// unaffected, since the linker ignores -X for a symbol it cannot find.
 func goreleaserConfig(name, dir string) string {
 	return fmt.Sprintf(`version: 2
 project_name: %s
@@ -136,7 +138,7 @@ builds:
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
     flags: [-trimpath, -buildvcs=false]
-    ldflags: [-s -w -buildid= -X github.com/joeblew999/dev/scaffold.Version={{ .Version }}]
+    ldflags: ["-s -w -buildid= -X main.version={{ .Version }}"]
 archives:
   - formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"

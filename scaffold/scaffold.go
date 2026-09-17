@@ -51,7 +51,7 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	return Init(stdout, dir, *name, *pin)
 }
 
-// Version is this binary's release, set by the build; "dev" when built by hand.
+// Version is this binary's release, "dev" when built by hand; main sets it.
 var Version = "dev"
 
 var validName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)

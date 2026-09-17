@@ -41,12 +41,13 @@ description = "hk checks: gofmt, vet, tidy, whitespace, secrets"
 run = "hk check --all"
 
 [tasks.check]
-description = "vet, tests, and the skill still matches the verbs"
+description = "vet, tests, the skill still matches the verbs, and a snapshot release builds and signs"
 depends = ["build"]
 run = [
   "go vet ./...",
   "go test ./...",
   "bin/dev skill --check",
+  "bin/dev release . --snapshot",
 ]
 
 [tasks.test]

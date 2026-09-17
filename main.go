@@ -46,14 +46,18 @@ var verbs = map[string]struct {
 	"init":    {scaffold.Run, scaffold.Usage},
 }
 
+// version is set by the release build (-X main.version); "dev" by hand.
+var version = "dev"
+
 func main() {
+	scaffold.Version = version
 	if len(os.Args) < 2 {
 		fmt.Fprint(os.Stderr, index())
 		os.Exit(2)
 	}
 	verb, args := os.Args[1], os.Args[2:]
 	if verb == "version" {
-		fmt.Println(scaffold.Version)
+		fmt.Println(version)
 		return
 	}
 	if verb == "skill" {
