@@ -412,7 +412,10 @@ func (c Command) skill(verb string, args []string, stdout, stderr io.Writer) err
 		return fmt.Errorf("%s has changed since this %s was built, so it would %s from stale embedded prose; rebuild first: mise run build", rel(changed), c.Name, what)
 	}
 	for name, body := range c.Skills {
-		if err := c.writeSkill(stdout, name, body, bool(check)); err != nil {
+		// Through withProvenance like the command's own manual: a shipped
+		// skill is as generated as any other file here, and one that does not
+		// say so is one somebody edits.
+		if err := c.writeSkill(stdout, name, withProvenance(body, c.Name), bool(check)); err != nil {
 			return err
 		}
 	}
@@ -522,9 +525,10 @@ func CheckSkill(t TB, c Command) {
 		return
 	}
 	for name, body := range c.Skills {
+		want := withProvenance(body, c.Name)
 		for _, p := range skillPaths(dir, name) {
 			have, err := os.ReadFile(p)
-			if err != nil || string(have) != body {
+			if err != nil || string(have) != want {
 				t.Errorf("%s is stale; regenerate it with: %s skill", rel(p), c.Name)
 			}
 		}
