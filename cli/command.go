@@ -63,6 +63,14 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 	if c.Default != "" && (len(args) == 0 || strings.HasPrefix(args[0], "-")) {
 		args = append([]string{c.Default}, args...)
 	}
+	// Asking what the command does is not an error, so it goes to stdout and
+	// exits 0 — the same rule a verb's --help follows. With no verb at all the
+	// index is a correction rather than an answer: it goes to stderr and
+	// exits 2, because something was meant to run and did not.
+	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
+		fmt.Fprint(stdout, c.index())
+		return 0
+	}
 	if len(args) == 0 {
 		fmt.Fprint(stderr, c.index())
 		return 2

@@ -287,3 +287,32 @@ func testHelpCommand() Command {
 		},
 	}}
 }
+
+// `<cmd> --help` is a question and gets an answer: the index, on stdout,
+// exit 0. `<cmd>` with no verb is a mistake and gets a correction: the same
+// text on stderr, exit 2. The difference is whether something was meant to
+// run, and a task that only wants to show the manual must not look failed.
+func TestTopLevelHelpAnswersRatherThanCorrects(t *testing.T) {
+	c := testHelpCommand()
+	for _, tc := range []struct {
+		args   []string
+		code   int
+		stdout bool
+	}{
+		{[]string{"--help"}, 0, true},
+		{[]string{"-h"}, 0, true},
+		{nil, 2, false},
+	} {
+		var out, errOut strings.Builder
+		got := c.run(tc.args, &out, &errOut)
+		if got != tc.code {
+			t.Errorf("run(%v) exited %d, want %d", tc.args, got, tc.code)
+		}
+		if tc.stdout && !strings.Contains(out.String(), "verbs, by what does them") {
+			t.Errorf("run(%v) should answer on stdout, got %q", tc.args, out.String())
+		}
+		if !tc.stdout && errOut.String() == "" {
+			t.Errorf("run(%v) should correct on stderr", tc.args)
+		}
+	}
+}

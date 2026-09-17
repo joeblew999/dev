@@ -68,6 +68,14 @@ description = "Regenerate skills/dev/SKILL.md, and the copy Claude Code reads he
 depends = ["build"]
 run = ".bin/dev skill"
 
+[tasks.usage]
+description = "Every verb and what it does, as the binary itself prints it"
+depends = ["build"]
+# The binary is the manual: this is the same text `dev` prints with no verb,
+# rendered from the verbs' own usage.md files. `mise run help <verb>` narrows
+# it to one verb and adds that verb's flags.
+run = ".bin/dev --help"
+
 [tasks.help]
 description = "What a verb takes (mise run help check): its flags, and what it is for"
 depends = ["build"]
