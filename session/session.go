@@ -91,9 +91,12 @@ func updateFlag(args []string) (update, ok bool) {
 	if len(args) != 1 {
 		return false, false
 	}
-	name, value, _ := strings.Cut(args[0], "=")
+	name, value, given := strings.Cut(args[0], "=")
 	if name != "--update" {
 		return false, false
+	}
+	if !given {
+		return true, true // a bare --update means yes
 	}
 	var b cli.Bool
 	if err := b.Set(value); err != nil {

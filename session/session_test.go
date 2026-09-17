@@ -244,3 +244,23 @@ func TestSessionLockRecordsWhichClaudeCodeWroteIt(t *testing.T) {
 		t.Fatalf("old format: got %v by %q", names, by)
 	}
 }
+
+// A bare --update once parsed as --update= and so as false: verify refused
+// the very change it was asked to record.
+func TestUpdateFlag(t *testing.T) {
+	for _, c := range []struct {
+		args       []string
+		update, ok bool
+	}{
+		{nil, false, true},
+		{[]string{"--update"}, true, true},
+		{[]string{"--update=true"}, true, true},
+		{[]string{"--update=false"}, false, true},
+		{[]string{"--other"}, false, false},
+		{[]string{"--update", "x"}, false, false},
+	} {
+		if update, ok := updateFlag(c.args); update != c.update || ok != c.ok {
+			t.Errorf("updateFlag(%q) = %v, %v; want %v, %v", c.args, update, ok, c.update, c.ok)
+		}
+	}
+}
