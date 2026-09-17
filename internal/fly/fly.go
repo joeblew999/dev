@@ -133,9 +133,6 @@ func Deploy(out io.Writer, dir string, extra []string) error {
 	return nil
 }
 
-// stdin is where delete's question is answered; a test replaces it.
-var stdin io.Reader = os.Stdin
-
 // Destroy removes the app dir's fly.toml names, suffix included, or name
 // when given, with its machines and volumes. It says so and asks, unless yes.
 func Destroy(stdin io.Reader, out io.Writer, dir, name string, yes bool) error {

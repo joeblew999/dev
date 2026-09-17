@@ -18,6 +18,7 @@ import (
 
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/cloudflare"
+	"github.com/joeblew999/dev/internal/fnox"
 )
 
 // BinDir is where every command's binary is built and run from, under a dot
@@ -35,7 +36,6 @@ const (
 	NodeBin   = "node"
 	TinyGoBin = "tinygo"
 	GsxTool   = "gsx"
-	FnoxBin   = "fnox"
 )
 
 // Env keys stage sets or reads.
@@ -174,7 +174,7 @@ func Exec(path string, asWorker bool, env string, args []string) error {
 	if d.WasmOnly {
 		return fmt.Errorf("%s builds only a Worker; run it with --worker", d.Path)
 	}
-	return execIn(d.Root, FnoxBin, append([]string{"exec", "--", filepath.Join(BinDir, d.Name)}, args...)...)
+	return execIn(d.Root, fnox.Bin, append([]string{"exec", "--", filepath.Join(BinDir, d.Name)}, args...)...)
 }
 
 // Check checks the directory: gsx formatting, go vet and go test (vet only,

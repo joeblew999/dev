@@ -54,6 +54,28 @@ This file says only what is about developing the tool itself.
   build `sources`, or editing it leaves the binary stale while mise reports it
   fresh.
 
+## Refactoring without breaking it
+
+Three times in one day a refactor here was done by editing Go as text — a
+blanket string replace, a regex over a line range, an index-and-slice rewrite
+— and each time it corrupted a file that had been fine. What saved it every
+time was `git checkout --`, which only worked because the tree was committed
+and green first.
+
+- **Commit green before starting.** The tree you can return to is the whole
+  safety net.
+- **One file at a time, then `go build ./...`.** It takes about a second. A
+  batch of edits with one build at the end says something broke and not which
+  edit did it.
+- **Edit by exact match, not by pattern.** `stdout` → `c.Stdout` across a file
+  hits function parameters too. If a change cannot be written as an exact
+  replacement of text you have just read, it is too big to do in one step.
+- **`mise run lint` says what `go vet` will not** — a function nobody calls, a
+  variable a refactor left behind, a deprecated call. Every one of those lived
+  in this tree until staticcheck was added to the gate.
+- **`mise run dead` is a report, not a gate.** Dead code is normal mid-refactor;
+  the point is to see what a change left behind, not to fail on it.
+
 ## Layout
 
 | Path | Owns |

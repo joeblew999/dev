@@ -16,6 +16,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -71,21 +72,33 @@ func Mentioned(md string) []string {
 	return out
 }
 
+// exported reads the package's own files. It parses each one rather than the
+// directory: ParseDir is deprecated because it ignores build tags, and every
+// file here is wanted anyway.
+//
 // exported is every name a package offers a caller: its functions, types,
 // struct fields, constants and package variables. A skill names any of them as
 // readily as it names a function, and each is a thing the package either has
 // or does not.
 func exported(t TB, dir string) map[string]bool {
-	pkgs, err := parser.ParseDir(token.NewFileSet(), dir, func(fi os.FileInfo) bool {
-		return !strings.HasSuffix(fi.Name(), "_test.go")
-	}, 0)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Errorf("reading %s: %v", dir, err)
 		return nil
 	}
+	fset := token.NewFileSet()
 	have := map[string]bool{}
-	for _, pkg := range pkgs {
-		ast.Inspect(pkg, func(n ast.Node) bool {
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(fset, filepath.Join(dir, name), nil, 0)
+		if err != nil {
+			t.Errorf("reading %s: %v", filepath.Join(dir, name), err)
+			continue
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
 			switch d := n.(type) {
 			case *ast.FuncDecl:
 				have[d.Name.Name] = true

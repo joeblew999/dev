@@ -24,6 +24,7 @@ import (
 
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/gitrepo"
+	"github.com/joeblew999/dev/internal/secrets"
 )
 
 // The signing key. One long-lived Ed25519 key signs every release, local or
@@ -36,7 +37,6 @@ const (
 	// The binaries a release drives.
 	GoreleaserBin = "goreleaser"
 	PackslipBin   = "packslip"
-	GhBin         = "gh"
 )
 
 // DistDir is where goreleaser writes and packslip signs, under a dot for the
@@ -297,7 +297,7 @@ func (r *release) publish(version string) error {
 	// goreleaser needs a token env even though gh authenticates from its own
 	// keychain; reuse it when set, else ask gh for one.
 	if os.Getenv("GITHUB_TOKEN") == "" {
-		if token, err := out(GhBin, "auth", "token"); err == nil && token != "" {
+		if token, err := out(secrets.GhBin, "auth", "token"); err == nil && token != "" {
 			os.Setenv("GITHUB_TOKEN", token)
 		}
 	}
@@ -331,8 +331,8 @@ func (r *release) publish(version string) error {
 	files := []string{DistDir + "/packslip.sigstore.json", DistDir + "/checksums.txt"}
 	matches, _ := filepath.Glob(DistDir + "/*.tar.gz")
 	files = append(files, matches...)
-	if err := run(GhBin, append(append([]string{"release", "upload", tag}, files...), "--clobber")...); err != nil {
-		if err := run(GhBin, append(append([]string{"release", "create", tag}, files...), "--title", tag, "--notes", "Release "+tag)...); err != nil {
+	if err := run(secrets.GhBin, append(append([]string{"release", "upload", tag}, files...), "--clobber")...); err != nil {
+		if err := run(secrets.GhBin, append(append([]string{"release", "create", tag}, files...), "--title", tag, "--notes", "Release "+tag)...); err != nil {
 			return err
 		}
 	}

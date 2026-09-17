@@ -10,6 +10,7 @@ goreleaser = "latest"
 packslip = "latest"
 gh = "latest"
 "go:golang.org/x/tools/cmd/deadcode" = "latest"   # what `mise run dead` reports
+"go:honnef.co/go/tools/cmd/staticcheck" = "latest"   # what `mise run lint` runs after hk
 
 [hooks]
 postinstall = { task = "bootstrap" }
@@ -68,8 +69,19 @@ description = "Code nothing reaches, so a refactor can see what it left behind"
 run = "deadcode -test ./..."
 
 [tasks.lint]
-description = "hk checks: gofmt, vet, tidy, whitespace, secrets"
-run = "hk check --all"
+description = "hk checks, then staticcheck: what go vet does not say"
+# go vet and the compiler are both silent about a function nobody calls, a
+# variable left behind by a refactor, and a standard library call that has
+# been deprecated for a year. Every one of those was found here by hand after
+# living in the tree for a while. staticcheck says them, so the gate does.
+#
+# session/ is excluded: its verb is parked, so the whole package is
+# unreachable and staticcheck is right to say so every time, which teaches
+# people to ignore it. Unpark the verb and the exclusion goes.
+run = [
+  "hk check --all",
+  "staticcheck $(go list ./... | grep -v internal/session)",
+]
 
 [tasks.check]
 description = "vet, tests (which hold the skill to the verbs), and a snapshot release builds and signs"

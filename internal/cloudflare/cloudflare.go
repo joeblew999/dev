@@ -8,7 +8,6 @@ package cloudflare
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -16,8 +15,15 @@ import (
 	"github.com/joeblew999/dev/internal/fnox"
 )
 
-// stdin is where delete's question is answered; a test replaces it.
-var stdin io.Reader = os.Stdin
+// What this package is about, named here rather than in whichever file
+// happened to need them first. Every other file in the package reads them
+// from here.
+const (
+	// ConfigFile is the file whose presence makes a directory a Worker.
+	ConfigFile = "wrangler.toml"
+	// WranglerBin is the CLI every Worker verb runs through.
+	WranglerBin = "wrangler"
+)
 
 // Run is every Worker verb but wait. DIR comes first; flags may follow anywhere.
 // Run is every Worker verb but wait. cli has parsed DIR and the flags before

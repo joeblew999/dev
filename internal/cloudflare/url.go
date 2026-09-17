@@ -17,12 +17,8 @@ import (
 )
 
 const (
-	// ConfigFile is the file whose presence makes a directory a Worker.
-	ConfigFile = "wrangler.toml"
-	// WranglerBin is the CLI every Worker verb runs through.
-	WranglerBin = "wrangler"
-	// FnoxBin is the wrapper that supplies the account's credentials.
-	FnoxBin      = "fnox"
+	// Where a developer's own workers.dev subdomain is remembered, so the
+	// account is asked for it once rather than on every url.
 	localFile    = "mise.local.toml"
 	subdomainKey = "CLOUDFLARE_WORKERS_SUBDOMAIN"
 )

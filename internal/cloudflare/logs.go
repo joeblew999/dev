@@ -3,6 +3,8 @@ package cloudflare
 import (
 	"os"
 	"os/exec"
+
+	"github.com/joeblew999/dev/internal/fnox"
 )
 
 // Logs streams the deployed Worker's logs, in the Worker's directory so
@@ -13,7 +15,7 @@ func Logs(dir, env string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(FnoxBin, "exec", "--", WranglerBin, "tail", name, "--env", env)
+	cmd := exec.Command(fnox.Bin, "exec", "--", WranglerBin, "tail", name, "--env", env)
 	cmd.Dir = dir
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()
