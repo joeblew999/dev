@@ -1,10 +1,12 @@
 package session
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -89,10 +91,7 @@ func Verify(out io.Writer, update bool) error {
 		if err := writeSessionLock(seen, current); err != nil {
 			return err
 		}
-		was := recordedBy
-		if was == "" {
-			was = "an unrecorded version"
-		}
+		was := cmp.Or(recordedBy, "an unrecorded version")
 		fmt.Fprintf(out, "Claude Code is %s; %s was recorded by %s, so it now follows this session.\n", current, sessionLockPath(), was)
 		if len(arrived) > 0 {
 			fmt.Fprintf(out, "arrived:\n%s", indent(strings.Join(arrived, "\n")))
@@ -199,11 +198,7 @@ func arrivalAdvice(arrived []string) string {
 		}
 	}
 	if len(plugins) > 0 {
-		var names []string
-		for plugin := range plugins {
-			names = append(names, plugin)
-		}
-		slices.Sort(names)
+		names := slices.Sorted(maps.Keys(plugins))
 		return fmt.Sprintf("these came from the %s plugin(s); add them to blocked_plugins in %s, then: %s",
 			strings.Join(names, ", "), pinsFile, syncCmd)
 	}

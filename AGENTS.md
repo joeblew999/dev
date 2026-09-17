@@ -5,6 +5,43 @@
 This is the developer tool of the stack. It is used from many repos, so it is
 bounded: it knows the stack's conventions and nothing about any one project.
 
+## Modern Go
+
+Refer to https://github.com/JetBrains/go-modern-guidelines and follow its
+way, and specifically ensure you install the tooling at
+https://github.com/JetBrains/go-modern-guidelines#claude-code — the plugin
+`modern-go-guidelines@goland-claude-marketplace`. Its skill builds a small CLI
+on first run from a directory outside any repo, so the machine needs a `go`
+there: `mise use -g go@1.27.1` once, a global default that every repo's own
+pin overrides.
+
+This module is `go 1.27`, so write 1.22–1.27 Go and not the workarounds that
+predate it. An agent's training likely predates 1.27, so when a feature seems
+too new to exist, `go doc` it before deciding it does not — the toolchain
+mise pins is the authority, not memory.
+
+The guidelines are applied in two halves, and the split is the whole method:
+
+- **`go fix ./...` first.** Every guideline that carries a modernizer is one
+  of its analyzers, and it rewrites by syntax tree — the one kind of editing
+  Go as text that the refactoring rules below do not warn against. `go fix
+  -diff ./...` previews, but read `git diff` after the real run: the preview
+  has been seen to miss files the run then touched.
+- **The rest by hand, the skill's way:** `list` for the file, `explain` a rule
+  before skipping it, and skip only when it would not compile, would change
+  behaviour, or plainly does not fit. The record of every rule against this
+  tree — applied, no site, or skipped with the rule's own reason — is
+  `.plans/done/2026-09-17_2120_modern-go-by-the-guidelines.md`.
+
+Two things the guidelines do not say and this repo learned:
+
+- `httptest.NewTestServer(t, h)` needs `srv.Start()` when the code under test
+  brings its own client: its default is an in-memory network that only
+  `srv.Client()` can reach.
+- The four `encoding/json` imports are v1 on purpose. The `json_v2` rule
+  itself says to leave existing code until a migration is asked for, because
+  even a compiling import swap can change what goes on the wire.
+
 ## Be clear
 
 when you speak back to the dev, be clear !!
@@ -85,23 +122,6 @@ and green first.
 - **`mise run dead` is a report, not a gate.** Dead code is normal mid-refactor;
   the point is to see what a change left behind, not to fail on it.
 
-## Modern Go
-
-This module is `go 1.27`, so write 1.22–1.27 Go and not the workarounds that
-predate it.
-
-- `for i := range n`, not `for i := 0; i < n; i++`.
-- No `v := v` before a closure or goroutine: loop variables stopped being
-  shared in 1.22.
-- `slices` and `maps` for sorting, searching, cloning and comparing — not
-  `sort` and not a hand-written loop. `slices.Sort`, `slices.SortFunc`,
-  `slices.Contains`, `slices.Equal`.
-- The built-in `min` and `max`.
-- `net/http`'s own `ServeMux` with `"GET /thing/{id}"` and `r.PathValue("id")`;
-  no third-party router.
-- `log/slog` for structured logging; no logrus, no zap.
-- `iter.Seq` and `iter.Seq2` for a collection worth ranging over.
-- `errors.Join` to accumulate, `fmt.Errorf("...: %w", err)` to wrap.
 
 ## Layout
 

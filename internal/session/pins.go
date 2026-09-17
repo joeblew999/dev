@@ -2,6 +2,7 @@ package session
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/BurntSushi/toml"
@@ -70,10 +71,5 @@ func loadPins() (pins, error) {
 
 // names returns source names in sorted order, so sync and check are stable.
 func (p pins) names() []string {
-	var names []string
-	for name := range p.Source {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	return names
+	return slices.Sorted(maps.Keys(p.Source))
 }

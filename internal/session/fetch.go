@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -25,7 +26,7 @@ func copyTar(files skillFiles, archive []byte, prefix, name, repo, ref string) e
 	r := tar.NewReader(gz)
 	for {
 		header, err := r.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

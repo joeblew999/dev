@@ -2,6 +2,7 @@ package cloudflare
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,9 +24,7 @@ func Delete(stdin io.Reader, out io.Writer, dir, env, name string, yes bool) err
 	if err != nil {
 		return err
 	}
-	if name == "" {
-		name = workerName(cfg, env)
-	}
+	name = cmp.Or(name, workerName(cfg, env))
 	all, err := namespaces(dir)
 	if err != nil {
 		return err

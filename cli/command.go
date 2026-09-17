@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -126,10 +127,7 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 		// because they are about to run one verb, and an agent does not read
 		// the manual first — so what the flags mean is half of it, and why
 		// this family of verbs behaves as it does is the other half.
-		usage := one(c.Name, verbs, helpPath(verb, rest))
-		if usage == "" {
-			usage = one(c.Name, verbs, verb)
-		}
+		usage := cmp.Or(one(c.Name, verbs, helpPath(verb, rest)), one(c.Name, verbs, verb))
 		if prose := strings.TrimRight(v.Usage, "\n"); prose != "" {
 			usage = prose + "\n\n" + usage
 		}
@@ -188,12 +186,7 @@ func (c Command) ownUsage() string { return usageTemplate }
 // of its own; everything that walks the table walks it through here, so the
 // manual, the index and CheckUsage all agree.
 func sortedVerbs(verbs map[string]Verb) []string {
-	names := make([]string, 0, len(verbs))
-	for name := range verbs {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	return names
+	return slices.Sorted(maps.Keys(verbs))
 }
 
 // manualOrder is the verb names in the order the manual reads them: Order

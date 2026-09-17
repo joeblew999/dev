@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -88,13 +89,6 @@ func lockSkill(name, source string, files skillFiles) string {
 
 // sortedFiles returns every file path in files, sorted, skipping the lock.
 func sortedFiles(files skillFiles) []string {
-	var names []string
-	for file := range files {
-		if file == lockFile {
-			continue
-		}
-		names = append(names, file)
-	}
-	slices.Sort(names)
-	return names
+	names := slices.Sorted(maps.Keys(files))
+	return slices.DeleteFunc(names, func(file string) bool { return file == lockFile })
 }

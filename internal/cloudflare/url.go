@@ -3,6 +3,7 @@ package cloudflare
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -200,11 +201,7 @@ func writeLocal(path, key, value string) error {
 		return err
 	}
 	env[key] = value
-	keys := make([]string, 0, len(env))
-	for k := range env {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
+	keys := slices.Sorted(maps.Keys(env))
 	var b strings.Builder
 	b.WriteString("# Written by `dev url` from the Cloudflare account in fnox. Gitignored: it is\n")
 	b.WriteString("# this clone's. After switching accounts: dev url DIR --deployed --refresh\n")
