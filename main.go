@@ -16,7 +16,6 @@ import (
 	"github.com/joeblew999/dev/internal/deps"
 	"github.com/joeblew999/dev/internal/release"
 	"github.com/joeblew999/dev/internal/secrets"
-	"github.com/joeblew999/dev/internal/session"
 	"github.com/joeblew999/dev/internal/stage"
 )
 
@@ -57,7 +56,12 @@ var dev = cli.Command{
 		"wait":    {Run: app.Run, Usage: app.Usage},
 		"delete":  {Run: app.Run, Usage: app.Usage},
 		"secrets": {Run: secrets.Run, Usage: secrets.Usage},
-		"session": {Run: session.Run, Usage: session.Usage},
+		// "session": {Run: session.Run, Usage: session.Usage},
+		//
+		// Not exposed for now. The manual, the index and --help are all
+		// rendered from this table, so a verb left out of it is gone from every
+		// one of them with nothing else to change. internal/session stays
+		// compiled and tested; put the line back to have the verb back.
 		"release": {Run: release.Run, Usage: release.Usage},
 		"deps":    {Run: deps.Run, Usage: deps.Usage},
 	},
@@ -69,7 +73,7 @@ var dev = cli.Command{
 	// The manual's reading order: start a repo, build it, ship it, then the
 	// verbs that keep it. Without this the sections fall in verb-name order,
 	// which puts init fifth — the first thing anyone does, halfway down.
-	Order: []string{"build", "deploy", "secrets", "release", "deps", "session", "skill"},
+	Order: []string{"build", "deploy", "secrets", "release", "deps", "skill"},
 }
 
 // version is set by the release build (-X main.version).
