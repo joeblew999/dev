@@ -12,6 +12,7 @@ jq = "latest"   # .claude/hooks/skill-gate reads the tool payload with it
 goreleaser = "latest"
 packslip = "latest"
 gh = "latest"
+"go:github.com/oligot/go-mod-upgrade" = "latest"   # what `dev deps` runs in every module
 
 [hooks]
 postinstall = { task = "bootstrap" }

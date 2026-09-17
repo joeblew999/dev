@@ -9,6 +9,7 @@ go = "1.27"
 goreleaser = "latest"
 packslip = "latest"
 gh = "latest"
+"go:github.com/oligot/go-mod-upgrade" = "latest"   # what `dev deps` runs in every module
 
 [hooks]
 postinstall = { task = "bootstrap" }

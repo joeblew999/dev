@@ -25,8 +25,21 @@ type UsageError struct{ Msg string }
 
 func (e *UsageError) Error() string { return e.Msg }
 
-// Usagef makes a UsageError.
+// Usagef makes a UsageError — unless what it is reporting is a request for
+// help, which every verb passes here by writing `Usagef("%s: %v", verb, err)`
+// around whatever parsing returned.
+//
+// It has to be caught here rather than at each call site. Asking every verb in
+// every repo to remember one line is asking it to be forgotten, and it was:
+// the first fix made propagation the caller's job, and a command in another
+// repo, written from the scaffold, still answered --help with
+// "error: flag: help requested".
 func Usagef(format string, a ...any) error {
+	for _, arg := range a {
+		if err, ok := arg.(error); ok && errors.Is(err, flag.ErrHelp) {
+			return ErrHelp
+		}
+	}
 	return &UsageError{fmt.Sprintf(format, a...)}
 }
 

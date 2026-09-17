@@ -44,7 +44,7 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 		cmd.Dir = dir
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, stdout, stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("%s: go-mod-upgrade: %w", dir, err)
+			return fmt.Errorf("%s: go-mod-upgrade: %w; pin it in mise.toml: \"go:github.com/oligot/go-mod-upgrade\" = \"latest\"", dir, err)
 		}
 	}
 	return nil
