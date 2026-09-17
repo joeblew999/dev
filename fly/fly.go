@@ -80,6 +80,18 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 			return err
 		}
 		return Logs(dir)
+	case "delete":
+		name := fs.String("name", "", "the app to destroy (default: the one fly.toml names, with the suffix)")
+		var yes cli.Bool
+		fs.Var(&yes, "yes", "destroy without asking")
+		dir, _, err := cli.DirAnd(fs, args, 0)
+		if err != nil {
+			return err
+		}
+		if err := noEnv(dir, *env); err != nil {
+			return err
+		}
+		return Destroy(stdin, stdout, dir, *name, bool(yes))
 	case "smoke":
 		return fmt.Errorf("smoke runs a Worker on local workerd; a Fly app has no local runtime here. dev check DIR tests it, and dev deploy DIR --wait PATH proves it online")
 	}
@@ -138,6 +150,33 @@ func Deploy(out io.Writer, dir string, extra []string) error {
 	if err := fnox.Exec(".", nil, out, args...); err != nil {
 		return fmt.Errorf("flyctl deploy of %s failed: %w. It needs FLY_API_TOKEN in fnox (a deploy token from: flyctl tokens create deploy), or a login from: flyctl auth login; and the app must exist: flyctl apps create %s", app, err, app)
 	}
+	return nil
+}
+
+// stdin is where delete's question is answered; a test replaces it.
+var stdin io.Reader = os.Stdin
+
+// Destroy removes the app dir's fly.toml names, suffix included, or name
+// when given, with its machines and volumes. It says so and asks, unless yes.
+func Destroy(stdin io.Reader, out io.Writer, dir, name string, yes bool) error {
+	if err := installed(); err != nil {
+		return err
+	}
+	if name == "" {
+		app, err := App(dir)
+		if err != nil {
+			return err
+		}
+		name = app
+	}
+	fmt.Fprintf(out, "will destroy the Fly app %s, its machines and volumes\n", name)
+	if !yes && !cli.Confirm(stdin, out, "destroy? [y/N] ") {
+		return fmt.Errorf("not destroyed (pass --yes to skip the question)")
+	}
+	if err := fnox.Exec(".", nil, out, "flyctl", "apps", "destroy", name, "--yes"); err != nil {
+		return fmt.Errorf("flyctl apps destroy %s failed: %w", name, err)
+	}
+	fmt.Fprintf(out, "destroyed %s\n", name)
 	return nil
 }
 

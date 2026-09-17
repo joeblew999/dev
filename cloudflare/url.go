@@ -26,10 +26,25 @@ var subdomainEndpoint = "https://api.cloudflare.com/client/v4/accounts/%s/worker
 
 // wranglerConfig is the little of wrangler.toml a URL needs.
 type wranglerConfig struct {
-	Name string `toml:"name"`
+	Name string      `toml:"name"`
+	KV   []kvBinding `toml:"kv_namespaces"`
 	Env  map[string]struct {
-		Name string `toml:"name"`
+		Name string      `toml:"name"`
+		KV   []kvBinding `toml:"kv_namespaces"`
 	} `toml:"env"`
+}
+
+type kvBinding struct {
+	Binding string `toml:"binding"`
+}
+
+// kvBindings is the KV bindings env deploys with: an environment's own, since
+// wrangler does not inherit bindings into a named environment.
+func (c wranglerConfig) kvBindings(env string) []kvBinding {
+	if env == "" {
+		return c.KV
+	}
+	return c.Env[env].KV
 }
 
 func readWrangler(path string) (wranglerConfig, error) {

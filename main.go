@@ -39,6 +39,7 @@ var verbs = map[string]struct {
 	"logs":    {app.Run, app.Usage},
 	"smoke":   {app.Run, app.Usage},
 	"wait":    {app.Run, app.Usage},
+	"delete":  {app.Run, app.Usage},
 	"secrets": {secrets.Run, secrets.Usage},
 	"session": {session.Run, session.Usage},
 	"release": {release.Run, release.Usage},

@@ -1,6 +1,7 @@
 package fly
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"path/filepath"
@@ -103,5 +104,20 @@ func TestErrorsNameTheirFix(t *testing.T) {
 	}
 	if err := noEnv(dir, "staging"); err == nil || !strings.Contains(err.Error(), "second directory") {
 		t.Errorf("--env on Fly: %v; want the way to have two apps", err)
+	}
+}
+
+func TestDestroyAsksThenRunsFlyctl(t *testing.T) {
+	got := capture(t)
+	dir := appDir(t)
+	var out bytes.Buffer
+	if err := Destroy(strings.NewReader("no\n"), &out, dir, "", false); err == nil {
+		t.Error("a refusal destroyed the app")
+	}
+	if err := Destroy(nil, &out, dir, "", true); err != nil {
+		t.Fatal(err)
+	}
+	if s := strings.Join(*got, " "); !strings.HasSuffix(s, "flyctl apps destroy acme-site --yes") {
+		t.Errorf("ran %q", s)
 	}
 }

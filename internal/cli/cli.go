@@ -4,6 +4,7 @@
 package cli
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"io"
@@ -95,4 +96,17 @@ func ParseInterleaved(fs *flag.FlagSet, args []string) ([]string, error) {
 		}
 	}
 	return append(positionals, tail...), nil
+}
+
+// Confirm asks on out and reads one line from stdin: y or yes means yes.
+// Anything else, including no terminal to answer from, means no.
+func Confirm(stdin io.Reader, out io.Writer, prompt string) bool {
+	fmt.Fprint(out, prompt)
+	line, err := bufio.NewReader(stdin).ReadString('\n')
+	if err != nil && line == "" {
+		fmt.Fprintln(out)
+		return false
+	}
+	answer := strings.ToLower(strings.TrimSpace(line))
+	return answer == "y" || answer == "yes"
 }

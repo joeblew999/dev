@@ -34,6 +34,11 @@ dev smoke DIR [--env NAME] [--path P] [--expect TEXT] [--timeout DURATION]
     and fail unless it answers 200 with TEXT in the body
 dev wait URL [--timeout DURATION]
     wait until URL answers 200 steadily
+dev delete DIR [--env NAME] [--name APP] [--yes]
+    remove the deployed app in DIR, or APP (one a rename or an old config left
+    behind), and for a Worker the KV namespaces wrangler provisioned for it,
+    titled <worker>-<binding>; a namespace made by hand stays. Says what will
+    go and asks, unless --yes
 
 Which cloud DIR deploys to is read from it: wrangler.toml means Cloudflare
 Workers, fly.toml means Fly; --env is a wrangler environment. DEPLOY_SUFFIX

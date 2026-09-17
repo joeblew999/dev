@@ -8,12 +8,16 @@ package cloudflare
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/joeblew999/dev/fnox"
 	"github.com/joeblew999/dev/internal/cli"
 )
+
+// stdin is where delete's question is answered; a test replaces it.
+var stdin io.Reader = os.Stdin
 
 // Run is every Worker verb but wait. DIR comes first; flags may follow anywhere.
 func Run(verb string, args []string, stdout, stderr io.Writer) error {
@@ -58,6 +62,15 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 			return err
 		}
 		return Logs(dir, *env)
+	case "delete":
+		name := fs.String("name", "", "the Worker to delete (default: the one the config deploys env to)")
+		var yes cli.Bool
+		fs.Var(&yes, "yes", "delete without asking")
+		dir, _, err := cli.DirAnd(fs, args, 0)
+		if err != nil {
+			return err
+		}
+		return Delete(stdin, stdout, dir, *env, *name, bool(yes))
 	case "smoke":
 		path := fs.String("path", "/", "what to request")
 		expect := fs.String("expect", "", "text the body must contain")

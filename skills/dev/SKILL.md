@@ -9,6 +9,7 @@ A repo on this stack is a few commands, each its own directory and Go module:
 main.go, and beside it a worker.go and wrangler.toml if it deploys to
 Cloudflare, a fly.toml if it deploys to Fly, a package.json and .gsx sources if
 it has a UI. A repo that is one command keeps it at the root and uses `.`.
+A new repo gets the whole stack from `dev init`.
 Every command has the same stages, and a mise task names one:
 `<cmd>:<stage>[:variant]`, so `mise run proxy:deploy` runs
 `dev deploy cmd/proxy`. Run stages through their tasks (`mise tasks`
@@ -47,6 +48,11 @@ dev smoke DIR [--env NAME] [--path P] [--expect TEXT] [--timeout DURATION]
     and fail unless it answers 200 with TEXT in the body
 dev wait URL [--timeout DURATION]
     wait until URL answers 200 steadily
+dev delete DIR [--env NAME] [--name APP] [--yes]
+    remove the deployed app in DIR, or APP (one a rename or an old config left
+    behind), and for a Worker the KV namespaces wrangler provisioned for it,
+    titled <worker>-<binding>; a namespace made by hand stays. Says what will
+    go and asks, unless --yes
 
 Which cloud DIR deploys to is read from it: wrangler.toml means Cloudflare
 Workers, fly.toml means Fly; --env is a wrangler environment. DEPLOY_SUFFIX
@@ -57,6 +63,18 @@ Run from the repo root; needs fnox, and wrangler or flyctl.
 ```
 dev deps list      list available Go module upgrades in every module, changing nothing
 dev deps upgrade   interactively upgrade Go modules in every module
+```
+
+```
+dev init [DIR] [--name NAME] [--pin VERSION]
+    write the stack into DIR (default .): mise.toml with the tools pinned and
+    the stack's tasks, hk.pkl, session.toml, .mcp.json, the Claude Code
+    settings and skill hook, the two workflows, .gitignore, AGENTS.md, and a
+    first command cmd/NAME (an HTTP server answering /health) with its module
+    and go.work. NAME defaults to DIR's name; the module path comes from the
+    git remote, or example.com without one. VERSION is the dev release to
+    pin; default this binary's own. Existing files are left alone and named.
+    Then: mise trust && mise install && mise run test
 ```
 
 ```
