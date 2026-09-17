@@ -5,9 +5,14 @@
 This is the developer tool of the stack. It is used from many repos, so it is
 bounded: it knows the stack's conventions and nothing about any one project.
 
+## Be clear
+
+when you speak back to the dev, be clear !!
+
 ## Self reflection
 
 MAKE sure that the code and usage line up well, so that devs and agents will get a proper cli and skills experience !!
+
 
 ## The stack's rules live in the dev skill
 
@@ -43,11 +48,12 @@ This file says only what is about developing the tool itself.
 - **`cli/` is the public API** — the command shape, flags, DIR and `--`
   passthrough — and every other repo on the stack builds its commands on it,
   so a change there reaches them all. Everything else lives under `internal/`.
-- **The prose is markdown beside the code.** Each package's verbs are
-  documented in its own `usage.md`, the manual's surrounding prose in
-  `skill/head.md` and `skill/tail.md`, all compiled in by `go:embed`. A file
-  added there goes in `mise.toml`'s build `sources`, or editing it leaves the
-  binary stale while mise reports it fresh.
+- **The prose is markdown beside the code it describes**, always: a package's
+  verbs in its own `usage.md`, the manual's surrounding prose in `head.md` and
+  `tail.md` beside `main.go`, a library's manual in that library's directory.
+  All compiled in by `go:embed`. A file added there goes in `mise.toml`'s
+  build `sources`, or editing it leaves the binary stale while mise reports it
+  fresh.
 
 ## Layout
 

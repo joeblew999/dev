@@ -112,9 +112,10 @@ release ships, and `.claude/skills/<name>/` and `.agents/skills/<name>/`,
 which that repo's own agents read. `dev build` runs it after every build.
 Never edit a `SKILL.md`; it is written from the verbs.
 
-What a person writes is markdown beside the code: `usage.md` per package,
-`head.md` and `tail.md` for the prose around the verbs, embedded with
-`//go:embed`. Files rather than Go string constants, because a Go raw string
+What a person writes is markdown beside the code it describes, which is the
+whole rule: `usage.md` in each package for its verbs, `head.md` and `tail.md`
+beside the command's own main.go for the prose around them, and a library's
+own manual in that library's directory. Embedded with `//go:embed`. Files rather than Go string constants, because a Go raw string
 is backtick-delimited and so cannot hold inline code.
 
 A `usage.md` holds no verbs and no flags — those are rendered under it. It

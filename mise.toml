@@ -38,7 +38,7 @@ description = ".bin/dev, and the skill from its verbs"
 # rewrites the manual from the old bytes and says it succeeded.
 sources = [
   "**/*.go", "go.mod", "go.sum",
-  "skill/*.md", "cli/*.md", "internal/*/usage.md",
+  "head.md", "tail.md", "cli/*.md", "internal/*/usage.md",
 ]
 outputs = [".bin/dev", "./dev", "skills/dev/SKILL.md", ".claude/skills/dev/SKILL.md", ".agents/skills/dev/SKILL.md"]
 run = [

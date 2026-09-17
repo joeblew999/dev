@@ -19,23 +19,24 @@ import (
 	"github.com/joeblew999/dev/internal/stage"
 )
 
-// skill holds the prose around the verbs in the generated manual: head.md
-// before them, tail.md after. Markdown files, not string consts, so prose
+// The prose around the verbs in the generated manual: head.md before them,
+// tail.md after. Beside main.go, because main.go is the command they
+// describe — the same rule that puts each package's usage.md beside its
+// verbs. Markdown files, not string consts, so prose
 // edits stay prose; go:embed compiles them into the binary, so `dev skill`
 // works anywhere and the rendered manual ships via release.
 
-//go:embed skill/head.md
+//go:embed head.md
 var skillHead string
 
-//go:embed skill/tail.md
+//go:embed tail.md
 var skillTail string
 
-// cliSkill is the manual for the library rather than for dev's verbs. A repo
-// is asked to write its commands against cli, so it needs the library's API
-// and rules; before this they were prose two thirds of the way down dev's own
-// manual, and the API was in no manual at all.
+// cliSkill is the manual for the library rather than for dev's verbs, so it
+// lives in cli/ beside what it documents. main.go only embeds it, because a
+// skill ships from the command that declares it.
 
-//go:embed skill/cli.md
+//go:embed cli/skill.md
 var cliSkill string
 
 // dev is the whole tool: what each verb runs, and its usage. cli.Main runs it
