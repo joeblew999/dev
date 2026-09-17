@@ -94,6 +94,31 @@ Name that markdown in the build task's `sources`, and the three manual copies
 in its `outputs`. mise watches `.go` by default, so a prose-only edit
 otherwise leaves the binary stale while reporting it fresh.
 
+## How a manual reaches another repo
+
+Three routes, and which one a skill takes decides whether it is committed.
+
+- **The repo's own commands.** `<cmd> skill` writes the three copies and they
+  are committed, so the repo's own sessions read its own manual with no
+  release and no pin. A changed verb reaches that repo's agent on the next
+  build.
+- **A tool it pins.** `dev release` turns every `skills/<name>/` directory
+  into a packslip resource, so a command's manual ships with the binary. A
+  repo pins the tool in `mise.toml` with the public key its releases are
+  signed with, and mise's `[settings.skills] auto_sync` links the manual into
+  `.claude/skills/<name>/`. Those links are gitignored: mise writes them per
+  developer from the pinned versions, and `prune` removes what no pin names.
+- **An upstream that ships no releases.** Vendored by commit through
+  `session.toml` and committed, because there is no version to link from.
+
+So a manual is committed when the repo produces it or vendors it, and
+gitignored when a pin produces it. Committing a link, or ignoring your own
+command's manual, is how a repo ends up with two of something.
+
+A skill a command ships through `Skills` travels the second way: it is a
+`skills/<name>/` directory like any other, so the release carries it and a
+consumer gets it on a pin bump. That is how this manual reaches you.
+
 ## The two tests
 
 ```go
