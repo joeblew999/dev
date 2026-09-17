@@ -21,12 +21,12 @@ import (
 // It reads the directories rather than asking an agent what it loaded,
 // because an agent is told what is available and cannot enumerate it. The
 // directory is the fact.
-func (c Command) skills(verb string, args []string, stdout, stderr io.Writer) error {
-	if HelpRequested(args) {
+func (c Command) skills(call Call) error {
+	if HelpRequested(call.Args) {
 		return ErrHelp
 	}
-	if len(args) > 0 {
-		return Usagef("%s skills takes no arguments", c.Name)
+	if len(call.Args) > 0 {
+		return call.Usagef("takes no arguments")
 	}
 	root, err := root(".")
 	if err != nil {
@@ -35,15 +35,15 @@ func (c Command) skills(verb string, args []string, stdout, stderr io.Writer) er
 	seen := map[string][]string{}
 	for _, dir := range []string{ClaudeDir, AgentsDir} {
 		found := readSkills(filepath.Join(root, dir))
-		fmt.Fprintf(stdout, "%s\n", dir)
+		fmt.Fprintf(call.Stdout, "%s\n", dir)
 		if len(found) == 0 {
-			fmt.Fprintf(stdout, "  (none)\n")
+			fmt.Fprintf(call.Stdout, "  (none)\n")
 		}
 		for _, s := range found {
-			fmt.Fprintf(stdout, "  %-22s %s\n", s.name, s.from)
+			fmt.Fprintf(call.Stdout, "  %-22s %s\n", s.name, s.from)
 			seen[s.name] = append(seen[s.name], dir)
 		}
-		fmt.Fprintln(stdout)
+		fmt.Fprintln(call.Stdout)
 	}
 	// An agent reads one of these directories and not the other, so a skill in
 	// one alone is a skill that agent cannot see. Worth saying, because mise
@@ -56,7 +56,7 @@ func (c Command) skills(verb string, args []string, stdout, stderr io.Writer) er
 	}
 	sort.Strings(only)
 	for _, line := range only {
-		fmt.Fprintf(stdout, "%s\n", line)
+		fmt.Fprintf(call.Stdout, "%s\n", line)
 	}
 	return nil
 }

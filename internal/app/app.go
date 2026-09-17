@@ -9,7 +9,6 @@ import (
 	_ "embed"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -81,30 +80,35 @@ func WaitFlags(fs *flag.FlagSet) {
 	fs.Duration("timeout", 2*time.Minute, "how `LONG` to keep trying")
 }
 
-func Run(verb string, args []string, stdout, stderr io.Writer) error {
-	if verb == "wait" {
-		fs := cli.Flags(verb, stderr)
-		WaitFlags(fs)
-		if err := fs.Parse(args); err != nil {
-			return cli.Usagef("wait: %v", err)
-		}
-		if fs.NArg() != 1 {
-			return cli.Usagef("wait needs exactly one URL")
-		}
-		d, _ := time.ParseDuration(cli.Value(fs, "timeout"))
-		return cloudflare.Wait(stdout, fs.Arg(0), d)
+// Each verb is the work it does, and which cloud does it comes from the
+// directory. cli has already parsed DIR and the flags, so these are the
+// dispatch and nothing else.
+
+func URLVerb(c cli.Call) error    { return to(c, "url") }
+func DeployVerb(c cli.Call) error { return to(c, "deploy") }
+func LogsVerb(c cli.Call) error   { return to(c, "logs") }
+func SmokeVerb(c cli.Call) error  { return to(c, "smoke") }
+func DeleteVerb(c cli.Call) error { return to(c, "delete") }
+
+// WaitVerb is the one verb here that talks to no cloud: it polls a URL.
+func WaitVerb(c cli.Call) error {
+	if len(c.Args) != 1 {
+		return c.Usagef("needs exactly one URL")
 	}
-	if len(args) == 0 || args[0] == "" || args[0][0] == '-' {
-		return cli.Usagef("%s: the directory comes first", verb)
-	}
-	target, err := Target(args[0])
+	d, _ := time.ParseDuration(c.Value("timeout"))
+	return cloudflare.Wait(c.Stdout, c.Args[0], d)
+}
+
+// to sends a verb to whichever cloud the directory deploys to.
+func to(c cli.Call, verb string) error {
+	target, err := Target(c.Dir)
 	if err != nil {
 		return err
 	}
 	if target == "fly" {
-		return fly.Run(verb, args, stdout, stderr)
+		return fly.Run(verb, c)
 	}
-	return cloudflare.Run(verb, args, stdout, stderr)
+	return cloudflare.Run(verb, c)
 }
 
 // Target names the cloud dir deploys to, "cloudflare" or "fly", from the

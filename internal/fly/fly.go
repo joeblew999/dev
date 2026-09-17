@@ -35,73 +35,40 @@ const (
 
 // Run is every Fly verb but wait. DIR comes first; flags may follow anywhere,
 // and for deploy everything after a bare -- goes to flyctl.
-func Run(verb string, args []string, stdout, stderr io.Writer) error {
-	fs := cli.Flags(verb, stderr)
-	env := fs.String("env", "", "not a Fly concept; one fly.toml is one app")
+// Run is every Fly verb. cli has parsed DIR and the flags before this is
+// reached, so each case is the call it makes and nothing else.
+func Run(verb string, c cli.Call) error {
+	if err := noEnv(c.Dir, c.Value("env")); err != nil {
+		return err
+	}
 	switch verb {
 	case "url":
-		var deployed, refresh cli.Bool
-		fs.Var(&deployed, "deployed", "the deployed app's URL; otherwise --local")
-		fs.Var(&refresh, "refresh", "accepted for symmetry with a Worker; a Fly URL is never cached")
-		local := fs.String("local", "", "what to print when not --deployed")
-		dir, _, err := cli.DirAnd(fs, args, 0)
-		if err != nil {
-			return err
-		}
-		if err := noEnv(dir, *env); err != nil {
-			return err
-		}
-		if !deployed {
-			fmt.Fprintln(stdout, *local)
+		if !c.Given("deployed") {
+			fmt.Fprintln(c.Stdout, c.Value("local"))
 			return nil
 		}
-		u, err := URL(dir)
+		u, err := URL(c.Dir)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(stdout, u)
+		fmt.Fprintln(c.Stdout, u)
 		return nil
 	case "deploy":
-		waitPath := fs.String("wait", "", "path to wait for a 200 on after deploying, e.g. /health")
-		dir, extra, err := cli.DirAnd(fs, args, -1)
-		if err != nil {
+		if err := Deploy(c.Stdout, c.Dir, c.Args); err != nil {
 			return err
 		}
-		if err := noEnv(dir, *env); err != nil {
-			return err
-		}
-		if err := Deploy(stdout, dir, extra); err != nil {
-			return err
-		}
-		if *waitPath == "" {
+		if c.Value("wait") == "" {
 			return nil
 		}
-		u, err := URL(dir)
+		u, err := URL(c.Dir)
 		if err != nil {
 			return err
 		}
-		return Wait(stdout, u+*waitPath, 2*time.Minute)
+		return Wait(c.Stdout, u+c.Value("wait"), 2*time.Minute)
 	case "logs":
-		dir, _, err := cli.DirAnd(fs, args, 0)
-		if err != nil {
-			return err
-		}
-		if err := noEnv(dir, *env); err != nil {
-			return err
-		}
-		return Logs(dir)
+		return Logs(c.Dir)
 	case "delete":
-		name := fs.String("name", "", "the app to destroy (default: the one fly.toml names, with the suffix)")
-		var yes cli.Bool
-		fs.Var(&yes, "yes", "destroy without asking")
-		dir, _, err := cli.DirAnd(fs, args, 0)
-		if err != nil {
-			return err
-		}
-		if err := noEnv(dir, *env); err != nil {
-			return err
-		}
-		return Destroy(stdin, stdout, dir, *name, bool(yes))
+		return Destroy(c.Stdin, c.Stdout, c.Dir, c.Value("name"), c.Given("yes"))
 	case "smoke":
 		return fmt.Errorf("smoke runs a Worker on local workerd; a Fly app has no local runtime here. dev check DIR tests it, and dev deploy DIR --wait PATH proves it online")
 	}

@@ -8,7 +8,6 @@ import (
 	"crypto/rand"
 	_ "embed"
 	"encoding/hex"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -62,42 +61,32 @@ func PushFlags(fs *flag.FlagSet) {
 	fs.String("fix", "mise run secrets:set {provider}", "the `TEMPLATE` to run for a secret fnox does not have")
 }
 
-// set, push and ci are the three subcommands, each its own function. cli
-// routes to them from Subs, so a subcommand's name is written in Subs and
-// nowhere else — no dispatch switch naming them a second time.
-func runSet(verb string, args []string, stdout, stderr io.Writer) error {
-	fs := cli.Flags(verb, stderr)
-	SetFlags(fs)
-	dir, rest, err := cli.DirAnd(fs, args, 1)
+// set, push and ci are the three subcommands, each the work it does. cli
+// parses what each declared in Subs, so none of them builds a FlagSet or
+// pulls a directory out of the arguments for itself.
+func runSet(c cli.Call) error {
+	if len(c.Args) != 1 {
+		return c.Usagef("give the secret's name or its owner")
+	}
+	name, err := Resolve(c.Value("names"), c.Args[0])
 	if err != nil {
 		return err
 	}
-	name, err := Resolve(cli.Value(fs, "names"), rest[0])
-	if err != nil {
-		return err
-	}
-	return Set(os.Stdin, stdout, stderr, name, cli.Given(fs, "generate"), cli.Given(fs, "if-missing"), dir, cli.Value(fs, "env"))
+	return Set(c.Stdin, c.Stdout, c.Stderr, name, c.Given("generate"), c.Given("if-missing"), c.Dir, c.Value("env"))
 }
 
-func runPush(verb string, args []string, stdout, stderr io.Writer) error {
-	fs := cli.Flags(verb, stderr)
-	PushFlags(fs)
-	dir, _, err := cli.DirAnd(fs, args, 0)
-	if err != nil {
-		return err
+func runPush(c cli.Call) error {
+	if len(c.Args) > 0 {
+		return c.Usagef("takes only the directory")
 	}
-	return Push(os.Stdin, stdout, dir, cli.Value(fs, "env"), cli.Value(fs, "fix"))
+	return Push(c.Stdin, c.Stdout, c.Dir, c.Value("env"), c.Value("fix"))
 }
 
-func runCI(verb string, args []string, stdout, stderr io.Writer) error {
-	fs := cli.Flags(verb, stderr)
-	if err := fs.Parse(args); err != nil || fs.NArg() == 0 {
-		if errors.Is(err, cli.ErrHelp) {
-			return cli.ErrHelp
-		}
-		return cli.Usagef("%s: give the names to push", verb)
+func runCI(c cli.Call) error {
+	if len(c.Args) == 0 {
+		return c.Usagef("give the names to push")
 	}
-	for _, name := range fs.Args() {
+	for _, name := range c.Args {
 		v, err := fnox.Get(name)
 		if err != nil || v == "" {
 			return fmt.Errorf("%s is not in fnox; store it with: fnox set -g %s", name, name)
@@ -105,7 +94,7 @@ func runCI(verb string, args []string, stdout, stderr io.Writer) error {
 		if err := CI(name, v); err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "set %s in this repo's Actions secrets\n", name)
+		fmt.Fprintf(c.Stdout, "set %s in this repo's Actions secrets\n", name)
 	}
 	return nil
 }

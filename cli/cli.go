@@ -11,13 +11,42 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 )
 
 // Runner is every dev command: the verb it was called as, the arguments after
 // it, and where to write. A package that answers to several verbs (build,
 // wasm, check, run, workerd are all stage's) switches on verb.
-type Runner func(verb string, args []string, stdout, stderr io.Writer) error
+type Runner func(Call) error
+
+// Call is one invocation of a verb, parsed. A verb declares its Args and its
+// Flags, so cli can read them once and hand the result over — rather than
+// every verb opening with the same four lines to build a FlagSet, parse a
+// directory out of the arguments and check the error.
+//
+// That preamble was seventeen copies of one idea. A verb's body is now the
+// work it does.
+type Call struct {
+	Verb  string        // the verb as it was typed, with any subcommand: "secrets push"
+	Dir   string        // the directory it acts on, when its Args begin with DIR
+	Args  []string      // what is left: positionals, then anything after a bare --
+	Flags *flag.FlagSet // parsed, so Value and Given read from it
+
+	Stdin          io.Reader
+	Stdout, Stderr io.Writer
+}
+
+// Value is a parsed flag's value by name.
+func (c Call) Value(name string) string { return Value(c.Flags, name) }
+
+// Given reports whether a bool flag is set.
+func (c Call) Given(name string) bool { return Given(c.Flags, name) }
+
+// Usagef is an argument error, naming this verb.
+func (c Call) Usagef(format string, a ...any) error {
+	return Usagef("%s: %s", c.Verb, fmt.Sprintf(format, a...))
+}
 
 // UsageError means the arguments were wrong; main prints the package's usage
 // after it.
@@ -70,6 +99,10 @@ func (b *Bool) Set(s string) error {
 	}
 	return nil
 }
+
+// Stdin is where a verb that asks a question reads the answer. A variable so
+// a test can replace it.
+var Stdin io.Reader = os.Stdin
 
 // ErrHelp is what a verb returns when it was asked for help rather than run.
 // The flag package has already printed the flags and what each one means, so

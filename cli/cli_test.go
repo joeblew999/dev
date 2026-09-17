@@ -2,6 +2,7 @@ package cli
 
 import (
 	"flag"
+	"io"
 	"strings"
 	"testing"
 )
@@ -25,5 +26,32 @@ func TestParseInterleavedPassesEverythingAfterDoubleDash(t *testing.T) {
 	got, err := ParseInterleaved(fs, []string{"--env", "x", "--", "serve", "--config", "f.toml"})
 	if err != nil || *env != "x" || strings.Join(got, " ") != "serve --config f.toml" {
 		t.Fatalf("got %q %v env=%q", got, err, *env)
+	}
+}
+
+// A verb whose Args begin with DIR gets its directory parsed by cli, so no
+// verb does it for itself. mise appends what a developer typed after a task
+// name, so flags may follow the directory but never precede it — and saying
+// so is cli's job, since cli is what reads them.
+func TestParseTakesTheDirectoryFirst(t *testing.T) {
+	v := Verb{Args: "DIR", Flags: func(fs *flag.FlagSet) { fs.String("env", "", "an `ENV`") }}
+
+	c, err := v.parse("deploy", []string{"cmd/x", "--env", "prod", "extra"}, io.Discard, io.Discard)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if c.Dir != "cmd/x" {
+		t.Errorf("Dir = %q, want cmd/x", c.Dir)
+	}
+	if c.Value("env") != "prod" {
+		t.Errorf("--env = %q, want prod", c.Value("env"))
+	}
+	if len(c.Args) != 1 || c.Args[0] != "extra" {
+		t.Errorf("Args = %v, want [extra]", c.Args)
+	}
+
+	if _, err := v.parse("deploy", []string{"--env", "prod"}, io.Discard, io.Discard); err == nil ||
+		!strings.Contains(err.Error(), "the directory comes first") {
+		t.Errorf("flags before DIR should say so, got %v", err)
 	}
 }

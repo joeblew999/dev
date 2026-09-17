@@ -5,7 +5,7 @@ package cli
 
 import (
 	_ "embed"
-	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -57,19 +57,10 @@ func rel(p string) string {
 
 // skill is `<Name> skill [--check]`: write every copy of the manual, or with
 // --check say which is stale and how to fix it.
-func (c Command) skill(verb string, args []string, stdout, stderr io.Writer) error {
-	fs := Flags(verb, stderr)
-	var check Bool
-	fs.Var(&check, "check", "fail when any copy is stale; write nothing")
-	rest, err := ParseInterleaved(fs, args)
-	if errors.Is(err, ErrHelp) {
-		return err
-	}
-	if err != nil {
-		return Usagef("%s: %v", verb, err)
-	}
-	if len(rest) > 0 {
-		return Usagef("%s skill takes only --check", c.Name)
+func (c Command) skill(call Call) error {
+	check := call.Given("check")
+	if len(call.Args) > 0 {
+		return call.Usagef("takes only --check")
 	}
 	// Both branches below answer from prose compiled into this binary, so
 	// neither means anything if the binary is behind its sources: writing
@@ -90,16 +81,13 @@ func (c Command) skill(verb string, args []string, stdout, stderr io.Writer) err
 	}
 	// Both agent directories carry the same pinned skills, which mise cannot
 	// do for itself: its skills.dir is one path.
-	if !bool(check) {
-		if err := mirror(dir, stdout); err != nil {
+	if !check {
+		if err := mirror(dir, call.Stdout); err != nil {
 			return err
 		}
 	}
 	for name, body := range c.Skills {
-		// Through withProvenance like the command's own manual: a shipped
-		// skill is as generated as any other file here, and one that does not
-		// say so is one somebody edits.
-		if err := c.writeSkill(stdout, name, withProvenance(body, c.Name), bool(check)); err != nil {
+		if err := c.writeSkill(call.Stdout, name, withProvenance(body, c.Name), check); err != nil {
 			return err
 		}
 	}
@@ -114,7 +102,7 @@ func (c Command) skill(verb string, args []string, stdout, stderr io.Writer) err
 			if err != nil || string(have) != want {
 				return fmt.Errorf("%s is stale; regenerate it with: %s skill", rel(p), c.Name)
 			}
-			fmt.Fprintf(stdout, "%s is up to date\n", rel(p))
+			fmt.Fprintf(call.Stdout, "%s is up to date\n", rel(p))
 			continue
 		}
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -123,7 +111,7 @@ func (c Command) skill(verb string, args []string, stdout, stderr io.Writer) err
 		if err := os.WriteFile(p, []byte(want), 0o644); err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "wrote %s from the verbs' own usage\n", rel(p))
+		fmt.Fprintf(call.Stdout, "wrote %s from the verbs' own usage\n", rel(p))
 	}
 	return nil
 }
@@ -131,14 +119,14 @@ func (c Command) skill(verb string, args []string, stdout, stderr io.Writer) err
 // writeSkill writes or checks one of c.Skills, in the three places a manual
 // goes. It is the same work c.skill does for the command's own manual, on a
 // body that was written rather than rendered.
-func writeSkillTo(stdout io.Writer, paths []string, body string, check bool) error {
+func writeSkillTo(out io.Writer, paths []string, body string, check bool) error {
 	for _, p := range paths {
 		if check {
 			have, err := os.ReadFile(p)
 			if err != nil || string(have) != body {
 				return fmt.Errorf("%s is stale; regenerate it with: dev skill", rel(p))
 			}
-			fmt.Fprintf(stdout, "%s is up to date\n", rel(p))
+			fmt.Fprintf(out, "%s is up to date\n", rel(p))
 			continue
 		}
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -147,7 +135,7 @@ func writeSkillTo(stdout io.Writer, paths []string, body string, check bool) err
 		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "wrote %s\n", rel(p))
+		fmt.Fprintf(out, "wrote %s\n", rel(p))
 	}
 	return nil
 }
@@ -172,10 +160,15 @@ func skillPaths(root, name string) []string {
 }
 
 // version is `<Name> version`.
-func (c Command) version(verb string, args []string, stdout, stderr io.Writer) error {
-	if len(args) > 0 {
-		return Usagef("%s version takes no arguments", c.Name)
+func (c Command) version(call Call) error {
+	if len(call.Args) > 0 {
+		return call.Usagef("takes no arguments")
 	}
-	fmt.Fprintln(stdout, c.Version)
+	fmt.Fprintln(call.Stdout, c.Version)
 	return nil
+}
+
+// checkFlag is `skill --check`: say whether every copy is current, write none.
+func checkFlag(fs *flag.FlagSet) {
+	fs.Var(new(Bool), "check", "say whether each copy is current; write nothing")
 }

@@ -72,65 +72,30 @@ is made from the flags.
 ## A verb
 
 ```go
-func serve(verb string, args []string, stdout, stderr io.Writer) error {
-    fs := cli.Flags(verb, stderr)
-    addr := fs.String("addr", "127.0.0.1:8080", "address to listen on")
-    rest, err := cli.ParseInterleaved(fs, args)
-    if err != nil {
-        return cli.Usagef("%s: %v", verb, err)
-    }
-    ...
+func serve(c cli.Call) error {
+    return listen(c.Value("addr"), c.Stdout)
 }
 ```
 
-Every verb is a `cli.Runner`: `func(verb string, args []string, stdout, stderr
-io.Writer) error`. The verb it was called as comes first, so one function can
-answer to several.
+A verb is a `cli.Runner`: `func(cli.Call) error`. It receives one invocation,
+already parsed — because the verb declared `Args` and `Flags`, `cli` can read
+them once instead of every verb opening with the same four lines to build a
+FlagSet, pull a directory out of the arguments and check the error.
 
-- `cli.Flags(name, stderr)` — a `*flag.FlagSet` that reports to stderr and
-  never exits. Each flag's third argument is what `--help` prints, so write it
-  as the sentence a person needs, and backquote the word that names its
-  value: `"wrangler environment `+"`NAME`"+`"` prints as `[--env NAME]` in the
-  manual and `-env NAME` under `--help`, from one string.
-- `cli.Value(fs, name)` and `cli.Given(fs, name)` — read a flag back by name,
-  which is what registering through a func costs at the call site.
-- `cli.ParseInterleaved(fs, args)` — flags wherever they appear, positionals
-  returned, everything after a bare `--` passed through verbatim. mise appends
-  what a developer typed after a task name, so flags cannot be required first.
-- `cli.DirAnd(fs, args, n)` — for a verb that acts on a directory:
-  `DIR [flags and positionals in any order]`, with `n` positionals after it,
-  or `-1` for any number.
-- `cli.Bool` — a bool flag that also accepts `""` as false, so a task can pass
-  `--flag=$var` with the variable unset.
-- `cli.Usagef(...)` — the arguments were wrong. The command prints the verb's
-  usage after it and exits 2. Pass the underlying error as an argument and a
-  request for help is recognised rather than reported as a failure.
-- `cli.Confirm(stdin, out, prompt)` — ask before something destructive. No
-  terminal means no.
-- `cli.HelpRequested(args)` — for a verb that dispatches on a subcommand, or
-  wants `DIR` first: ask this before enforcing either, or `--help` is answered
-  with a complaint about what is missing.
+- `c.Dir` — the directory it acts on, when its `Args` begin with `DIR`.
+- `c.Args` — what is left: positionals, then anything after a bare `--`.
+- `c.Value("addr")`, `c.Given("yes")` — a flag's value, and whether a bool
+  flag is set.
+- `c.Stdin`, `c.Stdout`, `c.Stderr` — where to read and write.
+- `c.Usagef("...")` — the arguments were wrong. The command prints the verb's
+  section after it and exits 2.
+- `c.Verb` — the verb as it was typed, command and subcommand included, for a
+  message that has to name it.
 
-## Its manual
-
-`<cmd> skill` writes three copies of the manual — `skills/<name>/`, which the
-release ships, and `.claude/skills/<name>/` and `.agents/skills/<name>/`,
-which that repo's own agents read. `dev build` runs it after every build.
-Never edit a `SKILL.md`; it is written from the verbs.
-
-What a person writes is markdown beside the code it describes, which is the
-whole rule: `usage.md` in each package for its verbs, `skill.md` beside the
-command's own main.go for the manual around them, and a library's own manual
-in that library's directory. Embedded with `//go:embed`. Files rather than Go string constants, because a Go raw string
-is backtick-delimited and so cannot hold inline code.
-
-A `usage.md` holds no verbs and no flags — those are rendered under it. It
-holds only what no verb can say: why this group exists, what they share, what
-a repo has to supply. A test fails when it starts listing again.
-
-Name that markdown in the build task's `sources`, and the three manual copies
-in its `outputs`. mise watches `.go` by default, so a prose-only edit
-otherwise leaves the binary stale while reporting it fresh.
+The helpers a verb used to call itself are still there for anything that
+parses its own arguments — `cli.Flags`, `cli.DirAnd`, `cli.ParseInterleaved`,
+`cli.Bool`, `cli.Confirm`, `cli.HelpRequested` — but a verb that declares
+`Args` and `Flags` needs none of them.
 
 ## How a manual reaches another repo
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,22 +11,21 @@ import (
 )
 
 func testCommand() Command {
-	stage := "tool build DIR    build it\ntool check DIR    check it\n"
+	stage := "### Stages\n\nWhat every command goes through.\n"
 	return Command{
 		Name:    "tool",
 		Version: "1.2.3",
 		Skill:   "---\nname: tool\n---\n\n# tool\n\n\n<!-- verbs -->\n## Rules\n\n- one\n",
 		Verbs: map[string]Verb{
-			"build": {Run: func(verb string, args []string, stdout, stderr io.Writer) error {
-				_, err := stdout.Write([]byte("built\n"))
+			// build takes nothing, so the default verb can run with no
+			// arguments at all; check takes a directory, which cli parses.
+			"build": {Run: func(c Call) error {
+				_, err := c.Stdout.Write([]byte("built\n"))
 				return err
-			}, Usage: stage},
-			"check": {Run: func(verb string, args []string, stdout, stderr io.Writer) error {
-				if len(args) == 0 {
-					return Usagef("check: the directory comes first")
-				}
+			}, Desc: "build it", Usage: stage},
+			"check": {Run: func(c Call) error {
 				return errors.New("boom")
-			}, Usage: stage},
+			}, Args: "DIR", Desc: "check it", Usage: stage},
 		},
 	}
 }
@@ -40,13 +38,13 @@ func TestRun(t *testing.T) {
 		stdout string
 		stderr string
 	}{
-		{nil, 2, "", "tool build DIR"},
+		{nil, 2, "", "tool build"},
 		{[]string{"nope"}, 2, "", `unknown verb "nope"`},
 		{[]string{"build"}, 0, "built\n", ""},
-		{[]string{"check"}, 2, "", "error: check: the directory comes first\n\ntool build DIR"},
+		{[]string{"check"}, 2, "", "error: tool check: the directory comes first"},
 		{[]string{"check", "."}, 1, "", "error: boom\n"},
 		{[]string{"version"}, 0, "1.2.3\n", ""},
-		{[]string{"version", "x"}, 2, "", "error: tool version takes no arguments"},
+		{[]string{"version", "x"}, 2, "", "error: tool version: takes no arguments"},
 	}
 	for _, tc := range cases {
 		var out, errb bytes.Buffer
@@ -62,7 +60,7 @@ func TestRun(t *testing.T) {
 	}
 	// The index lists the command's own verbs beside the table's, each usage once.
 	idx := c.index()
-	for _, want := range []string{"tool skill [--check]", "tool version", "tool build DIR"} {
+	for _, want := range []string{"tool skill [--check]", "tool version", "tool check DIR"} {
 		if strings.Count(idx, want) != 1 {
 			t.Errorf("index has %q %d times, want once:\n%s", want, strings.Count(idx, want), idx)
 		}
@@ -72,11 +70,22 @@ func TestRun(t *testing.T) {
 func TestDefault(t *testing.T) {
 	c := testCommand()
 	c.Default = "build"
-	for _, args := range [][]string{nil, {"-v"}} {
-		var out, errb bytes.Buffer
-		if code := c.run(args, &out, &errb); code != 0 || out.String() != "built\n" {
-			t.Errorf("%v with Default: exit %d, stdout %q, stderr %q", args, code, out.String(), errb.String())
-		}
+
+	// No verb runs the default one.
+	var out, errb bytes.Buffer
+	if code := c.run(nil, &out, &errb); code != 0 || out.String() != "built\n" {
+		t.Errorf("no verb: exit %d, stdout %q, stderr %q", code, out.String(), errb.String())
+	}
+
+	// So does a flag with no verb — and the default verb then judges the
+	// flag, which is how an unknown one is caught rather than ignored. It
+	// used to be ignored, because a verb that never parsed its arguments
+	// could not tell -v from nothing.
+	out.Reset()
+	errb.Reset()
+	if code := c.run([]string{"-v"}, &out, &errb); code != 2 ||
+		!strings.Contains(errb.String(), "not defined: -v") {
+		t.Errorf("unknown flag: exit %d, stderr %q", code, errb.String())
 	}
 }
 

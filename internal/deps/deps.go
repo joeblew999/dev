@@ -5,9 +5,7 @@ package deps
 import (
 	_ "embed"
 	"fmt"
-	"io"
 	"io/fs"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -34,32 +32,24 @@ var Subs = map[string]cli.Verb{
 // list and upgrade are the two subcommands. Each is its own function rather
 // than one that reads the verb it was called as, so a subcommand's name is in
 // Subs and nowhere else at all.
-func list(verb string, args []string, stdout, stderr io.Writer) error {
-	return each(verb, args, stdout, stderr, "--list")
-}
-
-func upgrade(verb string, args []string, stdout, stderr io.Writer) error {
-	return each(verb, args, stdout, stderr)
-}
+func list(c cli.Call) error    { return each(c, "--list") }
+func upgrade(c cli.Call) error { return each(c) }
 
 // each runs go-mod-upgrade in every module of the repo. Listing and upgrading
 // are the same walk; --list is the whole difference.
-func each(verb string, args []string, stdout, stderr io.Writer, flags ...string) error {
-	if cli.HelpRequested(args) {
-		return cli.ErrHelp
-	}
-	if len(args) > 0 {
-		return cli.Usagef("%s takes no arguments", verb)
+func each(c cli.Call, flags ...string) error {
+	if len(c.Args) > 0 {
+		return c.Usagef("takes no arguments")
 	}
 	dirs, err := Modules(".")
 	if err != nil {
 		return err
 	}
 	for _, dir := range dirs {
-		fmt.Fprintf(stdout, "== %s ==\n", dir)
+		fmt.Fprintf(c.Stdout, "== %s ==\n", dir)
 		cmd := exec.Command("go-mod-upgrade", flags...)
 		cmd.Dir = dir
-		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, stdout, stderr
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = c.Stdin, c.Stdout, c.Stderr
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("%s: go-mod-upgrade: %w; pin it in mise.toml: \"go:github.com/oligot/go-mod-upgrade\" = \"latest\"", dir, err)
 		}

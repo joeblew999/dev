@@ -84,3 +84,36 @@ func placeholder(f *flag.Flag) string {
 	}
 	return " " + name
 }
+
+// parse turns what was typed into a Call, using what the verb declared. Args
+// beginning with DIR means the first argument is a directory; the rest are
+// positionals, and everything after a bare -- is passed through verbatim.
+//
+// A verb that wants none of this still gets it: with no Args and no Flags the
+// arguments arrive untouched, which is what a subcommand like `secrets ci`
+// needs.
+func (v Verb) parse(verb string, args []string, stdout, stderr io.Writer) (Call, error) {
+	fs := Flags(verb, stderr)
+	if v.Flags != nil {
+		v.Flags(fs)
+	}
+	c := Call{Verb: verb, Flags: fs, Stdin: Stdin, Stdout: stdout, Stderr: stderr}
+	if strings.HasPrefix(v.Args, "DIR") {
+		dir, rest, err := DirAnd(fs, args, -1)
+		if err != nil {
+			return c, err
+		}
+		c.Dir, c.Args = dir, rest
+		return c, nil
+	}
+	if HelpRequested(args) {
+		fs.Usage()
+		return c, ErrHelp
+	}
+	rest, err := ParseInterleaved(fs, args)
+	if err != nil {
+		return c, Usagef("%s: %v", verb, err)
+	}
+	c.Args = rest
+	return c, nil
+}

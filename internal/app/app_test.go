@@ -47,7 +47,4 @@ func TestNameFollowsTheTarget(t *testing.T) {
 	if got, err := Name("fl", ""); err != nil || got != "acme" {
 		t.Errorf("Name = %q, %v", got, err)
 	}
-	if err := Run("deploy", []string{"--env", "x"}, os.Stdout, os.Stderr); err == nil || !strings.Contains(err.Error(), "directory comes first") {
-		t.Errorf("flags before DIR: %v", err)
-	}
 }

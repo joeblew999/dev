@@ -20,66 +20,36 @@ import (
 var stdin io.Reader = os.Stdin
 
 // Run is every Worker verb but wait. DIR comes first; flags may follow anywhere.
-func Run(verb string, args []string, stdout, stderr io.Writer) error {
-	fs := cli.Flags(verb, stderr)
-	env := fs.String("env", "", "wrangler environment")
+// Run is every Worker verb but wait. cli has parsed DIR and the flags before
+// this is reached, so each case is the call it makes and nothing else.
+func Run(verb string, c cli.Call) error {
 	switch verb {
 	case "url":
-		var deployed, refresh cli.Bool
-		fs.Var(&deployed, "deployed", "the deployed Worker's URL; otherwise --local")
-		fs.Var(&refresh, "refresh", "ask the API again instead of reading mise.local.toml")
-		local := fs.String("local", "", "what to print when not --deployed")
-		dir, _, err := cli.DirAnd(fs, args, 0)
+		u, err := URL(c.Dir, c.Value("env"), c.Given("deployed"), c.Value("local"), c.Given("refresh"))
 		if err != nil {
 			return err
 		}
-		u, err := URL(dir, *env, bool(deployed), *local, bool(refresh))
-		if err != nil {
-			return err
-		}
-		fmt.Fprintln(stdout, u)
+		fmt.Fprintln(c.Stdout, u)
 		return nil
 	case "deploy":
-		wait := fs.String("wait", "", "path to wait for a 200 on after deploying, e.g. /health")
-		dir, _, err := cli.DirAnd(fs, args, 0)
-		if err != nil {
+		if err := Deploy(c.Stdout, c.Dir, c.Value("env")); err != nil {
 			return err
 		}
-		if err := Deploy(stdout, dir, *env); err != nil {
-			return err
-		}
-		if *wait == "" {
+		if c.Value("wait") == "" {
 			return nil
 		}
-		u, err := URL(dir, *env, true, "", false)
+		u, err := URL(c.Dir, c.Value("env"), true, "", false)
 		if err != nil {
 			return err
 		}
-		return Wait(stdout, u+*wait, 2*time.Minute)
+		return Wait(c.Stdout, u+c.Value("wait"), 2*time.Minute)
 	case "logs":
-		dir, _, err := cli.DirAnd(fs, args, 0)
-		if err != nil {
-			return err
-		}
-		return Logs(dir, *env)
+		return Logs(c.Dir, c.Value("env"))
 	case "delete":
-		name := fs.String("name", "", "the Worker to delete (default: the one the config deploys env to)")
-		var yes cli.Bool
-		fs.Var(&yes, "yes", "delete without asking")
-		dir, _, err := cli.DirAnd(fs, args, 0)
-		if err != nil {
-			return err
-		}
-		return Delete(stdin, stdout, dir, *env, *name, bool(yes))
+		return Delete(c.Stdin, c.Stdout, c.Dir, c.Value("env"), c.Value("name"), c.Given("yes"))
 	case "smoke":
-		path := fs.String("path", "/", "what to request")
-		expect := fs.String("expect", "", "text the body must contain")
-		timeout := fs.Duration("timeout", 3*time.Minute, "how long wrangler dev may take to start")
-		dir, _, err := cli.DirAnd(fs, args, 0)
-		if err != nil {
-			return err
-		}
-		return Smoke(stdout, dir, *env, *path, *expect, *timeout)
+		d, _ := time.ParseDuration(c.Value("timeout"))
+		return Smoke(c.Stdout, c.Dir, c.Value("env"), c.Value("path"), c.Value("expect"), d)
 	}
 	return cli.Usagef("cloudflare: unknown verb %q", verb)
 }

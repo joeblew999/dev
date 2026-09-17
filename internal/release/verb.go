@@ -16,10 +16,7 @@ package release
 
 import (
 	_ "embed"
-	"errors"
 	"flag"
-	"io"
-	"strings"
 
 	"github.com/joeblew999/dev/cli"
 )
@@ -38,35 +35,24 @@ func Flags(fs *flag.FlagSet) {
 	fs.String("name", "", "the binary's `NAME` (default: the repo's)")
 }
 
-func Run(verb string, args []string, stdout, stderr io.Writer) error {
-	fs := cli.Flags(verb, stderr)
-	Flags(fs)
-	if len(args) == 0 || args[0] == "" || strings.HasPrefix(args[0], "-") {
-		return cli.Usagef("release: the command directory comes first")
-	}
-	dir := args[0]
-	rest, err := cli.ParseInterleaved(fs, args[1:])
-	if errors.Is(err, cli.ErrHelp) {
-		return err
-	}
-	if err != nil {
-		return cli.Usagef("release: %v", err)
-	}
-	if len(rest) > 1 {
-		return cli.Usagef("release: at most one VERSION")
+// Run is `dev release DIR [VERSION]`. cli has parsed DIR and the flags, so
+// what is left is the one positional this verb allows and what to do with it.
+func Run(c cli.Call) error {
+	if len(c.Args) > 1 {
+		return c.Usagef("at most one VERSION")
 	}
 	version := ""
-	if len(rest) == 1 {
-		version = rest[0]
+	if len(c.Args) == 1 {
+		version = c.Args[0]
 	}
-	r, err := newRelease(dir, cli.Value(fs, "name"))
+	r, err := newRelease(c.Dir, c.Value("name"))
 	if err != nil {
 		return err
 	}
-	if cli.Given(fs, "keygen") {
-		return Keygen(stdout, cli.Given(fs, "rotate"))
+	if c.Given("keygen") {
+		return Keygen(c.Stdout, c.Given("rotate"))
 	}
-	if cli.Given(fs, "snapshot") {
+	if c.Given("snapshot") {
 		return r.snapshot()
 	}
 	return r.publish(version)

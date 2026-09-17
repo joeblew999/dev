@@ -2,7 +2,6 @@ package cli
 
 import (
 	"flag"
-	"io"
 	"strings"
 	"testing"
 )
@@ -227,7 +226,7 @@ func testHelpCommand() Command {
 	return Command{Name: "x", Verbs: map[string]Verb{
 		"go": {
 			Desc: "what it is for",
-			Run:  func(string, []string, io.Writer, io.Writer) error { return ErrHelp },
+			Run:  func(Call) error { return ErrHelp },
 		},
 	}}
 }

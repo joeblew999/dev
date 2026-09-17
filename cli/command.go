@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -95,12 +94,12 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 	// subcommands in Subs and then names them again in a switch, and the two
 	// lists drift — which is a fact stated twice, the thing this stack keeps
 	// deleting.
-	run, path := v.Run, verb
+	run, path := v.Run, c.Name+" "+verb
 	named := ""
 	if len(rest) > 0 && !strings.HasPrefix(rest[0], "-") {
 		named = rest[0]
 		if sub, ok := v.Subs[named]; ok && sub.Run != nil {
-			run, path, rest = sub.Run, verb+" "+named, rest[1:]
+			run, path, rest = sub.Run, path+" "+named, rest[1:]
 		}
 	}
 	if run == nil {
@@ -114,7 +113,10 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "error: %s\n\n%s", what, Flatten(c.sectionFor(verb)))
 		return 2
 	}
-	err := run(path, rest, stdout, stderr)
+	call, err := v.parse(path, rest, stdout, stderr)
+	if err == nil {
+		err = run(call)
+	}
 	if errors.Is(err, ErrHelp) {
 		// The flag package has printed each flag and what it means; this adds
 		// what the verb is for. Together they are the whole of what a person
@@ -171,7 +173,7 @@ func (c Command) all() map[string]Verb {
 		m[name] = v
 	}
 	own := c.ownUsage()
-	m["skill"] = Verb{Run: c.skill, Args: "[--check]", Desc: "rewrite the manual from the verbs, in all three places it is read", Usage: own}
+	m["skill"] = Verb{Run: c.skill, Flags: checkFlag, Desc: "rewrite the manual from the verbs, in all three places it is read", Usage: own}
 	m["skills"] = Verb{Run: c.skills, Desc: "list what every agent in this repo can read, and where each came from", Usage: own}
 	m["version"] = Verb{Run: c.version, Desc: "print the version, to tell a release from a local build", Usage: own}
 	return m
@@ -181,12 +183,7 @@ func (c Command) all() map[string]Verb {
 var usageTemplate string
 
 // ownUsage is the usage of skill and version, in the shape the others use.
-func (c Command) ownUsage() string {
-	return fmt.Sprintf(usageTemplate, c.Name,
-		filepath.Join(ShippedDir, c.Name, SkillFile),
-		filepath.Join(ClaudeDir, c.Name, SkillFile),
-		filepath.Join(AgentsDir, c.Name, SkillFile))
-}
+func (c Command) ownUsage() string { return usageTemplate }
 
 // sortedVerbs is the table's names in order. Verbs is a map, so it has none
 // of its own; everything that walks the table walks it through here, so the

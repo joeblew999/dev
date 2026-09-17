@@ -124,7 +124,6 @@ several commands moves together rather than one at a time.
 ### The tool itself
 
 Every command built on this verb system gets these two without writing them.
-%!(EXTRA string=dev, string=skills/dev/SKILL.md, string=.claude/skills/dev/SKILL.md, string=.agents/skills/dev/SKILL.md)
 
 - `dev skill [--check]`
   rewrite the manual from the verbs, in all three places it is read

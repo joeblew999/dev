@@ -1,20 +1,18 @@
 // The stage verbs: what each takes and what it runs. What they do lives in
 // stage.go, and what a directory holds in inspect.go.
-// Package stage builds, runs and checks one command directory from what it
-// finds there: a Go main, a package.json (Vite), gsx sources, a wrangler.toml
-// (a Worker, one wasm per environment), a fly.toml (a Fly app). mise names a
-// stage per directory;
-// this does the rest, so a new command is new lines in mise.toml, not new
-// tooling.
 package stage
 
 import (
 	_ "embed"
 	"flag"
-	"io"
 
 	"github.com/joeblew999/dev/cli"
 )
+
+// Usage is the prose for these verbs. It is markdown in a file beside this
+// one, not a string const: a Go raw string is backtick-delimited, so it can
+// never hold the inline code that keeps `<dir>` from reaching a markdown
+// renderer as an HTML tag.
 
 //go:embed usage.md
 var Usage string
@@ -30,69 +28,15 @@ func CheckFlags(fs *flag.FlagSet) {
 	fs.String("expect", "", "the `TEXT` the smoke check's body must contain")
 }
 
-// Run is every stage verb. DIR comes first; flags may follow anywhere.
-// Each verb is its own function. One function switching on the verb it was
-// called as means the verb names live here as well as in the table that
-// declares them, and two lists of the same five strings drift.
+// Each verb is the work it does. cli parses what the verb declared — its Args
+// and its Flags — so none of them opens with a FlagSet, a DirAnd and an error
+// check the way all five used to.
 
-// BuildVerb is `build`: the binary, and the manual when the command has verbs.
-func BuildVerb(verb string, args []string, stdout, stderr io.Writer) error {
-	dir, err := dirOnly(verb, args, stderr, nil)
-	if err != nil {
-		return err
-	}
-	return Build(stdout, dir, false, "")
-}
+func BuildVerb(c cli.Call) error   { return Build(c.Stdout, c.Dir, false, "") }
+func WasmVerb(c cli.Call) error    { return Build(c.Stdout, c.Dir, true, c.Value("env")) }
+func RunVerb(c cli.Call) error     { return Exec(c.Dir, false, "", c.Args) }
+func WorkerdVerb(c cli.Call) error { return Exec(c.Dir, true, c.Value("env"), c.Args) }
 
-// WasmVerb is `wasm`: the same command built as a Worker.
-func WasmVerb(verb string, args []string, stdout, stderr io.Writer) error {
-	fs := cli.Flags(verb, stderr)
-	EnvFlag(fs)
-	dir, _, err := cli.DirAnd(fs, args, 0)
-	if err != nil {
-		return err
-	}
-	return Build(stdout, dir, true, cli.Value(fs, "env"))
-}
-
-// CheckVerb is `check`: everything that says the command is sound.
-func CheckVerb(verb string, args []string, stdout, stderr io.Writer) error {
-	fs := cli.Flags(verb, stderr)
-	CheckFlags(fs)
-	dir, _, err := cli.DirAnd(fs, args, 0)
-	if err != nil {
-		return err
-	}
-	return Check(stdout, dir, cli.Value(fs, "path"), cli.Value(fs, "expect"))
-}
-
-// RunVerb is `run`: the built binary, under the repo's secrets.
-func RunVerb(verb string, args []string, stdout, stderr io.Writer) error {
-	fs := cli.Flags(verb, stderr)
-	dir, rest, err := cli.DirAnd(fs, args, -1)
-	if err != nil {
-		return err
-	}
-	return Exec(dir, false, "", rest)
-}
-
-// WorkerdVerb is `workerd`: the Worker on local workerd.
-func WorkerdVerb(verb string, args []string, stdout, stderr io.Writer) error {
-	fs := cli.Flags(verb, stderr)
-	EnvFlag(fs)
-	dir, rest, err := cli.DirAnd(fs, args, -1)
-	if err != nil {
-		return err
-	}
-	return Exec(dir, true, cli.Value(fs, "env"), rest)
-}
-
-// dirOnly is a verb that takes a directory and nothing else.
-func dirOnly(verb string, args []string, stderr io.Writer, flags func(*flag.FlagSet)) (string, error) {
-	fs := cli.Flags(verb, stderr)
-	if flags != nil {
-		flags(fs)
-	}
-	dir, _, err := cli.DirAnd(fs, args, 0)
-	return dir, err
+func CheckVerb(c cli.Call) error {
+	return Check(c.Stdout, c.Dir, c.Value("path"), c.Value("expect"))
 }
