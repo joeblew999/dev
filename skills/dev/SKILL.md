@@ -40,7 +40,8 @@ dev deploy DIR [--env NAME] [--wait PATH] [-- FLAGS]
     deploy what DIR holds. A Worker deploys from a throwaway copy of its
     wrangler.toml, so the ids wrangler writes back never reach git, and says
     what was created. A Fly app deploys with the repo root as build context,
-    FLAGS going to flyctl. With --wait, wait until it answers 200 at PATH
+    FLAGS going to flyctl, created first when the account lacks it (FLY_ORG
+    names the org). With --wait, wait until it answers 200 at PATH
 dev logs DIR [--env NAME]
     stream the deployed app's logs (wrangler tail, flyctl logs)
 dev smoke DIR [--env NAME] [--path P] [--expect TEXT] [--timeout DURATION]

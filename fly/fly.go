@@ -6,6 +6,8 @@
 package fly
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -141,6 +143,9 @@ func Deploy(out io.Writer, dir string, extra []string) error {
 	if err != nil {
 		return err
 	}
+	if err := ensureApp(out, app); err != nil {
+		return err
+	}
 	args := []string{"flyctl", "deploy", "--config", filepath.Join(dir, configFile)}
 	if suffix.Set() {
 		args = append(args, "--app", app)
@@ -177,6 +182,41 @@ func Destroy(stdin io.Reader, out io.Writer, dir, name string, yes bool) error {
 		return fmt.Errorf("flyctl apps destroy %s failed: %w", name, err)
 	}
 	fmt.Fprintf(out, "destroyed %s\n", name)
+	return nil
+}
+
+// ensureApp creates the app when the account does not have it, since
+// flyctl deploy will not: a developer's suffixed copy, or a fork whose
+// upstream owns the committed name (Fly app names are global). The org is
+// FLY_ORG when set, otherwise flyctl's default, the personal one.
+func ensureApp(out io.Writer, app string) error {
+	var list bytes.Buffer
+	if err := fnox.Exec(".", nil, &list, "flyctl", "apps", "list", "--json"); err != nil {
+		return fmt.Errorf("flyctl apps list failed: %w. It needs FLY_API_TOKEN in fnox (a token from: flyctl tokens create org), or a login from: flyctl auth login", err)
+	}
+	var apps []struct {
+		Name string `json:"Name"`
+	}
+	text := list.String()
+	if i := strings.Index(text, "["); i >= 0 {
+		text = text[i:]
+	}
+	if err := json.Unmarshal([]byte(text), &apps); err != nil {
+		return fmt.Errorf("reading flyctl's app list: %w", err)
+	}
+	for _, a := range apps {
+		if a.Name == app {
+			return nil
+		}
+	}
+	args := []string{"flyctl", "apps", "create", app}
+	if org := os.Getenv("FLY_ORG"); org != "" {
+		args = append(args, "--org", org)
+	}
+	fmt.Fprintf(out, "creating the Fly app %s, which the account does not have yet\n", app)
+	if err := fnox.Exec(".", nil, out, args...); err != nil {
+		return fmt.Errorf("flyctl apps create %s failed: %w (a name is global across Fly; DEPLOY_SUFFIX gives this copy its own, FLY_ORG the org)", app, err)
+	}
 	return nil
 }
 

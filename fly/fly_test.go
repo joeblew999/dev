@@ -18,6 +18,10 @@ func capture(t *testing.T) *[]string {
 	var got []string
 	old := fnox.Exec
 	fnox.Exec = func(dir string, stdin io.Reader, stdout io.Writer, args ...string) error {
+		if strings.Join(args, " ") == "flyctl apps list --json" {
+			io.WriteString(stdout, `[{"Name":"acme-site"}]`)
+			return nil
+		}
 		got = append([]string{"in:" + dir}, args...)
 		if stdin != nil {
 			b, _ := io.ReadAll(stdin)
@@ -119,5 +123,32 @@ func TestDestroyAsksThenRunsFlyctl(t *testing.T) {
 	}
 	if s := strings.Join(*got, " "); !strings.HasSuffix(s, "flyctl apps destroy acme-site --yes") {
 		t.Errorf("ran %q", s)
+	}
+}
+
+// An app the account lacks is created before the deploy; one it has is not.
+func TestDeployCreatesAMissingApp(t *testing.T) {
+	dir := appDir(t)
+	var ran []string
+	old := fnox.Exec
+	fnox.Exec = func(_ string, _ io.Reader, stdout io.Writer, args ...string) error {
+		ran = append(ran, strings.Join(args, " "))
+		if strings.HasPrefix(strings.Join(args, " "), "flyctl apps list") {
+			io.WriteString(stdout, "[]")
+		}
+		return nil
+	}
+	t.Cleanup(func() { fnox.Exec = old })
+	oldLook := lookPath
+	lookPath = func(string) (string, error) { return "/x/flyctl", nil }
+	t.Cleanup(func() { lookPath = oldLook })
+	t.Setenv(suffix.Env, "probe")
+	t.Setenv("FLY_ORG", "acme")
+	if err := Deploy(io.Discard, dir, nil); err != nil {
+		t.Fatal(err)
+	}
+	want := "flyctl apps list --json; flyctl apps create acme-site-probe --org acme; flyctl deploy --config cmd/site/fly.toml --app acme-site-probe ."
+	if got := strings.Join(ran, "; "); got != want {
+		t.Errorf("ran %q\nwant %q", got, want)
 	}
 }
