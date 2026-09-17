@@ -36,4 +36,6 @@ Run `dev` with no arguments for every verb.
 
 `mise install`, then `mise run test`. The tool is one command at the repo
 root, so its own stages take `.`: `mise run release:snapshot` builds and signs
-a release locally; a pushed tag publishes one.
+a release locally, `mise run release <version>` publishes one, signed with
+the key in fnox (`packslip.pub` is its public half, the `pubkey` consumers
+pin). The release workflow runs the same on demand.
