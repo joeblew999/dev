@@ -11,9 +11,12 @@ import (
 	"strings"
 )
 
+// Bin is the fnox CLI every function here shells out to.
+const Bin = "fnox"
+
 // Get returns a secret's value, or an error when fnox does not have it.
 var Get = func(name string) (string, error) {
-	out, err := exec.Command("fnox", "get", name).Output()
+	out, err := exec.Command(Bin, "get", name).Output()
 	if err != nil {
 		return "", err
 	}
@@ -23,7 +26,7 @@ var Get = func(name string) (string, error) {
 // Set stores a value in the developer's global fnox config. The value goes in
 // on stdin, so it is never an argument, a process list or a shell history.
 var Set = func(name, value string) error {
-	cmd := exec.Command("fnox", "set", "-g", name)
+	cmd := exec.Command(Bin, "set", "-g", name)
 	cmd.Stdin = strings.NewReader(value)
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -31,7 +34,7 @@ var Set = func(name, value string) error {
 
 // Exec runs a command in dir with fnox's secrets in its environment.
 var Exec = func(dir string, stdin io.Reader, stdout io.Writer, args ...string) error {
-	cmd := exec.Command("fnox", append([]string{"exec", "--"}, args...)...)
+	cmd := exec.Command(Bin, append([]string{"exec", "--"}, args...)...)
 	cmd.Dir = dir
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout

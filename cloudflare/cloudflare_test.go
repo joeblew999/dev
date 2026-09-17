@@ -70,7 +70,7 @@ func stubFnox(t *testing.T, values map[string]string) {
 
 func TestURLReadsTheSubdomainOnceAndKeepsIt(t *testing.T) {
 	t.Chdir(t.TempDir())
-	if err := os.WriteFile(wranglerFile, []byte("name = \"app\"\n[env.tinygo]\nmain = \"x.mjs\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(ConfigFile, []byte("name = \"app\"\n[env.tinygo]\nmain = \"x.mjs\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	calls := fakeAccount(t, "tok", "someone")
@@ -101,7 +101,7 @@ func TestURLReadsTheSubdomainOnceAndKeepsIt(t *testing.T) {
 
 func TestURLNamesTheMissingCredential(t *testing.T) {
 	t.Chdir(t.TempDir())
-	os.WriteFile(wranglerFile, []byte("name = \"app\"\n"), 0o644)
+	os.WriteFile(ConfigFile, []byte("name = \"app\"\n"), 0o644)
 	stubFnox(t, map[string]string{})
 	_, err := URL(".", "", true, "", false)
 	want := "CLOUDFLARE_API_TOKEN is not in fnox; store it with: fnox set -g CLOUDFLARE_API_TOKEN"
@@ -112,7 +112,7 @@ func TestURLNamesTheMissingCredential(t *testing.T) {
 
 func TestURLReportsWhatCloudflareSaid(t *testing.T) {
 	t.Chdir(t.TempDir())
-	os.WriteFile(wranglerFile, []byte("name = \"app\"\n"), 0o644)
+	os.WriteFile(ConfigFile, []byte("name = \"app\"\n"), 0o644)
 	fakeAccount(t, "right", "x")
 	stubFnox(t, map[string]string{"CLOUDFLARE_API_TOKEN": "wrong", "CLOUDFLARE_ACCOUNT_ID": "acct"})
 	_, err := URL(".", "", true, "", false)

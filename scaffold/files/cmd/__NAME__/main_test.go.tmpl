@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/joeblew999/dev/cli"
 )
 
 func TestHealth(t *testing.T) {
@@ -18,3 +20,6 @@ func TestHealth(t *testing.T) {
 		t.Fatalf("/health answered %d, want 200", resp.StatusCode)
 	}
 }
+
+// TestSkill holds every copy of the manual to the verbs; dev check runs it.
+func TestSkill(t *testing.T) { cli.CheckSkill(t, app) }

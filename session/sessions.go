@@ -59,7 +59,7 @@ func newestModTime(dir string) (time.Time, bool) {
 // repo. It shells out to ps, which both macOS and Linux have; anything it cannot
 // work out is skipped, because this is only a warning.
 func claudeSessions(now time.Time) []session {
-	out, err := exec.Command("ps", "-eo", "pid=,etime=,command=").Output()
+	out, err := exec.Command(PsBin, "-eo", "pid=,etime=,command=").Output()
 	if err != nil {
 		return nil
 	}
@@ -128,7 +128,7 @@ func processCwd(pid int) string {
 		}
 		return ""
 	}
-	out, err := exec.Command("lsof", "-a", "-p", strconv.Itoa(pid), "-d", "cwd", "-Fn").Output()
+	out, err := exec.Command(LsofBin, "-a", "-p", strconv.Itoa(pid), "-d", "cwd", "-Fn").Output()
 	if err != nil {
 		return ""
 	}

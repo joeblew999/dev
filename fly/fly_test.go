@@ -42,7 +42,7 @@ func appDir(t *testing.T) string {
 	if err := os.MkdirAll("cmd/site", 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join("cmd/site", configFile), []byte("app = \"acme-site\"\nprimary_region = \"lhr\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join("cmd/site", ConfigFile), []byte("app = \"acme-site\"\nprimary_region = \"lhr\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return "cmd/site"
@@ -100,7 +100,7 @@ func TestErrorsNameTheirFix(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), `flyctl = "latest"`) {
 		t.Errorf("missing flyctl: %v; want the mise.toml line", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, configFile), []byte("primary_region = \"lhr\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ConfigFile), []byte("primary_region = \"lhr\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := App(dir); err == nil || !strings.Contains(err.Error(), `app = "<name>"`) {

@@ -1,21 +1,17 @@
 // Command dev is the stack's developer tool. It is not part of any binary that
 // ships: mise tasks build and run it. A task names a stage of a command
 // directory; dev reads the directory and does the rest, so a new command is
-// new lines in mise.toml, never new tooling. Every package is one thing, named
-// as the tasks name it, and every verb has the one shape in internal/cli.
+// new lines in mise.toml, never new tooling. Every task, test and release
+// included, runs the same on a developer's machine and in GitHub Actions:
+// mise.toml is the one source of truth for both, local is the fast path, CI
+// proves a machine nobody set up. Every package is one thing, named as the
+// tasks name it, and every verb has the one shape in cli.
 package main
 
 import (
-	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
-
 	"github.com/joeblew999/dev/app"
+	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/deps"
-	"github.com/joeblew999/dev/internal/cli"
 	"github.com/joeblew999/dev/release"
 	"github.com/joeblew999/dev/scaffold"
 	"github.com/joeblew999/dev/secrets"
@@ -23,28 +19,31 @@ import (
 	"github.com/joeblew999/dev/stage"
 )
 
-// verbs is the whole tool: what each verb runs, and its usage. `dev skill`
-// renders the skill from this table, so the manual is the code's.
-var verbs = map[string]struct {
-	run   cli.Runner
-	usage string
-}{
-	"build":   {stage.Run, stage.Usage},
-	"wasm":    {stage.Run, stage.Usage},
-	"check":   {stage.Run, stage.Usage},
-	"run":     {stage.Run, stage.Usage},
-	"workerd": {stage.Run, stage.Usage},
-	"deploy":  {app.Run, app.Usage},
-	"url":     {app.Run, app.Usage},
-	"logs":    {app.Run, app.Usage},
-	"smoke":   {app.Run, app.Usage},
-	"wait":    {app.Run, app.Usage},
-	"delete":  {app.Run, app.Usage},
-	"secrets": {secrets.Run, secrets.Usage},
-	"session": {session.Run, session.Usage},
-	"release": {release.Run, release.Usage},
-	"deps":    {deps.Run, deps.Usage},
-	"init":    {scaffold.Run, scaffold.Usage},
+// dev is the whole tool: what each verb runs, and its usage. cli.Main runs it
+// and renders the manual from this table, so the manual is the code's; any
+// command built the same way gets the same.
+var dev = cli.Command{
+	Name: "dev",
+	Verbs: map[string]cli.Verb{
+		"build":   {Run: stage.Run, Usage: stage.Usage},
+		"wasm":    {Run: stage.Run, Usage: stage.Usage},
+		"check":   {Run: stage.Run, Usage: stage.Usage},
+		"run":     {Run: stage.Run, Usage: stage.Usage},
+		"workerd": {Run: stage.Run, Usage: stage.Usage},
+		"deploy":  {Run: app.Run, Usage: app.Usage},
+		"url":     {Run: app.Run, Usage: app.Usage},
+		"logs":    {Run: app.Run, Usage: app.Usage},
+		"smoke":   {Run: app.Run, Usage: app.Usage},
+		"wait":    {Run: app.Run, Usage: app.Usage},
+		"delete":  {Run: app.Run, Usage: app.Usage},
+		"secrets": {Run: secrets.Run, Usage: secrets.Usage},
+		"session": {Run: session.Run, Usage: session.Usage},
+		"release": {Run: release.Run, Usage: release.Usage},
+		"deps":    {Run: deps.Run, Usage: deps.Usage},
+		"init":    {Run: scaffold.Run, Usage: scaffold.Usage},
+	},
+	Head: skillHead,
+	Tail: skillTail,
 }
 
 // version and pubkey are set by the release build (-X main.version, -X
@@ -56,114 +55,13 @@ var (
 
 func main() {
 	scaffold.Version, scaffold.Pubkey = version, pubkey
-	if len(os.Args) < 2 {
-		fmt.Fprint(os.Stderr, index())
-		os.Exit(2)
-	}
-	verb, args := os.Args[1], os.Args[2:]
-	if verb == "version" {
-		fmt.Println(version)
-		return
-	}
-	if verb == "skill" {
-		if err := skill(args); err != nil {
-			fmt.Fprintln(os.Stderr, "error:", err)
-			os.Exit(1)
-		}
-		return
-	}
-	v, ok := verbs[verb]
-	if !ok {
-		fmt.Fprintf(os.Stderr, "unknown verb %q\n\n%s", verb, index())
-		os.Exit(2)
-	}
-	err := v.run(verb, args, os.Stdout, os.Stderr)
-	var uerr *cli.UsageError
-	if errors.As(err, &uerr) {
-		fmt.Fprintf(os.Stderr, "error: %v\n\n%s", err, v.usage)
-		os.Exit(2)
-	}
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
-		os.Exit(1)
-	}
-}
-
-// index lists every verb, in the order the tool's packages are listed above.
-func index() string {
-	seen := map[string]bool{}
-	var b strings.Builder
-	b.WriteString("dev: the stack's developer tool (run through mise). Verbs, by what does them:\n\n")
-	var names []string
-	for name := range verbs {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		u := verbs[name].usage
-		if seen[u] {
-			continue
-		}
-		seen[u] = true
-		b.WriteString(u)
-		b.WriteString("\n")
-	}
-	return b.String()
-}
-
-// skill renders the tool's Claude Code skill from the verbs' own usage, so
-// what an AI reads can never drift from what the binary does. The release
-// ships it, and mise links it into every repo that pins the tool.
-func skill(args []string) error {
-	out, check := "skills/dev/SKILL.md", false
-	for _, a := range args {
-		switch {
-		case a == "--check":
-			check = true
-		case strings.HasPrefix(a, "--out="):
-			out = strings.TrimPrefix(a, "--out=")
-		default:
-			return fmt.Errorf("dev skill [--out=FILE] [--check]")
-		}
-	}
-	var b strings.Builder
-	b.WriteString(skillHead)
-	seen := map[string]bool{}
-	var names []string
-	for name := range verbs {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		u := verbs[name].usage
-		if seen[u] {
-			continue
-		}
-		seen[u] = true
-		b.WriteString("```\n" + u + "```\n\n")
-	}
-	b.WriteString(skillTail)
-	if check {
-		have, err := os.ReadFile(out)
-		if err != nil || string(have) != b.String() {
-			return fmt.Errorf("%s is stale; regenerate it with: dev skill", out)
-		}
-		fmt.Printf("%s is up to date\n", out)
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(out, []byte(b.String()), 0o644); err != nil {
-		return err
-	}
-	fmt.Printf("wrote %s from the verbs' own usage\n", out)
-	return nil
+	dev.Version = version
+	cli.Main(dev)
 }
 
 const skillHead = `---
 name: dev
-description: Build, check, run and deploy the commands of a repo on the mise + fnox + hk + packslip stack. Use before running go, npm, wrangler, fly, fnox or goreleaser by hand in such a repo: a mise task names a stage of a command directory and dev does the rest.
+description: Build, check, run, release and deploy the commands of a repo on the mise + fnox + hk + packslip stack. Use before running go, npm, wrangler, fly, fnox or goreleaser by hand in such a repo: a mise task names a stage of a command directory and dev does the rest. Tests and releases run the same locally and in GitHub Actions, from the same tasks.
 ---
 
 # dev
@@ -202,4 +100,7 @@ const skillTail = `## What a repo supplies
   DEPLOY_SUFFIX live in gitignored mise.local.toml.
 - Secret values only ever pass through fnox and the deploy CLI, never an argument.
 - Every error names its fix.
+- Every task runs the same locally and in GitHub Actions: mise run test and
+  mise run release are what CI runs, from the one mise.toml. Local is the fast
+  path day to day; CI proves a machine nobody set up. Neither replaces the other.
 `

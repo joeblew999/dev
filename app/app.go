@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/cloudflare"
 	"github.com/joeblew999/dev/fly"
-	"github.com/joeblew999/dev/internal/cli"
 )
 
 const Usage = `dev url DIR [--deployed[=BOOL]] [--env NAME] [--local URL] [--refresh]
@@ -79,7 +79,7 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 // Target names the cloud dir deploys to, "cloudflare" or "fly", from the
 // config file it holds.
 func Target(dir string) (string, error) {
-	cf, fl := exists(filepath.Join(dir, "wrangler.toml")), exists(filepath.Join(dir, "fly.toml"))
+	cf, fl := exists(filepath.Join(dir, cloudflare.ConfigFile)), exists(filepath.Join(dir, fly.ConfigFile))
 	switch {
 	case cf && fl:
 		return "", fmt.Errorf("%s has both wrangler.toml and fly.toml; a directory deploys to one cloud, so split it in two", dir)

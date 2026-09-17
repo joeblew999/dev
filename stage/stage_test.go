@@ -1,9 +1,12 @@
 package stage
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/joeblew999/dev/cli"
 )
 
 func TestInspectReadsWhatADirectoryHolds(t *testing.T) {
@@ -55,5 +58,52 @@ func TestStale(t *testing.T) {
 	}
 	if stale(filepath.Join(dir, "no-input"), out) {
 		t.Fatal("no input means nothing to do, not stale")
+	}
+}
+
+// A directory whose module imports dev/cli is a verb-table command: Inspect
+// says so, and Build then writes its manual. The module is built here with a
+// replace to this checkout, so nothing is fetched.
+func TestInspectSeesACLICommand(t *testing.T) {
+	dev, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum, err := os.ReadFile(filepath.Join(dev, "go.sum"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+	os.WriteFile("mise.toml", nil, 0o644)
+	os.MkdirAll("cmd/plain", 0o755)
+	os.WriteFile("cmd/plain/go.mod", []byte("module x/cmd/plain\n\ngo 1.27\n"), 0o644)
+	os.WriteFile("cmd/plain/main.go", []byte("package main\n\nfunc main() {}\n"), 0o644)
+	os.MkdirAll("cmd/tool", 0o755)
+	os.WriteFile("cmd/tool/go.mod", []byte("module x/cmd/tool\n\ngo 1.27.1\n\nrequire github.com/joeblew999/dev v0.0.0\n\nreplace github.com/joeblew999/dev => "+dev+"\n"), 0o644)
+	os.WriteFile("cmd/tool/go.sum", sum, 0o644)
+	os.WriteFile("cmd/tool/main.go", []byte(`package main
+
+import "github.com/joeblew999/dev/cli"
+
+func main() { cli.Main(cli.Command{Name: "tool"}) }
+`), 0o644)
+
+	for path, want := range map[string]bool{"cmd/plain": false, "cmd/tool": true} {
+		d, err := Inspect(path)
+		if err != nil {
+			t.Fatalf("Inspect(%s): %v", path, err)
+		}
+		if d.CLI != want {
+			t.Errorf("Inspect(%s).CLI = %v, want %v", path, d.CLI, want)
+		}
+	}
+	if err := Build(io.Discard, "cmd/tool", false, ""); err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	for _, dir := range []string{cli.ShippedDir, cli.ClaudeDir, cli.AgentsDir} {
+		p := filepath.Join(dir, "tool", cli.SkillFile)
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("after Build, %s: %v", p, err)
+		}
 	}
 }

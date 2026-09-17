@@ -29,7 +29,7 @@ func Smoke(out io.Writer, dir, env, path, expect string, timeout time.Duration) 
 	defer os.Remove(logf.Name())
 	defer logf.Close()
 
-	cmd := exec.Command("wrangler", "dev", "--env", env, "--ip", "127.0.0.1", "--port", strconv.Itoa(port))
+	cmd := exec.Command(WranglerBin, "dev", "--env", env, "--ip", "127.0.0.1", "--port", strconv.Itoa(port))
 	cmd.Dir = dir
 	cmd.Stdout, cmd.Stderr = logf, logf
 	ownGroup(cmd)

@@ -18,12 +18,22 @@ import (
 
 	"github.com/BurntSushi/toml"
 
+	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/fnox"
-	"github.com/joeblew999/dev/internal/cli"
 	"github.com/joeblew999/dev/internal/suffix"
 )
 
-const configFile = "fly.toml"
+// ConfigFile is the file whose presence makes a directory a Fly app.
+const ConfigFile = "fly.toml"
+
+const (
+	// FlyctlBin is the CLI every Fly verb runs through.
+	FlyctlBin = "flyctl"
+	// FnoxBin is the wrapper that supplies the account's credentials.
+	FnoxBin = "fnox"
+	// OrgEnv names the org a new app is created in.
+	OrgEnv = "FLY_ORG"
+)
 
 // Run is every Fly verb but wait. DIR comes first; flags may follow anywhere,
 // and for deploy everything after a bare -- goes to flyctl.
@@ -102,7 +112,7 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 
 func noEnv(dir, env string) error {
 	if env != "" {
-		return fmt.Errorf("a Fly app has no environments (--env %q): %s deploys one app; a second app is a second directory", env, filepath.Join(dir, configFile))
+		return fmt.Errorf("a Fly app has no environments (--env %q): %s deploys one app; a second app is a second directory", env, filepath.Join(dir, ConfigFile))
 	}
 	return nil
 }
@@ -112,7 +122,7 @@ func App(dir string) (string, error) {
 	var cfg struct {
 		App string `toml:"app"`
 	}
-	path := filepath.Join(dir, configFile)
+	path := filepath.Join(dir, ConfigFile)
 	if _, err := toml.DecodeFile(path, &cfg); err != nil {
 		return "", fmt.Errorf("%s: %w", path, err)
 	}
@@ -146,7 +156,7 @@ func Deploy(out io.Writer, dir string, extra []string) error {
 	if err := ensureApp(out, app); err != nil {
 		return err
 	}
-	args := []string{"flyctl", "deploy", "--config", filepath.Join(dir, configFile)}
+	args := []string{FlyctlBin, "deploy", "--config", filepath.Join(dir, ConfigFile)}
 	if suffix.Set() {
 		args = append(args, "--app", app)
 	}
@@ -178,7 +188,7 @@ func Destroy(stdin io.Reader, out io.Writer, dir, name string, yes bool) error {
 	if !yes && !cli.Confirm(stdin, out, "destroy? [y/N] ") {
 		return fmt.Errorf("not destroyed (pass --yes to skip the question)")
 	}
-	if err := fnox.Exec(".", nil, out, "flyctl", "apps", "destroy", name, "--yes"); err != nil {
+	if err := fnox.Exec(".", nil, out, FlyctlBin, "apps", "destroy", name, "--yes"); err != nil {
 		return fmt.Errorf("flyctl apps destroy %s failed: %w", name, err)
 	}
 	fmt.Fprintf(out, "destroyed %s\n", name)
@@ -191,7 +201,7 @@ func Destroy(stdin io.Reader, out io.Writer, dir, name string, yes bool) error {
 // FLY_ORG when set, otherwise flyctl's default, the personal one.
 func ensureApp(out io.Writer, app string) error {
 	var list bytes.Buffer
-	if err := fnox.Exec(".", nil, &list, "flyctl", "apps", "list", "--json"); err != nil {
+	if err := fnox.Exec(".", nil, &list, FlyctlBin, "apps", "list", "--json"); err != nil {
 		return fmt.Errorf("flyctl apps list failed: %w. It needs FLY_API_TOKEN in fnox (a token from: flyctl tokens create org), or a login from: flyctl auth login", err)
 	}
 	var apps []struct {
@@ -209,8 +219,8 @@ func ensureApp(out io.Writer, app string) error {
 			return nil
 		}
 	}
-	args := []string{"flyctl", "apps", "create", app}
-	if org := os.Getenv("FLY_ORG"); org != "" {
+	args := []string{FlyctlBin, "apps", "create", app}
+	if org := os.Getenv(OrgEnv); org != "" {
 		args = append(args, "--org", org)
 	}
 	fmt.Fprintf(out, "creating the Fly app %s, which the account does not have yet\n", app)
@@ -229,7 +239,7 @@ func Logs(dir string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command("fnox", "exec", "--", "flyctl", "logs", "--app", app)
+	cmd := exec.Command(FnoxBin, "exec", "--", FlyctlBin, "logs", "--app", app)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()
 }
@@ -244,11 +254,11 @@ func PutSecret(dir, name, value string) error {
 	if err != nil {
 		return err
 	}
-	return fnox.Exec(".", strings.NewReader(name+"="+value+"\n"), io.Discard, "flyctl", "secrets", "import", "--app", app)
+	return fnox.Exec(".", strings.NewReader(name+"="+value+"\n"), io.Discard, FlyctlBin, "secrets", "import", "--app", app)
 }
 
 func installed() error {
-	if _, err := lookPath("flyctl"); err != nil {
+	if _, err := lookPath(FlyctlBin); err != nil {
 		return fmt.Errorf("flyctl is not installed; add to mise.toml under [tools]: flyctl = \"latest\", then: mise install")
 	}
 	return nil

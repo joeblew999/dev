@@ -22,7 +22,7 @@ func TestFindChrome(t *testing.T) {
 	}
 	env := func(value string) func(string) string {
 		return func(key string) string {
-			if key == "CHROME" {
+			if key == ChromeEnv {
 				return value
 			}
 			return ""

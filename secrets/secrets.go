@@ -16,8 +16,8 @@ import (
 	"golang.org/x/term"
 
 	"github.com/joeblew999/dev/app"
+	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/fnox"
-	"github.com/joeblew999/dev/internal/cli"
 	"github.com/joeblew999/dev/internal/gitrepo"
 )
 
@@ -200,6 +200,9 @@ func Push(stdin io.Reader, out io.Writer, dir, env, fix string) error {
 	return nil
 }
 
+// GhBin is the CLI that sets the repo's Actions secrets.
+const GhBin = "gh"
+
 // CI sets one of the repo's GitHub Actions secrets, the value on stdin. A
 // variable so tests can replace it.
 var CI = func(name, value string) error {
@@ -207,7 +210,7 @@ var CI = func(name, value string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command("gh", "secret", "set", name, "--repo", slug)
+	cmd := exec.Command(GhBin, "secret", "set", name, "--repo", slug)
 	cmd.Stdin = strings.NewReader(value)
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {

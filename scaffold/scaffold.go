@@ -16,7 +16,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/joeblew999/dev/internal/cli"
+	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/gitrepo"
 )
 
@@ -27,7 +27,8 @@ const Usage = `dev init [DIR] [--name NAME] [--pin VERSION]
     write the stack into DIR (default .): mise.toml with the tools pinned and
     the stack's tasks, hk.pkl, session.toml, .mcp.json, the Claude Code
     settings and skill hook, the two workflows, .gitignore, AGENTS.md, and a
-    first command cmd/NAME (an HTTP server answering /health) with its module
+    first command cmd/NAME (an HTTP server answering /health, a cli.Command
+    whose skill its builds write) with its module, requiring the pinned dev,
     and go.work. NAME defaults to DIR's name; the module path comes from the
     git remote, or example.com without one. VERSION is the dev release to
     pin, with the public key its releases are signed with (--pubkey); default
@@ -43,15 +44,17 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	name := fs.String("name", "", "the first command's name (default: the directory's)")
 	pin := fs.String("pin", "", "the dev release to pin (default: this binary's version)")
 	pubkey := fs.String("pubkey", "", "the public key its releases are signed with (default: this binary's)")
-	dir, _, err := cli.DirAnd(fs, append([]string{"."}, args...), 0)
+	var dir string
+	var err error
+	// DIR defaults to "." when omitted (no args, or flags first); when
+	// given it comes first and flags may follow anywhere.
+	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
+		dir, _, err = cli.DirAnd(fs, append([]string{"."}, args...), 0)
+	} else {
+		dir, _, err = cli.DirAnd(fs, args, 0)
+	}
 	if err != nil {
 		return err
-	}
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		dir = args[0]
-		if _, _, err := cli.DirAnd(fs, args, 0); err != nil {
-			return err
-		}
 	}
 	return Init(stdout, dir, *name, *pin, *pubkey)
 }
@@ -96,7 +99,7 @@ func Init(out io.Writer, dir, name, pin, pubkey string) error {
 		slug = "<owner>/" + name
 		module = "example.com/" + name
 	}
-	replace := strings.NewReplacer("__NAME__", name, "__DEV__", devPin, "__MODULE__", module, "__SLUG__", slug)
+	replace := strings.NewReplacer("__NAME__", name, "__DEV__", devPin, "__PIN__", pin, "__MODULE__", module, "__SLUG__", slug)
 
 	// An existing repo keeps its shape: one with a module at the root gets no
 	// go.work and no nested module, and a command that exists is not
@@ -164,6 +167,26 @@ func Init(out io.Writer, dir, name, pin, pubkey string) error {
 	if len(written) == 0 {
 		return fmt.Errorf("nothing written: every file exists already")
 	}
+	// The command's module requires the pinned dev; resolve it now so the
+	// first build needs no step, and run its own `skill` verb once so both
+	// copies of its manual exist from the first commit. An existing command
+	// is kept as it is; its builds keep its manual current. Offline, or
+	// before that release exists, say what will.
+	if cmdDir := filepath.Join(dir, "cmd", name); !cmdExists && exists(filepath.Join(cmdDir, "go.mod")) {
+		if !exists(filepath.Join(cmdDir, "go.sum")) {
+			if err := tidy(cmdDir); err != nil {
+				fmt.Fprintf(out, "not resolved: %v\n  once dev %s is published: cd %s && go mod tidy\n", err, pin, cmdDir)
+			}
+		}
+		switch {
+		case !exists(filepath.Join(cmdDir, "go.sum")):
+			fmt.Fprintf(out, "not generated: the module is unresolved\n  once dev %s is published: cd %s && go mod tidy && go run . skill\n", pin, cmdDir)
+		default:
+			if err := generateSkill(cmdDir); err != nil {
+				fmt.Fprintf(out, "not generated: %v\n  repair it with: cd %s && go run . skill\n", err, cmdDir)
+			}
+		}
+	}
 	fmt.Fprintf(out, "\n%s is on the stack, pinned to dev %s, module %s.\nNext, in %s:\n  mise trust && mise install && mise run test\n", name, pin, module, dir)
 	return nil
 }
@@ -191,10 +214,41 @@ func currentPins(mise string) string {
 	})
 }
 
+// The binaries init shells out to: go resolves the new module and runs
+// its skill verb, mise reports the current pins.
+const (
+	GoBin   = "go"
+	MiseBin = "mise"
+)
+
+// tidy resolves a new command's module: the dev release it requires. A
+// variable so tests can replace it.
+var tidy = func(dir string) error {
+	cmd := exec.Command(GoBin, "mod", "tidy")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("go mod tidy: %s", strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// generateSkill runs a new command's own `skill` verb once, so every copy
+// of its manual exist from the first commit: the first `dev check` is green,
+// the first release ships a skill, and the first Claude Code session in the
+// repo has it in context. A variable so tests can replace it.
+var generateSkill = func(dir string) error {
+	cmd := exec.Command(GoBin, "run", ".", "skill")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("go run . skill: %s", strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
 // latest asks mise for a tool's newest release, "" when it cannot say. A
 // variable so tests can replace it.
 var latest = func(tool string) string {
-	out, err := exec.Command("mise", "latest", tool).Output()
+	out, err := exec.Command(MiseBin, "latest", tool).Output()
 	if err != nil {
 		return ""
 	}

@@ -75,7 +75,7 @@ func Bump(out io.Writer, sources []string) error {
 
 // lsRemoteHead returns upstream HEAD without cloning.
 func lsRemoteHead(repo string) (string, error) {
-	out, err := exec.Command("git", "ls-remote", "https://github.com/"+repo, "HEAD").Output()
+	out, err := exec.Command(GitBin, "ls-remote", "https://github.com/"+repo, "HEAD").Output()
 	if err != nil {
 		return "", fmt.Errorf("git ls-remote https://github.com/%s HEAD: %w", repo, err)
 	}

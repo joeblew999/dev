@@ -13,7 +13,7 @@ func Logs(dir, env string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command("fnox", "exec", "--", "wrangler", "tail", name, "--env", env)
+	cmd := exec.Command(FnoxBin, "exec", "--", WranglerBin, "tail", name, "--env", env)
 	cmd.Dir = dir
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()

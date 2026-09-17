@@ -2,7 +2,7 @@
 // rest of the repo's Claude Code session from being decided somewhere else.
 //
 // What is pinned lives in session.toml; this package only reads it. It runs as
-// `dev session ...` through cmd/dev, so every developer workflow stays in one
+// `dev session ...`, so every developer workflow stays in one
 // binary.
 package session
 
@@ -12,7 +12,16 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/joeblew999/dev/internal/cli"
+	"github.com/joeblew999/dev/cli"
+)
+
+// The binaries session shells out to: claude runs the session checks,
+// git reads remotes and upstream refs, ps and lsof find live sessions.
+const (
+	ClaudeBin = "claude"
+	GitBin    = "git"
+	PsBin     = "ps"
+	LsofBin   = "lsof"
 )
 
 // syncCmd is how this repo spells "run sync", quoted back in every error that
@@ -20,7 +29,7 @@ import (
 // a repo that runs the dev binary directly.
 var syncCmd = "mise run session:sync"
 
-// Usage is what cmd/dev prints for this verb.
+// Usage is what dev prints for this verb.
 const Usage = `dev session sync             write .claude/skills and the .claude/settings.json keys session.toml implies
 dev session check            fail when either has drifted from session.toml
 dev session verify [--update]  hold a fresh Claude Code session against SESSION.lock; --update records it

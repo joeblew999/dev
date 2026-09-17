@@ -26,7 +26,7 @@ import (
 // update rewrites the lock from what the session reports, for when a Claude
 // Code upgrade adds a built-in.
 func Verify(out io.Writer, update bool) error {
-	if _, err := exec.LookPath("claude"); err != nil {
+	if _, err := exec.LookPath(ClaudeBin); err != nil {
 		return fmt.Errorf("claude CLI not found; install Claude Code to run this check")
 	}
 	seen, answer, err := sessionSkills()
@@ -131,7 +131,7 @@ var errNoLock = errors.New("no session lock yet")
 // claudeVersion is Claude Code's own version, "" when it cannot be read. A
 // change in it is the one legitimate way the built-in skills change.
 func claudeVersion() string {
-	out, err := exec.Command("claude", "--version").Output()
+	out, err := exec.Command(ClaudeBin, "--version").Output()
 	fields := strings.Fields(string(out))
 	if err != nil || len(fields) == 0 {
 		return ""
@@ -144,7 +144,7 @@ func claudeVersion() string {
 func sessionSkills() ([]string, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "claude", "-p",
+	cmd := exec.CommandContext(ctx, ClaudeBin, "-p",
 		"List the names of every skill available to you, one per line, nothing else.")
 	answer, err := cmd.Output()
 	if ctx.Err() != nil {

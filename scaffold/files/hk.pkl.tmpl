@@ -9,7 +9,7 @@ local linters = new Mapping {
     ["gomod_tidy"] = Builtins.gomod_tidy
     // Vendored third-party skills are upstream content; never rewrite them.
     ["trailing_whitespace"] = (Builtins.trailing_whitespace) {
-        exclude = List(".claude/skills/**")
+        exclude = List(".claude/skills/**", ".agents/skills/**")
     }
     ["check_merge_conflict"] = Builtins.check_merge_conflict
     ["detect_private_key"] = Builtins.detect_private_key

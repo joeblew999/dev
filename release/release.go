@@ -1,7 +1,11 @@
 // Package release publishes a GitHub Release of one command directory:
 // goreleaser builds the artifacts, packslip signs the manifest, gh uploads.
-// The same command runs locally and in CI; in CI (GITHUB_REF_NAME set) the
-// tag is the one pushed and packslip signs with the workflow's identity.
+//
+// It runs the same locally and in GitHub Actions, from the one mise task.
+// `mise run release <version>` on a developer's machine is the day-to-day
+// path; the release workflow runs the identical task on demand; neither
+// replaces the other. In CI (GITHUB_REF_NAME set) the tag is the one pushed
+// and packslip signs with the workflow's identity.
 //
 // Nothing is configured per repo. The binary is named after the repo, every
 // directory under skills/ ships as a skill, and the goreleaser config is
@@ -9,6 +13,7 @@
 package release
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -17,21 +22,22 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/fnox"
-	"github.com/joeblew999/dev/internal/cli"
+	"github.com/joeblew999/dev/internal/gitignore"
 	"github.com/joeblew999/dev/internal/gitrepo"
 	"github.com/joeblew999/dev/secrets"
 )
 
 const Usage = `dev release DIR [VERSION] [--snapshot] [--name NAME]
-    publish a GitHub Release of the command in DIR: tag VERSION (vX.Y.Z; in CI
-    the pushed tag), build every platform with goreleaser, sign the packslip
-    manifest, upload; the release workflow runs the same on demand. Signed
-    with the key in fnox (PACKSLIP_SIGNING_KEY),
-    which --keygen makes once, with its public half in packslip.pub for
-    consumers to pin (mise: pubkey = "..."). --snapshot builds, signs with a
-    throwaway key and verifies, publishing nothing. NAME is the binary's name; default the
-    repo's. Every directory under skills/ ships as a skill.
+    publish a GitHub Release of the command in DIR, the same locally and in
+    GitHub Actions: VERSION here (vX.Y.Z), the pushed tag there. Build every
+    platform with goreleaser, sign the packslip manifest, upload. Signed with
+    the key in fnox (PACKSLIP_SIGNING_KEY), which --keygen makes once, with its
+    public half in packslip.pub for consumers to pin (mise: pubkey = "...").
+    --snapshot builds, signs with a throwaway key and verifies, publishing
+    nothing; check runs it. NAME is the binary's name; default the repo's.
+    Every directory under skills/ ships as a skill.
 
 Needs goreleaser, packslip and gh, and a clean tree to publish.
 `
@@ -79,6 +85,10 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 const (
 	SigningKeyEnv = "PACKSLIP_SIGNING_KEY"
 	pubFile       = "packslip.pub"
+	// The binaries a release drives.
+	GoreleaserBin = "goreleaser"
+	PackslipBin   = "packslip"
+	GhBin         = "gh"
 )
 
 // signingKey writes the key to a file packslip can read and returns its path,
@@ -154,6 +164,12 @@ func Keygen(out io.Writer, rotate bool) error {
 	return nil
 }
 
+// DistDir is where goreleaser writes and packslip signs, under a dot for the
+// reason stage.BinDir is: build output is not source. dev states it rather
+// than reading it, because dev generates the goreleaser config for whatever
+// directory holds the main.go and commits nothing to the repo.
+const DistDir = ".dist"
+
 // release is one command directory as goreleaser and packslip see it.
 type release struct {
 	dir, name, slug string
@@ -181,12 +197,21 @@ func newRelease(dir, name string) (*release, error) {
 			r.skills = append(r.skills, fmt.Sprintf("skill/%s=repo:skills/%s", e.Name(), e.Name()))
 		}
 	}
+	// goreleaser is about to write DistDir; git should already be ignoring it.
+	if err := gitignore.Ensure(".", DistDir); err != nil {
+		return nil, err
+	}
 	r.config = ".goreleaser.yml"
 	if data, err := os.ReadFile(r.config); err == nil {
 		// A repo with its own config may build more than one binary; the
 		// manifest must name every one, or mise exposes only the first.
 		if bins := binaries(data); len(bins) > 0 {
 			r.bins = bins
+		}
+		// dev looks for the artifacts under DistDir; a config that sends
+		// goreleaser somewhere else signs nothing and says so far too late.
+		if !bytes.Contains(data, []byte("\ndist: "+DistDir)) && !bytes.HasPrefix(data, []byte("dist: "+DistDir)) {
+			return nil, fmt.Errorf("%s does not set `dist: %s`; add that line (dev builds under a dot, so .gitignore and mise outputs agree)", r.config, DistDir)
 		}
 	} else {
 		f, err := os.CreateTemp("", "goreleaser-*.yml")
@@ -223,6 +248,7 @@ func binaries(config []byte) []string {
 func goreleaserConfig(name, dir, pubkey string) string {
 	return fmt.Sprintf(`version: 2
 project_name: %s
+dist: `+DistDir+`
 builds:
   - id: %s
     dir: %s
@@ -273,19 +299,19 @@ func keygen(name string) (string, error) {
 	os.Remove(key)
 	os.Remove(key + ".pub")
 	os.Remove(strings.TrimSuffix(key, filepath.Ext(key)) + ".pub")
-	if err := run("packslip", "keygen", "--out", key); err != nil {
+	if err := run(PackslipBin, "keygen", "--out", key); err != nil {
 		return "", err
 	}
 	return key, nil
 }
 
-// create signs dist/*.tar.gz into dist/packslip.sigstore.json.
+// create signs DistDir/*.tar.gz into DistDir/packslip.sigstore.json.
 func (r *release) create(version, commit, tag, key string, noLog bool) error {
-	matches, err := filepath.Glob("dist/*.tar.gz")
+	matches, err := filepath.Glob(DistDir + "/*.tar.gz")
 	if err != nil || len(matches) == 0 {
-		return fmt.Errorf("no dist/*.tar.gz to sign; goreleaser built nothing")
+		return fmt.Errorf("no %s/*.tar.gz to sign; goreleaser wrote its archives elsewhere or built nothing", DistDir)
 	}
-	return run("packslip", r.createArgs(version, commit, tag, key, noLog, matches)...)
+	return run(PackslipBin, r.createArgs(version, commit, tag, key, noLog, matches)...)
 }
 
 // createArgs is the packslip create command line. The download URL of every
@@ -297,7 +323,7 @@ func (r *release) createArgs(version, commit, tag, key string, noLog bool, artif
 	args := []string{"create",
 		"--project", "github.com/" + r.slug,
 		"--version", version,
-		"--out", "dist",
+		"--out", DistDir,
 	}
 	for _, b := range r.bins {
 		args = append(args, "--bin", b)
@@ -325,7 +351,7 @@ func (r *release) createArgs(version, commit, tag, key string, noLog bool, artif
 // verifies it, then shows it. Nothing is tagged or uploaded.
 func (r *release) snapshot() error {
 	defer r.cleanup()
-	if err := run("goreleaser", "release", "--snapshot", "--clean", "--config", r.config); err != nil {
+	if err := run(GoreleaserBin, "release", "--snapshot", "--clean", "--config", r.config); err != nil {
 		return err
 	}
 	describe, err := out("git", "describe", "--tags", "--always")
@@ -356,11 +382,11 @@ func (r *release) snapshot() error {
 	if err := os.WriteFile(pubFile, []byte(pub+"\n"), 0o600); err != nil {
 		return err
 	}
-	matches, _ := filepath.Glob("dist/*.tar.gz")
-	if err := run("packslip", "verify", "dist/packslip.sigstore.json", "--pubkey", pubFile, "--allow-unlogged", "--artifact", matches[0]); err != nil {
+	matches, _ := filepath.Glob(DistDir + "/*.tar.gz")
+	if err := run(PackslipBin, "verify", DistDir+"/packslip.sigstore.json", "--pubkey", pubFile, "--allow-unlogged", "--artifact", matches[0]); err != nil {
 		return err
 	}
-	return run("packslip", "show", "dist/packslip.sigstore.json")
+	return run(PackslipBin, "show", DistDir+"/packslip.sigstore.json")
 }
 
 var semverStart = regexp.MustCompile(`^\d+\.\d+\.\d+`)
@@ -410,7 +436,7 @@ func (r *release) publish(version string) error {
 	// goreleaser needs a token env even though gh authenticates from its own
 	// keychain; reuse it when set, else ask gh for one.
 	if os.Getenv("GITHUB_TOKEN") == "" {
-		if token, err := out("gh", "auth", "token"); err == nil && token != "" {
+		if token, err := out(GhBin, "auth", "token"); err == nil && token != "" {
 			os.Setenv("GITHUB_TOKEN", token)
 		}
 	}
@@ -421,7 +447,7 @@ func (r *release) publish(version string) error {
 	defer os.Remove(notes.Name())
 	fmt.Fprintln(notes, "Release "+tag)
 	notes.Close()
-	if err := run("goreleaser", "release", "--clean", "--config", r.config, "--release-notes", notes.Name()); err != nil {
+	if err := run(GoreleaserBin, "release", "--clean", "--config", r.config, "--release-notes", notes.Name()); err != nil {
 		return err
 	}
 	// A local release signs with the long-lived key from fnox, logged: mise
@@ -441,11 +467,11 @@ func (r *release) publish(version string) error {
 	}
 	// goreleaser created the release when it published; upload into it, or
 	// create it when goreleaser ran without a token to do so itself.
-	files := []string{"dist/packslip.sigstore.json", "dist/checksums.txt"}
-	matches, _ := filepath.Glob("dist/*.tar.gz")
+	files := []string{DistDir + "/packslip.sigstore.json", DistDir + "/checksums.txt"}
+	matches, _ := filepath.Glob(DistDir + "/*.tar.gz")
 	files = append(files, matches...)
-	if err := run("gh", append(append([]string{"release", "upload", tag}, files...), "--clobber")...); err != nil {
-		if err := run("gh", append(append([]string{"release", "create", tag}, files...), "--title", tag, "--notes", "Release "+tag)...); err != nil {
+	if err := run(GhBin, append(append([]string{"release", "upload", tag}, files...), "--clobber")...); err != nil {
+		if err := run(GhBin, append(append([]string{"release", "create", tag}, files...), "--title", tag, "--notes", "Release "+tag)...); err != nil {
 			return err
 		}
 	}

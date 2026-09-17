@@ -14,7 +14,7 @@ import (
 
 // MCP runs `claude mcp list` and fails on any server that does not connect.
 func MCP(stdout, stderr io.Writer) error {
-	out, err := exec.Command("claude", "mcp", "list").CombinedOutput()
+	out, err := exec.Command(ClaudeBin, "mcp", "list").CombinedOutput()
 	fmt.Fprint(stdout, string(out))
 	if err != nil && len(out) == 0 {
 		return fmt.Errorf("claude mcp list: %w (is Claude Code installed?)", err)

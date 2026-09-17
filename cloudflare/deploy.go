@@ -32,7 +32,7 @@ var idKeys = map[string]string{
 // account, or that it inherited the deployed Worker's bindings, which is what
 // happens on every deploy after the first.
 func Deploy(out io.Writer, dir, env string) error {
-	src := filepath.Join(dir, wranglerFile)
+	src := filepath.Join(dir, ConfigFile)
 	copyPath := filepath.Join(dir, deployCopy)
 	before, err := os.ReadFile(src)
 	if err != nil {
@@ -42,7 +42,7 @@ func Deploy(out io.Writer, dir, env string) error {
 		return err
 	}
 	defer os.Remove(copyPath)
-	if err := fnox.Exec(dir, nil, out, "wrangler", "deploy", "--config", deployCopy, "--env", env); err != nil {
+	if err := fnox.Exec(dir, nil, out, WranglerBin, "deploy", "--config", deployCopy, "--env", env); err != nil {
 		return fmt.Errorf("wrangler deploy failed: %w", err)
 	}
 	after, err := os.ReadFile(copyPath)

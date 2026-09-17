@@ -31,40 +31,42 @@ depends = ["build"]
 run = "hk install"
 
 [tasks.build]
-description = "bin/dev"
+description = ".bin/dev, and the skill from its verbs"
 sources = ["**/*.go", "go.mod", "go.sum"]
-outputs = ["bin/dev"]
-run = "go build -o bin/dev ."
+outputs = [".bin/dev"]
+run = [
+  "go build -o .bin/dev .",
+  ".bin/dev skill",
+]
 
 [tasks.lint]
 description = "hk checks: gofmt, vet, tidy, whitespace, secrets"
 run = "hk check --all"
 
 [tasks.check]
-description = "vet, tests, the skill still matches the verbs, and a snapshot release builds and signs"
+description = "vet, tests (which hold the skill to the verbs), and a snapshot release builds and signs"
 depends = ["build"]
 run = [
   "go vet ./...",
   "go test ./...",
-  "bin/dev skill --check",
-  "bin/dev release . --snapshot",
+  ".bin/dev release . --snapshot",
 ]
 
 [tasks.test]
-description = "What CI runs: lint, then check"
+description = "lint, then check: the same locally and in GitHub Actions (test.yml runs exactly this)"
 depends = ["lint", "check"]
 
 [tasks.skill]
-description = "Regenerate skills/dev/SKILL.md from the verbs' own usage"
+description = "Regenerate skills/dev/SKILL.md, and the copy Claude Code reads here, from the verbs' own usage"
 depends = ["build"]
-run = "bin/dev skill"
+run = ".bin/dev skill"
 
 [tasks.release]
-description = "Publish the release for the tag CI is on, or the version given"
+description = "Publish a release, the same locally and in GitHub Actions: <version> here, the pushed tag there"
 depends = ["build"]
-run = "bin/dev release ."
+run = ".bin/dev release ."
 
 [tasks."release:snapshot"]
-description = "Build and sign the release locally, publishing nothing"
+description = "Build and sign the release, publishing nothing (check runs this)"
 depends = ["build"]
-run = "bin/dev release . --snapshot"
+run = ".bin/dev release . --snapshot"

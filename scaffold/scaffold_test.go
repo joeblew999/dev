@@ -17,7 +17,16 @@ func TestInitWritesTheStackAndRefusesToOverwrite(t *testing.T) {
 		}
 		return ""
 	}
-	t.Cleanup(func() { latest = old })
+	oldTidy := tidy
+	tidy = func(dir string) error {
+		// A real tidy resolves the module and leaves go.sum; mimic that so
+		// init goes on to run the new command's skill verb.
+		return os.WriteFile(filepath.Join(dir, "go.sum"), nil, 0o644)
+	}
+	oldSkill := generateSkill
+	var skilled string
+	generateSkill = func(dir string) error { skilled = dir; return nil }
+	t.Cleanup(func() { latest, tidy = old, oldTidy; generateSkill = oldSkill })
 	dir := filepath.Join(t.TempDir(), "widget")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -35,8 +44,9 @@ func TestInitWritesTheStackAndRefusesToOverwrite(t *testing.T) {
 	}
 	for path, want := range map[string]string{
 		"mise.toml":                `"packslip:github.com/joeblew999/dev" = { version = "0.2.0", pubkey = "RWQtest" }`,
-		"cmd/widget/go.mod":        "module github.com/acme/widget/cmd/widget",
+		"cmd/widget/go.mod":        "require github.com/joeblew999/dev v0.2.0",
 		"cmd/widget/main.go":       "hello from widget",
+		"cmd/widget/main_test.go":  "cli.CheckSkill(t, app)",
 		"go.work":                  "./cmd/widget",
 		"AGENTS.md":                "- Repo: acme/widget",
 		".claude/hooks/skill-gate": "PreToolUse",
@@ -63,6 +73,11 @@ func TestInitWritesTheStackAndRefusesToOverwrite(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "mise.toml.tmpl")); err == nil {
 		t.Error("a template suffix leaked into the repo")
+	}
+	// The new command's own skill verb ran once, so every copy of its
+	// manual exist from the first commit.
+	if skilled != filepath.Join(dir, "cmd", "widget") {
+		t.Errorf("generateSkill ran in %q, want the new command's directory", skilled)
 	}
 
 	// A second run touches nothing and says so.

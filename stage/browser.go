@@ -41,7 +41,7 @@ var errNoChrome = errors.New("no Chrome found")
 
 // findChrome returns the browser to drive.
 func findChrome(getenv func(string) string, lookPath func(string) (string, error), exists func(string) bool) (string, error) {
-	if set := getenv("CHROME"); set != "" {
+	if set := getenv(ChromeEnv); set != "" {
 		if !exists(set) {
 			return "", fmt.Errorf("CHROME is set to %q, which does not exist", set)
 		}
@@ -78,7 +78,7 @@ func probe(out io.Writer, server, probe, path string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := exec.LookPath("node"); err != nil {
+	if _, err := exec.LookPath(NodeBin); err != nil {
 		return fmt.Errorf("node is not on PATH; run this through mise, which pins it")
 	}
 
@@ -87,7 +87,7 @@ func probe(out io.Writer, server, probe, path string) error {
 		return err
 	}
 	app := exec.Command(server)
-	app.Env = append(os.Environ(), fmt.Sprintf("GO_PORT=%d", appPort))
+	app.Env = append(os.Environ(), fmt.Sprintf(GoPortEnv+"=%d", appPort))
 	app.Stdout, app.Stderr = io.Discard, os.Stderr
 	if err := app.Start(); err != nil {
 		return fmt.Errorf("start %s: %w", server, err)
@@ -129,7 +129,7 @@ func probe(out io.Writer, server, probe, path string) error {
 	}
 
 	fmt.Fprintf(out, "%s driving %s\n\n", filepath.Base(chrome), url)
-	node := exec.Command("node", probe, endpoint, url)
+	node := exec.Command(NodeBin, probe, endpoint, url)
 	node.Stdout, node.Stderr = out, os.Stderr
 	return node.Run()
 }

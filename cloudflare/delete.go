@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/fnox"
-	"github.com/joeblew999/dev/internal/cli"
 )
 
 // Delete removes a Worker and what wrangler provisioned for it. The Worker
@@ -19,7 +19,7 @@ import (
 // <worker>-<binding> in lowercase, so a namespace made by hand is never
 // touched. It says what will go and asks, unless yes.
 func Delete(stdin io.Reader, out io.Writer, dir, env, name string, yes bool) error {
-	cfg, err := readWrangler(filepath.Join(dir, wranglerFile))
+	cfg, err := readWrangler(filepath.Join(dir, ConfigFile))
 	if err != nil {
 		return err
 	}

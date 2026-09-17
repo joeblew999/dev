@@ -17,7 +17,12 @@ import (
 )
 
 const (
-	wranglerFile = "wrangler.toml"
+	// ConfigFile is the file whose presence makes a directory a Worker.
+	ConfigFile = "wrangler.toml"
+	// WranglerBin is the CLI every Worker verb runs through.
+	WranglerBin = "wrangler"
+	// FnoxBin is the wrapper that supplies the account's credentials.
+	FnoxBin      = "fnox"
 	localFile    = "mise.local.toml"
 	subdomainKey = "CLOUDFLARE_WORKERS_SUBDOMAIN"
 )
@@ -73,7 +78,7 @@ func workerName(cfg wranglerConfig, env string) string {
 
 // Name is the Worker that dir's config deploys env to, suffix included.
 func Name(dir, env string) (string, error) {
-	cfg, err := readWrangler(filepath.Join(dir, wranglerFile))
+	cfg, err := readWrangler(filepath.Join(dir, ConfigFile))
 	if err != nil {
 		return "", err
 	}
@@ -86,7 +91,7 @@ func URL(dir, env string, worker bool, local string, refresh bool) (string, erro
 	if !worker {
 		return local, nil
 	}
-	cfg, err := readWrangler(filepath.Join(dir, wranglerFile))
+	cfg, err := readWrangler(filepath.Join(dir, ConfigFile))
 	if err != nil {
 		return "", err
 	}

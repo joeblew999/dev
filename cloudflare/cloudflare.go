@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/fnox"
-	"github.com/joeblew999/dev/internal/cli"
 )
 
 // stdin is where delete's question is answered; a test replaces it.
