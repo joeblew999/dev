@@ -1,5 +1,7 @@
 # dev
 
+https://github.com/joeblew999/dev
+
 The developer tool of a stack: mise for tasks and tools, fnox for secrets, hk
 for checks, packslip for releases, Cloudflare Workers or Fly for deploys, Go
 for the code, gsx and gsxui for a UI.
