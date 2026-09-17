@@ -27,16 +27,29 @@ var Usage string
 // Subs are deps' subcommands. Neither takes a flag, so each declares only
 // that it takes none; cli renders `dev deps list` from the names alone.
 var Subs = map[string]cli.Verb{
-	"list":    {Desc: "show which Go dependencies have newer versions, across every module"},
-	"upgrade": {Desc: "walk through those upgrades and pick the ones you want"},
+	"list":    {Run: list, Desc: "show which Go dependencies have newer versions, across every module"},
+	"upgrade": {Run: upgrade, Desc: "walk through those upgrades and pick the ones you want"},
 }
 
-func Run(verb string, args []string, stdout, stderr io.Writer) error {
+// list and upgrade are the two subcommands. Each is its own function rather
+// than one that reads the verb it was called as, so a subcommand's name is in
+// Subs and nowhere else at all.
+func list(verb string, args []string, stdout, stderr io.Writer) error {
+	return each(verb, args, stdout, stderr, "--list")
+}
+
+func upgrade(verb string, args []string, stdout, stderr io.Writer) error {
+	return each(verb, args, stdout, stderr)
+}
+
+// each runs go-mod-upgrade in every module of the repo. Listing and upgrading
+// are the same walk; --list is the whole difference.
+func each(verb string, args []string, stdout, stderr io.Writer, flags ...string) error {
 	if cli.HelpRequested(args) {
 		return cli.ErrHelp
 	}
-	if len(args) != 1 || (args[0] != "list" && args[0] != "upgrade") {
-		return cli.Usagef("deps: list or upgrade")
+	if len(args) > 0 {
+		return cli.Usagef("%s takes no arguments", verb)
 	}
 	dirs, err := Modules(".")
 	if err != nil {
@@ -44,10 +57,7 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 	}
 	for _, dir := range dirs {
 		fmt.Fprintf(stdout, "== %s ==\n", dir)
-		cmd := exec.Command("go-mod-upgrade")
-		if args[0] == "list" {
-			cmd.Args = append(cmd.Args, "--list")
-		}
+		cmd := exec.Command("go-mod-upgrade", flags...)
 		cmd.Dir = dir
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, stdout, stderr
 		if err := cmd.Run(); err != nil {

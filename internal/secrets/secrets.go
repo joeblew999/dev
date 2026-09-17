@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	_ "embed"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -37,9 +38,9 @@ var Usage string
 // registers the same ones — so `dev secrets push --help` and the manual show
 // the same flags because they are the same registration.
 var Subs = map[string]cli.Verb{
-	"set":  {Args: "DIR NAME|OWNER", Flags: SetFlags, Desc: "store one secret and push it to the app, in a single step"},
-	"push": {Args: "DIR", Flags: PushFlags, Desc: "push every secret an app needs, read as a list on stdin"},
-	"ci":   {Args: "NAME...", Desc: "give GitHub Actions the secrets it needs to sign and deploy"},
+	"set":  {Run: runSet, Args: "DIR NAME|OWNER", Flags: SetFlags, Desc: "store one secret and push it to the app, in a single step"},
+	"push": {Run: runPush, Args: "DIR", Flags: PushFlags, Desc: "push every secret an app needs, read as a list on stdin"},
+	"ci":   {Run: runCI, Args: "NAME...", Desc: "give GitHub Actions the secrets it needs to sign and deploy"},
 }
 
 // EnvFlag is the environment every secrets subcommand pushes to.
@@ -61,50 +62,52 @@ func PushFlags(fs *flag.FlagSet) {
 	fs.String("fix", "mise run secrets:set {provider}", "the `TEMPLATE` to run for a secret fnox does not have")
 }
 
-func Run(verb string, args []string, stdout, stderr io.Writer) error {
-	if len(args) == 0 {
-		return cli.Usagef("secrets: set or push")
+// set, push and ci are the three subcommands, each its own function. cli
+// routes to them from Subs, so a subcommand's name is written in Subs and
+// nowhere else — no dispatch switch naming them a second time.
+func runSet(verb string, args []string, stdout, stderr io.Writer) error {
+	fs := cli.Flags(verb, stderr)
+	SetFlags(fs)
+	dir, rest, err := cli.DirAnd(fs, args, 1)
+	if err != nil {
+		return err
 	}
-	fs := cli.Flags("secrets "+args[0], stderr)
-	if sub, ok := Subs[args[0]]; ok && sub.Flags != nil {
-		sub.Flags(fs)
-	} else {
-		EnvFlag(fs)
+	name, err := Resolve(cli.Value(fs, "names"), rest[0])
+	if err != nil {
+		return err
 	}
-	switch args[0] {
-	case "set":
-		dir, rest, err := cli.DirAnd(fs, args[1:], 1)
-		if err != nil {
+	return Set(os.Stdin, stdout, stderr, name, cli.Given(fs, "generate"), cli.Given(fs, "if-missing"), dir, cli.Value(fs, "env"))
+}
+
+func runPush(verb string, args []string, stdout, stderr io.Writer) error {
+	fs := cli.Flags(verb, stderr)
+	PushFlags(fs)
+	dir, _, err := cli.DirAnd(fs, args, 0)
+	if err != nil {
+		return err
+	}
+	return Push(os.Stdin, stdout, dir, cli.Value(fs, "env"), cli.Value(fs, "fix"))
+}
+
+func runCI(verb string, args []string, stdout, stderr io.Writer) error {
+	fs := cli.Flags(verb, stderr)
+	if err := fs.Parse(args); err != nil || fs.NArg() == 0 {
+		if errors.Is(err, cli.ErrHelp) {
+			return cli.ErrHelp
+		}
+		return cli.Usagef("%s: give the names to push", verb)
+	}
+	for _, name := range fs.Args() {
+		v, err := fnox.Get(name)
+		if err != nil || v == "" {
+			return fmt.Errorf("%s is not in fnox; store it with: fnox set -g %s", name, name)
+		}
+		if err := CI(name, v); err != nil {
 			return err
 		}
-		name, err := Resolve(cli.Value(fs, "names"), rest[0])
-		if err != nil {
-			return err
-		}
-		return Set(os.Stdin, stdout, stderr, name, cli.Given(fs, "generate"), cli.Given(fs, "if-missing"), dir, cli.Value(fs, "env"))
-	case "push":
-		dir, _, err := cli.DirAnd(fs, args[1:], 0)
-		if err != nil {
-			return err
-		}
-		return Push(os.Stdin, stdout, dir, cli.Value(fs, "env"), cli.Value(fs, "fix"))
-	case "ci":
-		if err := fs.Parse(args[1:]); err != nil || fs.NArg() == 0 {
-			return cli.Usagef("secrets ci: give the names to push")
-		}
-		for _, name := range fs.Args() {
-			v, err := fnox.Get(name)
-			if err != nil || v == "" {
-				return fmt.Errorf("%s is not in fnox; store it with: fnox set -g %s", name, name)
-			}
-			if err := CI(name, v); err != nil {
-				return err
-			}
-			fmt.Fprintf(stdout, "set %s in this repo's Actions secrets\n", name)
-		}
-		return nil
+		fmt.Fprintf(stdout, "set %s in this repo's Actions secrets\n", name)
 	}
-	return cli.Usagef("secrets: unknown subcommand %q", args[0])
+	return nil
 }
 
 // Resolve turns what the developer typed into a secret name, given the

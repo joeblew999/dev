@@ -45,7 +45,10 @@ A verb declares what only it knows and nothing that is written elsewhere:
   signature. Never the signature itself: that is rendered.
 - `Usage` — the prose for the group this verb belongs to: why these verbs
   exist and what they share. Verbs that share it share a section.
-- `Subs` — its subcommands, each with its own `Args` and `Flags`.
+- `Subs` — its subcommands, each with its own `Run`, `Args`, `Flags` and
+  `Desc`. `cli` routes to them, so a subcommand's name is written in `Subs`
+  and nowhere else: a package that dispatches its own subcommands names each
+  one twice, and the two lists drift.
 
 So `dev check DIR [--expect TEXT] [--path P]` is never typed, and neither is
 the line under it. A flag cannot be missing from a manual, because the manual

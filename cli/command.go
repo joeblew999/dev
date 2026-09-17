@@ -91,7 +91,30 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "unknown verb %q\n\n%s", verb, c.index())
 		return 2
 	}
-	err := v.Run(verb, rest, stdout, stderr)
+	// A subcommand it declares runs itself. Without this a package lists its
+	// subcommands in Subs and then names them again in a switch, and the two
+	// lists drift — which is a fact stated twice, the thing this stack keeps
+	// deleting.
+	run, path := v.Run, verb
+	named := ""
+	if len(rest) > 0 && !strings.HasPrefix(rest[0], "-") {
+		named = rest[0]
+		if sub, ok := v.Subs[named]; ok && sub.Run != nil {
+			run, path, rest = sub.Run, verb+" "+named, rest[1:]
+		}
+	}
+	if run == nil {
+		// Say which of the two it was. "takes a subcommand" is true when none
+		// was given and a lie when one was, and the second is the case where
+		// someone is already looking at the wrong word.
+		what := fmt.Sprintf("%s takes a subcommand", path)
+		if named != "" {
+			what = fmt.Sprintf("%s has no subcommand %q", path, named)
+		}
+		fmt.Fprintf(stderr, "error: %s\n\n%s", what, Flatten(c.sectionFor(verb)))
+		return 2
+	}
+	err := run(path, rest, stdout, stderr)
 	if errors.Is(err, ErrHelp) {
 		// The flag package has printed each flag and what it means; this adds
 		// what the verb is for. Together they are the whole of what a person

@@ -53,7 +53,7 @@ var dev = cli.Command{
 		"smoke":   {Run: app.Run, Args: "DIR", Flags: app.SmokeFlags, Desc: "start the Worker locally and make one request, to know a build is not broken", Usage: app.Usage},
 		"wait":    {Run: app.Run, Args: "URL", Flags: app.WaitFlags, Desc: "poll a URL until it answers steadily", Usage: app.Usage},
 		"delete":  {Run: app.Run, Args: "DIR", Flags: app.DeleteFlags, Desc: "remove a deployed app, and the storage created with it; asks first", Usage: app.Usage},
-		"secrets": {Run: secrets.Run, Subs: secrets.Subs, Usage: secrets.Usage},
+		"secrets": {Subs: secrets.Subs, Usage: secrets.Usage},
 		// "session": {Run: session.Run, Usage: session.Usage},
 		//
 		// Not exposed for now. The manual, the index and --help are all
@@ -61,7 +61,7 @@ var dev = cli.Command{
 		// one of them with nothing else to change. internal/session stays
 		// compiled and tested; put the line back to have the verb back.
 		"release": {Run: release.Run, Args: "DIR [VERSION]", Flags: release.Flags, Desc: "build for every platform, sign it, and publish it to GitHub", Usage: release.Usage},
-		"deps":    {Run: deps.Run, Subs: deps.Subs, Usage: deps.Usage},
+		"deps":    {Subs: deps.Subs, Usage: deps.Usage},
 	},
 	Skill: skillDoc,
 
