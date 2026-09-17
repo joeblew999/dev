@@ -31,6 +31,14 @@ var skillHead string
 //go:embed skill/tail.md
 var skillTail string
 
+// cliSkill is the manual for the library rather than for dev's verbs. A repo
+// is asked to write its commands against cli, so it needs the library's API
+// and rules; before this they were prose two thirds of the way down dev's own
+// manual, and the API was in no manual at all.
+
+//go:embed skill/cli.md
+var cliSkill string
+
 // dev is the whole tool: what each verb runs, and its usage. cli.Main runs it
 // and renders the manual from this table, so the manual is the code's; any
 // command built the same way gets the same.
@@ -55,6 +63,8 @@ var dev = cli.Command{
 	},
 	Head: skillHead,
 	Tail: skillTail,
+
+	Skills: map[string]string{"cli": cliSkill},
 
 	// The manual's reading order: start a repo, build it, ship it, then the
 	// verbs that keep it. Without this the sections fall in verb-name order,

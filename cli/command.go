@@ -42,6 +42,15 @@ type Command struct {
 	Head    string          // the manual's frontmatter and prose before the verbs
 	Tail    string          // the prose after
 
+	// Skills are manuals this command ships that are not its own verbs: a
+	// library it exposes, named by what a reader would look for. `dev` ships
+	// one for this package, because a repo writing a command against it needs
+	// the library's rules, not dev's verbs, and had nowhere to read them.
+	//
+	// Each is written to skills/<name>/ beside the command's, so `dev release`
+	// ships it with no new plumbing, and CheckSkill holds it like any other.
+	Skills map[string]string
+
 	// Order is the manual's reading order: verb names, each standing for the
 	// group that shares its usage. Verbs is a map and has no order of its
 	// own, so without this the manual is whatever alphabetical accident the
@@ -333,6 +342,11 @@ func (c Command) skill(verb string, args []string, stdout, stderr io.Writer) err
 		}
 		return fmt.Errorf("%s has changed since this %s was built, so it would %s from stale embedded prose; rebuild first: mise run build", rel(changed), c.Name, what)
 	}
+	for name, body := range c.Skills {
+		if err := c.writeSkill(stdout, name, body, bool(check)); err != nil {
+			return err
+		}
+	}
 	want := c.render()
 	shipped, claude, agents, err := c.paths()
 	if err != nil {
@@ -356,6 +370,49 @@ func (c Command) skill(verb string, args []string, stdout, stderr io.Writer) err
 		fmt.Fprintf(stdout, "wrote %s from the verbs' own usage\n", rel(p))
 	}
 	return nil
+}
+
+// writeSkill writes or checks one of c.Skills, in the three places a manual
+// goes. It is the same work c.skill does for the command's own manual, on a
+// body that was written rather than rendered.
+func writeSkillTo(stdout io.Writer, paths []string, body string, check bool) error {
+	for _, p := range paths {
+		if check {
+			have, err := os.ReadFile(p)
+			if err != nil || string(have) != body {
+				return fmt.Errorf("%s is stale; regenerate it with: dev skill", rel(p))
+			}
+			fmt.Fprintf(stdout, "%s is up to date\n", rel(p))
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "wrote %s\n", rel(p))
+	}
+	return nil
+}
+
+// writeSkill resolves where a named skill goes, then writes or checks it.
+func (c Command) writeSkill(stdout io.Writer, name, body string, check bool) error {
+	root, err := root(".")
+	if err != nil {
+		return err
+	}
+	return writeSkillTo(stdout, skillPaths(root, name), body, check)
+}
+
+// skillPaths are the three copies of a manual for name: the one the release
+// ships, and the ones each agent reads in this repo.
+func skillPaths(root, name string) []string {
+	return []string{
+		filepath.Join(root, ShippedDir, name, SkillFile),
+		filepath.Join(root, ClaudeDir, name, SkillFile),
+		filepath.Join(root, AgentsDir, name, SkillFile),
+	}
 }
 
 // version is `<Name> version`.
@@ -389,6 +446,18 @@ func CheckSkill(t TB, c Command) {
 		have, err := os.ReadFile(p)
 		if err != nil || string(have) != want {
 			t.Errorf("%s is stale; regenerate it with: %s skill", rel(p), c.Name)
+		}
+	}
+	dir, err := root(".")
+	if err != nil {
+		return
+	}
+	for name, body := range c.Skills {
+		for _, p := range skillPaths(dir, name) {
+			have, err := os.ReadFile(p)
+			if err != nil || string(have) != body {
+				t.Errorf("%s is stale; regenerate it with: %s skill", rel(p), c.Name)
+			}
 		}
 	}
 }

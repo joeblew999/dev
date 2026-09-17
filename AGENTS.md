@@ -5,6 +5,10 @@
 This is the developer tool of the stack. It is used from many repos, so it is
 bounded: it knows the stack's conventions and nothing about any one project.
 
+## Self reflection
+
+MAKE sure that the code and usage line up well, so that devs and agents will get a proper cli and skills experience !!
+
 ## The stack's rules live in the dev skill
 
 [.claude/skills/dev/SKILL.md](.claude/skills/dev/SKILL.md) is generated from
