@@ -25,6 +25,9 @@ var Usage string
 
 // Run is `dev deps list|upgrade`.
 func Run(verb string, args []string, stdout, stderr io.Writer) error {
+	if cli.HelpRequested(args) {
+		return cli.ErrHelp
+	}
 	if len(args) != 1 || (args[0] != "list" && args[0] != "upgrade") {
 		return cli.Usagef("deps: list or upgrade")
 	}

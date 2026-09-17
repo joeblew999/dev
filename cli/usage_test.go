@@ -316,3 +316,56 @@ func TestTopLevelHelpAnswersRatherThanCorrects(t *testing.T) {
 		}
 	}
 }
+
+// Subcommands share their parent's usage, so help for one must find that one.
+// "secrets" used to match "secrets set" and answer the wrong question.
+func TestEntryMatchesWholeWordsOnly(t *testing.T) {
+	md := "### Secrets\n\n" +
+		"- `x secrets set DIR NAME`\n  store one\n" +
+		"- `x secrets push DIR [--fix T]`\n  push them\n" +
+		"- `x check DIR`\n  check it\n" +
+		"- `x deps list`\n  list them\n"
+	for path, want := range map[string]string{
+		"secrets set":  "store one",
+		"secrets push": "push them",
+		"check":        "check it",
+		"deps list":    "list them",
+	} {
+		if got := Entry(md, "x", path); !strings.Contains(got, want) {
+			t.Errorf("Entry(%q) = %q, want it to contain %q", path, got, want)
+		}
+	}
+	// A parent names its children, not itself: answering "secrets" with the
+	// first child would be answering a question nobody asked.
+	if got := Entry(md, "x", "secrets"); got != "" {
+		t.Errorf("Entry(\"secrets\") should match no single item, got %q", got)
+	}
+	// And a path must not match mid-word.
+	if got := Entry(md, "x", "chec"); got != "" {
+		t.Errorf("Entry(\"chec\") should not match \"check\", got %q", got)
+	}
+}
+
+// A verb's arguments and its subcommands look alike from the outside — "check
+// ." is a directory, "secrets push" is a subcommand — so the lookup tries the
+// longest path and shortens until the usage says which it was.
+func TestHelpEntryPrefersTheLongestPathThatExists(t *testing.T) {
+	md := "- `x secrets push DIR`\n  push them\n- `x check DIR`\n  check it\n"
+	if got := helpEntry(md, "x", "secrets", []string{"push", "--help"}); !strings.Contains(got, "push them") {
+		t.Errorf("subcommand: got %q", got)
+	}
+	if got := helpEntry(md, "x", "check", []string{".", "--help"}); !strings.Contains(got, "check it") {
+		t.Errorf("verb with a directory: got %q", got)
+	}
+}
+
+// Everything after a bare -- belongs to the program being run, so its --help
+// is not ours to answer.
+func TestHelpRequestedStopsAtTheDoubleDash(t *testing.T) {
+	if !HelpRequested([]string{"DIR", "--help"}) {
+		t.Error("--help before -- is ours")
+	}
+	if HelpRequested([]string{"DIR", "--", "--help"}) {
+		t.Error("--help after -- belongs to the program being run")
+	}
+}

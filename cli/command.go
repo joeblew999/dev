@@ -87,7 +87,7 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 		// what the verb is for. Together they are the whole of what a person
 		// needs, and neither is an error.
 		usage := v.Usage
-		if entry := Entry(usage, c.Name, verb); entry != "" {
+		if entry := helpEntry(v.Usage, c.Name, verb, rest); entry != "" {
 			usage = entry
 		}
 		fmt.Fprintf(stdout, "\n%s", Flatten(usage))
@@ -103,6 +103,32 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// helpEntry is the usage for what was actually asked about: the verb, or the
+// subcommand under it when there is one. It tries the longest path first and
+// shortens, because a verb's arguments and its subcommands look alike from
+// here — "secrets push" is a subcommand, "check ." is a verb and a directory,
+// and only the usage knows which. Whichever it names is the one that matches.
+func helpEntry(usage, name, verb string, rest []string) string {
+	path := verb
+	for _, arg := range rest {
+		if arg == "--" || strings.HasPrefix(arg, "-") {
+			break
+		}
+		path += " " + arg
+	}
+	for path != "" {
+		if entry := Entry(usage, name, path); entry != "" {
+			return entry
+		}
+		cut := strings.LastIndex(path, " ")
+		if cut < 0 {
+			return ""
+		}
+		path = path[:cut]
+	}
+	return ""
 }
 
 // all is the table plus the two verbs every command has.

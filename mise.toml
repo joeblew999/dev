@@ -87,7 +87,7 @@ depends = ["build"]
 # which cloud it is talking to, and its flags differ per cloud, so those need
 # a real command directory: mise run help url cmd/proxy.
 usage = '''
-arg "<verb>" help="the verb to explain"
+arg "<verb>" help="the verb to explain, with its subcommand if it has one (secrets push)"
 arg "[dir]" help="the command directory it would act on" default="."
 '''
 run = '.bin/dev "$usage_verb" "$usage_dir" --help'

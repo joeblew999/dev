@@ -40,6 +40,9 @@ var Usage string
 
 // Run is `dev session sync|check|verify|bump|mcp`.
 func Run(verb string, args []string, stdout, stderr io.Writer) error {
+	if cli.HelpRequested(args) {
+		return cli.ErrHelp
+	}
 	applySyncCommand()
 	if len(args) == 0 {
 		return cli.Usagef("session: sync, check, verify, bump or mcp")

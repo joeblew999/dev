@@ -192,18 +192,25 @@ func blankFrontmatter(md string) string {
 	return strings.Join(lines, "\n")
 }
 
-// Entry is the one list item in md that documents "<name> <verb>", or "" when
-// the usage does not use the markdown shape or does not name that verb.
+// Entry is the one list item in md that documents "<name> <path>", where path
+// is a verb and any subcommand under it — "check", or "secrets push". It is ""
+// when the usage is not markdown, or names no such thing.
 //
 // A package's verbs share one usage — build, wasm, check, run and workerd are
-// all stage's — so asking what `check` takes would otherwise answer with all
-// five. Help is read when someone is already stuck on one verb; the rest is
-// noise at exactly the wrong moment.
-func Entry(md, name, verb string) string {
-	want := "- `" + name + " " + verb
+// all stage's, and secrets set, push and ci are all secrets' — so asking what
+// one takes would otherwise answer with every sibling. Help is read when
+// someone is already stuck on one thing; the rest is noise at exactly the
+// wrong moment.
+//
+// The path has to end on a whole word, or "secrets" would match "secrets set"
+// and answer the wrong question. What follows it must be an argument — DIR,
+// NAME, [--flag] — and not another lowercase word, which would be a
+// subcommand this path does not name.
+func Entry(md, name, path string) string {
+	want := "- `" + name + " " + path
 	lines := strings.Split(strings.TrimRight(md, "\n"), "\n")
 	for i, line := range lines {
-		if !strings.HasPrefix(line, want) {
+		if !strings.HasPrefix(line, want) || !endsOnAWord(line[len(want):]) {
 			continue
 		}
 		// The item runs to the next item, heading or blank line: its
@@ -218,4 +225,23 @@ func Entry(md, name, verb string) string {
 		return strings.Join(entry, "\n") + "\n"
 	}
 	return ""
+}
+
+// endsOnAWord reports whether rest — what follows the path inside a signature
+// — begins an argument rather than continuing a word or naming a subcommand.
+func endsOnAWord(rest string) bool {
+	rest = strings.TrimSuffix(rest, "`")
+	if rest == "" {
+		return true // the signature is exactly this path
+	}
+	if !strings.HasPrefix(rest, " ") {
+		return false // mid-word: "secret" against "secrets"
+	}
+	next := strings.TrimPrefix(rest, " ")
+	if next == "" {
+		return true
+	}
+	// An argument is written in capitals or brackets; a subcommand is a
+	// lowercase word, and means this path names its parent, not it.
+	return !(next[0] >= 'a' && next[0] <= 'z')
 }

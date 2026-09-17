@@ -19,7 +19,8 @@ command.
 
 ## Verbs
 
-`<cmd> <verb> --help` says what one verb takes: its flags and what each one
+`<cmd> <verb> --help` says what one verb takes, and `<cmd> <verb> <sub> --help`
+what one subcommand takes: its flags and what each one
 means, read from the flags the verb registers, so they cannot drift from the
 code. Here, `mise run help <verb>`.
 

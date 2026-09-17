@@ -66,12 +66,37 @@ func (b *Bool) Set(s string) error {
 // descriptions stayed invisible.
 var ErrHelp = flag.ErrHelp
 
+// HelpRequested reports whether args ask what a verb takes, rather than ask
+// it to run. Everything after a bare "--" belongs to the program being run, so
+// its --help is not ours.
+//
+// A verb that dispatches on a subcommand, or that wants DIR before anything
+// else, has to ask this before it enforces either: otherwise the question is
+// answered with "the directory comes first", which is true and useless.
+func HelpRequested(args []string) bool {
+	for _, a := range args {
+		if a == "--" {
+			return false
+		}
+		if a == "--help" || a == "-h" {
+			return true
+		}
+	}
+	return false
+}
+
 // DirAnd parses "DIR [flags and positionals in any order]": the directory a
 // command acts on comes first; positional is how many positionals follow, or
 // -1 for any number. Flags may come anywhere, because mise appends what the
 // developer typed after a task name to the command; everything after a bare
 // "--" is positional, verbatim.
 func DirAnd(fs *flag.FlagSet, args []string, positional int) (dir string, rest []string, err error) {
+	// Before the directory is required, because asking what the verb takes is
+	// how someone finds out that it wants one.
+	if HelpRequested(args) {
+		fs.Usage()
+		return "", nil, ErrHelp
+	}
 	if len(args) == 0 || args[0] == "" || args[0][0] == '-' {
 		return "", nil, Usagef("%s: the directory comes first", fs.Name())
 	}
