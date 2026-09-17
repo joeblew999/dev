@@ -1,4 +1,4 @@
-package gitignore
+package cli
 
 import (
 	"os"
@@ -16,7 +16,7 @@ func read(t *testing.T, dir string) string {
 	return string(b)
 }
 
-func TestEnsure(t *testing.T) {
+func TestIgnore(t *testing.T) {
 	for _, tc := range []struct {
 		name, start string
 		want        []string // substrings the result must hold
@@ -36,7 +36,7 @@ func TestEnsure(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err := Ensure(dir, ".bin", ".dist"); err != nil {
+			if err := Ignore(dir, ".bin", ".dist"); err != nil {
 				t.Fatal(err)
 			}
 			got := read(t, dir)
@@ -52,7 +52,7 @@ func TestEnsure(t *testing.T) {
 				}
 			}
 			// Twice is the same as once.
-			if err := Ensure(dir, ".bin", ".dist"); err != nil {
+			if err := Ignore(dir, ".bin", ".dist"); err != nil {
 				t.Fatal(err)
 			}
 			if again := read(t, dir); again != got {

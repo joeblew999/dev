@@ -34,7 +34,7 @@ func (c Command) skills(verb string, args []string, stdout, stderr io.Writer) er
 	}
 	seen := map[string][]string{}
 	for _, dir := range []string{ClaudeDir, AgentsDir} {
-		found := read(filepath.Join(root, dir))
+		found := readSkills(filepath.Join(root, dir))
 		fmt.Fprintf(stdout, "%s\n", dir)
 		if len(found) == 0 {
 			fmt.Fprintf(stdout, "  (none)\n")
@@ -64,8 +64,8 @@ func (c Command) skills(verb string, args []string, stdout, stderr io.Writer) er
 // skill is one entry of an agent's skills directory.
 type skillEntry struct{ name, from string }
 
-// read lists a skills directory, saying where each entry came from.
-func read(dir string) []skillEntry {
+// readSkills lists a skills directory, saying where each entry came from.
+func readSkills(dir string) []skillEntry {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil
@@ -103,4 +103,65 @@ func source(path string) string {
 		}
 	}
 	return "a pinned tool"
+}
+
+// mirror makes .agents/skills carry what .claude/skills carries.
+//
+// mise links a pinned tool's skill into one directory — skills.dir, which is
+// .claude/skills and is a single path, so mise cannot serve both agents. Left
+// alone, every skill a repo pins reaches Claude Code and none reaches Copilot,
+// which is a silent half of the repo's own convention.
+//
+// So a link in one becomes a link in the other, pointing at the same install,
+// and a mirror whose original is gone is removed — because mise's prune takes
+// the original when a pin changes, and a mirror nobody prunes is a skill at a
+// version nothing pins any more.
+//
+// Only symlinks are touched. A real directory in either place is the repo's
+// own manual, written by skill, and is none of this function's business.
+func mirror(root string, out io.Writer) error {
+	from, to := filepath.Join(root, ClaudeDir), filepath.Join(root, AgentsDir)
+	want := map[string]string{}
+	for _, e := range readSkills(from) {
+		target, err := os.Readlink(filepath.Join(from, e.name))
+		if err != nil {
+			continue // a real directory: the repo's own
+		}
+		want[e.name] = target
+	}
+	for _, e := range readSkills(to) {
+		p := filepath.Join(to, e.name)
+		if _, err := os.Readlink(p); err != nil {
+			continue
+		}
+		if _, ok := want[e.name]; !ok {
+			if err := os.Remove(p); err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "removed %s; nothing pins it any more\n", rel(p))
+		}
+	}
+	if len(want) > 0 {
+		if err := os.MkdirAll(to, 0o755); err != nil {
+			return err
+		}
+	}
+	var made []string
+	for name, target := range want {
+		p := filepath.Join(to, name)
+		made = append(made, filepath.Join(AgentsDir, name))
+		if have, err := os.Readlink(p); err == nil && have == target {
+			continue
+		}
+		os.Remove(p)
+		if err := os.Symlink(target, p); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "linked %s, so both agents read it\n", rel(p))
+	}
+	// A mirror is written per developer from the versions that repo pins, the
+	// same as the links it mirrors, so it is ignored for the same reason. The
+	// code that writes it is the code that ignores it.
+	sort.Strings(made)
+	return Ignore(root, made...)
 }

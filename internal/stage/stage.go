@@ -22,7 +22,6 @@ import (
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/cloudflare"
 	"github.com/joeblew999/dev/internal/fly"
-	"github.com/joeblew999/dev/internal/gitignore"
 )
 
 // BinDir is where every command's binary is built and run from, under a dot
@@ -199,7 +198,7 @@ func Build(out io.Writer, path string, asWorker bool, env string) error {
 			return err
 		}
 	}
-	if err := gitignore.Ensure(d.Root, BinDir); err != nil {
+	if err := cli.Ignore(d.Root, BinDir); err != nil {
 		return err
 	}
 	bin := filepath.Join(d.Root, BinDir, d.Name)

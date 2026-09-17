@@ -27,7 +27,6 @@ import (
 
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/fnox"
-	"github.com/joeblew999/dev/internal/gitignore"
 	"github.com/joeblew999/dev/internal/gitrepo"
 	"github.com/joeblew999/dev/internal/secrets"
 )
@@ -205,7 +204,7 @@ func newRelease(dir, name string) (*release, error) {
 		}
 	}
 	// goreleaser is about to write DistDir; git should already be ignoring it.
-	if err := gitignore.Ensure(".", DistDir); err != nil {
+	if err := cli.Ignore(".", DistDir); err != nil {
 		return nil, err
 	}
 	r.config = ".goreleaser.yml"

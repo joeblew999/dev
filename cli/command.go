@@ -419,6 +419,13 @@ func (c Command) skill(verb string, args []string, stdout, stderr io.Writer) err
 		}
 		return fmt.Errorf("%s has changed since this %s was built, so it would %s from stale embedded prose; rebuild first: mise run build", rel(changed), c.Name, what)
 	}
+	// Both agent directories carry the same pinned skills, which mise cannot
+	// do for itself: its skills.dir is one path.
+	if !bool(check) {
+		if err := mirror(dir, stdout); err != nil {
+			return err
+		}
+	}
 	for name, body := range c.Skills {
 		// Through withProvenance like the command's own manual: a shipped
 		// skill is as generated as any other file here, and one that does not
