@@ -15,7 +15,6 @@ import (
 	"github.com/joeblew999/dev/internal/app"
 	"github.com/joeblew999/dev/internal/deps"
 	"github.com/joeblew999/dev/internal/release"
-	"github.com/joeblew999/dev/internal/scaffold"
 	"github.com/joeblew999/dev/internal/secrets"
 	"github.com/joeblew999/dev/internal/session"
 	"github.com/joeblew999/dev/internal/stage"
@@ -53,7 +52,6 @@ var dev = cli.Command{
 		"session": {Run: session.Run, Usage: session.Usage},
 		"release": {Run: release.Run, Usage: release.Usage},
 		"deps":    {Run: deps.Run, Usage: deps.Usage},
-		"init":    {Run: scaffold.Run, Usage: scaffold.Usage},
 	},
 	Head: skillHead,
 	Tail: skillTail,
@@ -61,18 +59,13 @@ var dev = cli.Command{
 	// The manual's reading order: start a repo, build it, ship it, then the
 	// verbs that keep it. Without this the sections fall in verb-name order,
 	// which puts init fifth — the first thing anyone does, halfway down.
-	Order: []string{"init", "build", "deploy", "secrets", "release", "deps", "session", "skill"},
+	Order: []string{"build", "deploy", "secrets", "release", "deps", "session", "skill"},
 }
 
-// version and pubkey are set by the release build (-X main.version, -X
-// main.pubkey): the release's version, and the public key it is signed with.
-var (
-	version = "dev"
-	pubkey  = ""
-)
+// version is set by the release build (-X main.version).
+var version = "dev"
 
 func main() {
-	scaffold.Version, scaffold.Pubkey = version, pubkey
 	dev.Version = version
 	cli.Main(dev)
 }

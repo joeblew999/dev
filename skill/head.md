@@ -9,7 +9,9 @@ A repo on this stack is a few commands, each its own directory and Go module:
 main.go, and beside it a worker.go and wrangler.toml if it deploys to
 Cloudflare, a fly.toml if it deploys to Fly, a package.json and .gsx sources if
 it has a UI. A repo that is one command keeps it at the root and uses `.`.
-A new repo gets the whole stack from `dev init`.
+A new repo starts from `github.com/joeblew999/hello-stack`, which is this
+stack and nothing else: clone it, rename its command, and its own CI proves
+it still works.
 Every command has the same stages, and a mise task names one:
 `<cmd>:<stage>[:variant]`, so `mise run proxy:deploy` runs
 `dev deploy cmd/proxy`. Run stages through their tasks (`mise tasks`
