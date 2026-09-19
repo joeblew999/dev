@@ -197,8 +197,8 @@ func finish(c cli.Call, rep *cli.Report, started time.Time) error {
 		}
 	}
 	if rep.Outcome != "pass" {
-		return fmt.Errorf("%s: %d error(s), %d warning(s)", rep.Target,
-			rep.BySeverity[cli.SevError], rep.BySeverity[cli.SevWarning])
+		return fmt.Errorf("%s: %s, %s", rep.Target,
+			cli.Plural(rep.BySeverity[cli.SevError], "error"), cli.Plural(rep.BySeverity[cli.SevWarning], "warning"))
 	}
 	return nil
 }
@@ -369,7 +369,7 @@ func write(c cli.Call, r *cli.Report) {
 		}
 		fmt.Fprintf(c.Stdout, "  %-13s %7s  %-44s", s.Name, s.Took, short(s.Covered, 44))
 		if s.Findings > 0 {
-			fmt.Fprintf(c.Stdout, " %d finding(s)", s.Findings)
+			fmt.Fprintf(c.Stdout, " %s", cli.Plural(s.Findings, "finding"))
 		}
 		if s.Report != "" {
 			fmt.Fprintf(c.Stdout, "  → %s", here(s.Report))
@@ -392,8 +392,8 @@ func write(c cli.Call, r *cli.Report) {
 	}
 	notRun(c, r)
 	fixable(c, r)
-	fmt.Fprintf(c.Stdout, "%s in %s: %d error(s), %d warning(s)\n",
-		r.Outcome, r.Took, r.BySeverity[cli.SevError], r.BySeverity[cli.SevWarning])
+	fmt.Fprintf(c.Stdout, "%s in %s: %s, %s\n", r.Outcome, r.Took,
+		cli.Plural(r.BySeverity[cli.SevError], "error"), cli.Plural(r.BySeverity[cli.SevWarning], "warning"))
 }
 
 // short keeps a column a column. What is cut is in the JSON in full.

@@ -14,6 +14,7 @@
 package checkers
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/joeblew999/dev/cli"
@@ -75,7 +76,7 @@ func (f Found) Covered() string {
 		case p.n == 1:
 			parts = append(parts, "1 "+p.word)
 		case p.n > 1:
-			parts = append(parts, plural(p.n, p.word))
+			parts = append(parts, cli.Plural(p.n, p.word))
 		}
 	}
 	if len(parts) == 0 {
@@ -90,7 +91,7 @@ func Paged(args []string, pages int) []string {
 	if pages <= 0 {
 		return args
 	}
-	return append(args, "--max-pages", itoa(pages))
+	return append(args, "--max-pages", strconv.Itoa(pages))
 }
 
 // All is the registry, in the order a report lists them — whatever order they
@@ -161,26 +162,4 @@ func Issue(toolName, id, severity, message, where, fix string) cli.Finding {
 		Tool: toolName, ID: id, Severity: severity,
 		Message: message, Where: where, Fix: fix,
 	}
-}
-
-func plural(n int, word string) string {
-	if n == 1 {
-		return "1 " + word
-	}
-	return itoa(n) + " " + word + "s"
-}
-
-// itoa keeps this file free of fmt for one number.
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var b [20]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(b[i:])
 }

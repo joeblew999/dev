@@ -15,6 +15,7 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -396,6 +397,16 @@ func editDistance(a, b string) int {
 		copy(prev, cur)
 	}
 	return prev[len(b)]
+}
+
+// Plural is a count and its noun, said the way a person would: "1 page",
+// "3 pages". Reports count things constantly, and every place that did this
+// by hand either wrote out the if or printed "1 pages".
+func Plural(n int, word string) string {
+	if n == 1 {
+		return "1 " + word
+	}
+	return strconv.Itoa(n) + " " + word + "s"
 }
 
 // Lines is a text's lines with the blank tail every file ends with dropped.

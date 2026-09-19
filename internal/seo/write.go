@@ -142,11 +142,7 @@ func writeSitemap(s Site) (content, covered string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	word := "URLs"
-	if len(s.URLs) == 1 {
-		word = "URL"
-	}
-	return xml.Header + string(out) + "\n", fmt.Sprintf("%d %s", len(s.URLs), word), nil
+	return xml.Header + string(out) + "\n", cli.Plural(len(s.URLs), "URL"), nil
 }
 
 // writeRobots is allow-all plus the Sitemap directive, which is the only

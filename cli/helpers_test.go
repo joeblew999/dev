@@ -112,3 +112,33 @@ func TestDiffKeysSeesOnlyTheKeysItOwns(t *testing.T) {
 		t.Errorf("DiffKeys = %q; want missing: b, unexpected: a", got)
 	}
 }
+
+// Reports count things constantly, and "1 pages" is the tell that one of
+// them was written by hand.
+func TestPlural(t *testing.T) {
+	for _, tc := range []struct {
+		n    int
+		word string
+		want string
+	}{
+		{0, "page", "0 pages"},
+		{1, "page", "1 page"},
+		{2, "page", "2 pages"},
+		{1, "broken link", "1 broken link"},
+		{7, "broken link", "7 broken links"},
+	} {
+		if got := Plural(tc.n, tc.word); got != tc.want {
+			t.Errorf("Plural(%d, %q) = %q; want %q", tc.n, tc.word, got, tc.want)
+		}
+	}
+}
+
+// Or is the default a caller falls back to when a value is blank.
+func TestOr(t *testing.T) {
+	if got := Or("", "fallback"); got != "fallback" {
+		t.Errorf("Or(\"\", fallback) = %q", got)
+	}
+	if got := Or("given", "fallback"); got != "given" {
+		t.Errorf("Or(given, fallback) = %q", got)
+	}
+}

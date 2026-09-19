@@ -14,6 +14,7 @@
 package seo
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/joeblew999/dev/cli"
@@ -45,7 +46,7 @@ func writeHeaders(s Site) (content, covered string, err error) {
 	b.WriteString("# browser where no check here would see it. Write yours:\n")
 	b.WriteString("#   Content-Security-Policy: default-src 'self'; ...\n")
 	b.WriteString("# " + checkers.DocEssentials + "\n")
-	return b.String(), plural(len(headers), "header") + ", CSP left to you", nil
+	return b.String(), cli.Plural(len(headers), "header") + ", CSP left to you", nil
 }
 
 // validateHeaders reads them back. Presence, not policy: whether a value is
@@ -73,26 +74,5 @@ func validateHeaders(name, content, origin string) (found []cli.Finding, covered
 			Fix:      "the file needs a path line such as /* before its headers — " + checkers.DocEssentials,
 		})
 	}
-	return found, plural(present, "header") + " of " + itoa(len(headers))
-}
-
-func plural(n int, word string) string {
-	if n == 1 {
-		return "1 " + word
-	}
-	return itoa(n) + " " + word + "s"
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var b [20]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(b[i:])
+	return found, cli.Plural(present, "header") + " of " + strconv.Itoa(len(headers))
 }

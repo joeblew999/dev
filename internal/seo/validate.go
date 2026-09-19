@@ -72,11 +72,7 @@ func validateSitemap(name, content, origin string) (found []cli.Finding, covered
 			}
 		}
 	}
-	word := "URLs"
-	if len(doc.URLs) == 1 {
-		word = "URL"
-	}
-	return out, fmt.Sprintf("%d %s", len(doc.URLs), word)
+	return out, cli.Plural(len(doc.URLs), "URL")
 }
 
 // validateRobots holds robots.txt to what Google reads: it must say something,
@@ -134,7 +130,7 @@ func validateRobots(name, content, origin string) (found []cli.Finding, covered 
 			"over 500 KiB; Google reads no further",
 			"keep it small — what is past the limit is not applied — "+checkers.DocRobotsIntro))
 	}
-	covered = fmt.Sprintf("%d directive(s)", directives)
+	covered = cli.Plural(directives, "directive")
 	if sitemaps > 0 {
 		covered += ", sitemap named"
 	}
