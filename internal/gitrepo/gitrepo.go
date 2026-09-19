@@ -6,21 +6,21 @@ package gitrepo
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
+
+	"github.com/joeblew999/dev/cli/tool"
 )
 
 // Slug is owner/repo from dir's origin remote.
 func Slug(dir string) (string, error) {
-	cmd := exec.Command("git", "remote", "get-url", "origin")
-	cmd.Dir = dir
-	out, err := cmd.Output()
+	res, err := tool.Cmd{Bin: "git", Args: []string{"remote", "get-url", "origin"}, Dir: dir, Quiet: true}.Capture()
 	if err != nil {
 		return "", fmt.Errorf("no origin remote here; add one: git remote add origin https://github.com/<owner>/<repo>")
 	}
-	slug, ok := Parse(strings.TrimSpace(string(out)))
+	remote := strings.TrimSpace(res.Out)
+	slug, ok := Parse(remote)
 	if !ok {
-		return "", fmt.Errorf("origin %q is not a GitHub repository URL", strings.TrimSpace(string(out)))
+		return "", fmt.Errorf("origin %q is not a GitHub repository URL", remote)
 	}
 	return slug, nil
 }

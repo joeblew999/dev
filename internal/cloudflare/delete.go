@@ -3,7 +3,6 @@ package cloudflare
 import (
 	"bytes"
 	"cmp"
-	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -63,11 +62,9 @@ func Delete(stdin io.Reader, out io.Writer, dir, env, name string, yes bool) err
 // each binding of a Worker: the Worker's name, a dash, the binding in
 // lowercase with dashes.
 func provisionedTitles(bindings []kvBinding, worker string) []string {
-	var titles []string
-	for _, b := range bindings {
-		titles = append(titles, worker+"-"+strings.ReplaceAll(strings.ToLower(b.Binding), "_", "-"))
-	}
-	return titles
+	return cli.Map(bindings, func(b kvBinding) string {
+		return worker + "-" + strings.ReplaceAll(strings.ToLower(b.Binding), "_", "-")
+	})
 }
 
 type namespace struct {
@@ -81,14 +78,6 @@ func namespaces(dir string) ([]namespace, error) {
 	if err := fnox.Exec(dir, nil, &buf, "wrangler", "kv", "namespace", "list"); err != nil {
 		return nil, fmt.Errorf("wrangler kv namespace list failed: %w", err)
 	}
-	// wrangler prints its banner before the JSON.
-	text := buf.String()
-	if i := strings.Index(text, "["); i >= 0 {
-		text = text[i:]
-	}
-	var out []namespace
-	if err := json.Unmarshal([]byte(text), &out); err != nil {
-		return nil, fmt.Errorf("reading wrangler's namespace list: %w", err)
-	}
-	return out, nil
+	// wrangler prints its banner before the JSON; DecodeJSON starts at it.
+	return cli.DecodeJSON[[]namespace]("wrangler's namespace list", buf.String())
 }

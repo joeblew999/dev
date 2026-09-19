@@ -6,11 +6,11 @@ import (
 	_ "embed"
 	"fmt"
 	"io/fs"
-	"os/exec"
 	"path/filepath"
-	"slices"
 
 	"github.com/joeblew999/dev/cli"
+
+	"github.com/joeblew999/dev/cli/tool"
 )
 
 // Usage is what dev prints for these verbs. It is markdown in a file beside
@@ -38,20 +38,15 @@ func upgrade(c cli.Call) error { return each(c) }
 // each runs go-mod-upgrade in every module of the repo. Listing and upgrading
 // are the same walk; --list is the whole difference.
 func each(c cli.Call, flags ...string) error {
-	if len(c.Args) > 0 {
-		return c.Usagef("takes no arguments")
-	}
 	dirs, err := Modules(".")
 	if err != nil {
 		return err
 	}
 	for _, dir := range dirs {
 		fmt.Fprintf(c.Stdout, "== %s ==\n", dir)
-		cmd := exec.Command("go-mod-upgrade", flags...)
-		cmd.Dir = dir
-		cmd.Stdin, cmd.Stdout, cmd.Stderr = c.Stdin, c.Stdout, c.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("%s: go-mod-upgrade: %w; pin it in mise.toml: \"go:github.com/oligot/go-mod-upgrade\" = \"latest\"", dir, err)
+		run := tool.Cmd{Bin: "go-mod-upgrade", Pin: `"go:github.com/oligot/go-mod-upgrade" = "latest"`, Args: flags, Dir: dir, Stdin: c.Stdin}
+		if err := run.Stream(c.Stdout); err != nil {
+			return fmt.Errorf("%s: %w", dir, err)
 		}
 	}
 	return nil
@@ -75,6 +70,5 @@ func Modules(root string) ([]string, error) {
 		}
 		return nil
 	})
-	slices.Sort(dirs)
-	return dirs, err
+	return cli.Sorted(dirs), err
 }

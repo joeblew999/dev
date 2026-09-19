@@ -12,9 +12,10 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
+
+	"github.com/joeblew999/dev/cli"
 )
 
 // Skills live in the repo so every Claude Code session here loads them, and are
@@ -46,7 +47,7 @@ func Sync(out io.Writer) error {
 	}
 
 	fmt.Fprintf(out, "skills in %s:\n", skillsDir)
-	fmt.Fprint(out, indent(string(want[lockFile])))
+	fmt.Fprint(out, cli.Indent(string(want[lockFile])))
 	if !existed {
 		fmt.Fprintf(out, "\nThese are new: Claude Code reads %s at startup.\n", skillsDir)
 	}
@@ -77,7 +78,7 @@ func Check(out io.Writer) error {
 		return err
 	}
 	if diff := diffLocked(have, want); len(diff) > 0 {
-		return fmt.Errorf("%s does not match its pins:\n%sfix with: "+syncCmd, skillsDir, indent(strings.Join(diff, "\n")+"\n"))
+		return fmt.Errorf("%s does not match its pins:\n%sfix with: "+syncCmd, skillsDir, cli.Indent(strings.Join(diff, "\n")+"\n"))
 	}
 	p, err := loadPins()
 	if err != nil {
@@ -119,8 +120,7 @@ func pinnedSkills() (skillFiles, error) {
 		}
 	}
 
-	slices.Sort(lock)
-	files[lockFile] = []byte(strings.Join(lock, "\n") + "\n")
+	files[lockFile] = []byte(strings.Join(cli.Sorted(lock), "\n") + "\n")
 	return files, nil
 }
 
@@ -158,7 +158,7 @@ func writeOwned(dir string, have, want skillFiles) error {
 // file and every skill directory it names.
 func ownedPaths(lock []byte) []string {
 	owned := []string{lockFile}
-	for line := range strings.SplitSeq(strings.TrimSpace(string(lock)), "\n") {
+	for _, line := range cli.Lines(string(lock)) {
 		if name, _, ok := strings.Cut(line, "\t"); ok && name != "" {
 			owned = append(owned, name)
 		}
@@ -186,31 +186,14 @@ func removeEmptyDirs(dir string) {
 		return nil
 	})
 	// Deepest first, so a directory is removed after what it holds.
-	slices.SortFunc(dirs, func(a, b string) int { return strings.Compare(b, a) })
-	for _, d := range dirs {
+	for _, d := range cli.SortedDesc(dirs) {
 		_ = os.Remove(d)
 	}
 }
 
 // diffFiles describes how have differs from want, most useful first.
 func diffFiles(have, want skillFiles) []string {
-	var diff []string
-	for name, wantData := range want {
-		haveData, ok := have[name]
-		switch {
-		case !ok:
-			diff = append(diff, "missing: "+name)
-		case !bytes.Equal(haveData, wantData):
-			diff = append(diff, "changed: "+name)
-		}
-	}
-	for name := range have {
-		if _, ok := want[name]; !ok {
-			diff = append(diff, "unexpected: "+name)
-		}
-	}
-	slices.Sort(diff)
-	return diff
+	return cli.DiffMaps(have, want, bytes.Equal)
 }
 
 func sameFiles(a, b skillFiles) bool { return len(diffFiles(a, b)) == 0 }
@@ -218,12 +201,4 @@ func sameFiles(a, b skillFiles) bool { return len(diffFiles(a, b)) == 0 }
 func dirExists(dir string) bool {
 	info, err := os.Stat(dir)
 	return err == nil && info.IsDir()
-}
-
-func indent(s string) string {
-	var b strings.Builder
-	for line := range strings.SplitSeq(strings.TrimRight(s, "\n"), "\n") {
-		b.WriteString("  " + line + "\n")
-	}
-	return b.String()
 }

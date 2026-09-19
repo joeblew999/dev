@@ -6,13 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
+
+	"github.com/joeblew999/dev/cli"
+
+	"github.com/joeblew999/dev/cli/tool"
 )
 
 // Verify asks a fresh headless Claude Code session which skills it can see. The
@@ -38,12 +40,7 @@ func Verify(out io.Writer, update bool) error {
 
 	current := claudeVersion()
 	if update {
-		if err := writeSessionLock(seen, current); err != nil {
-			return err
-		}
-		fmt.Fprintf(out, "%s now allows the %d skills this session reports (Claude Code %s):\n", sessionLockPath(), len(seen), current)
-		fmt.Fprint(out, indent(strings.Join(seen, "\n")))
-		return nil
+		return record(out, seen, current, "%s now allows the %d skills this session reports (Claude Code %s):\n", sessionLockPath(), len(seen), current)
 	}
 
 	// Vendored skills that never load are the older failure, and worth their
@@ -52,19 +49,11 @@ func Verify(out io.Writer, update bool) error {
 	if err != nil {
 		return err
 	}
-	present := map[string]bool{}
-	for _, name := range seen {
-		present[name] = true
-	}
-	var missingSkills []string
-	for _, name := range locked {
-		if !present[name] {
-			missingSkills = append(missingSkills, name)
-		}
-	}
+	present := cli.ToSet(seen)
+	missingSkills := cli.Filter(locked, func(name string) bool { return !present[name] })
 	if len(missingSkills) > 0 {
 		return fmt.Errorf("a fresh Claude Code session cannot see: %s\nit answered:\n%scheck the SKILL.md frontmatter, then: "+syncCmd,
-			strings.Join(missingSkills, ", "), indent(answer))
+			strings.Join(missingSkills, ", "), cli.Indent(answer))
 	}
 
 	allowed, recordedBy, err := sessionLock()
@@ -72,12 +61,7 @@ func Verify(out io.Writer, update bool) error {
 		// The first verify in a repo, at its first push: nothing is allowed
 		// yet, so what the session has now is what it allows. Recorded, not
 		// refused, so day one has no manual step.
-		if err := writeSessionLock(seen, current); err != nil {
-			return err
-		}
-		fmt.Fprintf(out, "%s did not exist; it now allows the %d skills this first session reports (Claude Code %s). Commit it.\n", sessionLockPath(), len(seen), current)
-		fmt.Fprint(out, indent(strings.Join(seen, "\n")))
-		return nil
+		return record(out, seen, current, "%s did not exist; it now allows the %d skills this first session reports (Claude Code %s). Commit it.\n", sessionLockPath(), len(seen), current)
 	}
 	if err != nil {
 		return err
@@ -94,21 +78,21 @@ func Verify(out io.Writer, update bool) error {
 		was := cmp.Or(recordedBy, "an unrecorded version")
 		fmt.Fprintf(out, "Claude Code is %s; %s was recorded by %s, so it now follows this session.\n", current, sessionLockPath(), was)
 		if len(arrived) > 0 {
-			fmt.Fprintf(out, "arrived:\n%s", indent(strings.Join(arrived, "\n")))
+			fmt.Fprintf(out, "arrived:\n%s", listed(arrived))
 		}
 		if len(gone) > 0 {
-			fmt.Fprintf(out, "gone:\n%s", indent(strings.Join(gone, "\n")))
+			fmt.Fprintf(out, "gone:\n%s", listed(gone))
 		}
 		fmt.Fprintf(out, "commit %s\n", sessionLockPath())
 		return nil
 	}
 	if len(gone) > 0 {
 		return fmt.Errorf("skills the lock allows are no longer in the session:\n%sif that is intended: %s --update",
-			indent(strings.Join(gone, "\n")), verifyCmd())
+			listed(gone), verifyCmd())
 	}
 	if len(arrived) > 0 {
 		return fmt.Errorf("skills reached this session that %s does not allow:\n%s%s",
-			sessionLockPath(), indent(strings.Join(arrived, "\n")), arrivalAdvice(arrived))
+			sessionLockPath(), listed(arrived), arrivalAdvice(arrived))
 	}
 
 	if recordedBy == "" && current != "" {
@@ -120,9 +104,24 @@ func Verify(out io.Writer, update bool) error {
 		fmt.Fprintf(out, "%s now records Claude Code %s; commit it.\n", sessionLockPath(), current)
 	}
 	fmt.Fprintf(out, "a fresh Claude Code session has exactly the %d skills %s allows:\n", len(seen), sessionLockPath())
-	fmt.Fprint(out, indent(strings.Join(seen, "\n")))
+	fmt.Fprint(out, listed(seen))
 	return nil
 }
+
+// record writes the lock and says what it now allows. Three of verify's
+// answers end exactly this way, differing only in the sentence above the
+// list, and each had written the write, the check and the two prints again.
+func record(out io.Writer, seen []string, current, format string, a ...any) error {
+	if err := writeSessionLock(seen, current); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, format, a...)
+	fmt.Fprint(out, listed(seen))
+	return nil
+}
+
+// listed is a set of names as this package shows one: indented, one per line.
+func listed(names []string) string { return cli.Indent(strings.Join(names, "\n")) }
 
 // errNoLock is the first verify in a repo: verify records the lock then.
 var errNoLock = errors.New("no session lock yet")
@@ -130,8 +129,8 @@ var errNoLock = errors.New("no session lock yet")
 // claudeVersion is Claude Code's own version, "" when it cannot be read. A
 // change in it is the one legitimate way the built-in skills change.
 func claudeVersion() string {
-	out, err := exec.Command(ClaudeBin, "--version").Output()
-	fields := strings.Fields(string(out))
+	res, err := tool.Cmd{Bin: ClaudeBin, Pin: claudePin, Quiet: true, Args: []string{"--version"}}.Capture()
+	fields := strings.Fields(res.Out)
 	if err != nil || len(fields) == 0 {
 		return ""
 	}
@@ -141,49 +140,32 @@ func claudeVersion() string {
 // sessionSkills asks a fresh session what it can see, returning the names it
 // reported and its raw answer.
 func sessionSkills() ([]string, string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, ClaudeBin, "-p",
-		"List the names of every skill available to you, one per line, nothing else.")
-	answer, err := cmd.Output()
-	if ctx.Err() != nil {
+	res, err := tool.Cmd{
+		Bin:     ClaudeBin,
+		Pin:     claudePin,
+		Args:    []string{"-p", "List the names of every skill available to you, one per line, nothing else."},
+		Timeout: 2 * time.Minute,
+	}.Capture()
+	if errors.Is(err, context.DeadlineExceeded) {
 		return nil, "", fmt.Errorf("claude did not answer within 2 minutes")
 	}
 	if err != nil {
 		return nil, "", fmt.Errorf("claude -p: %w", err)
 	}
+	answer := res.Out
 	var names []string
-	for line := range strings.SplitSeq(string(answer), "\n") {
+	for _, line := range cli.Lines(answer) {
 		if name := strings.TrimSpace(line); name != "" {
 			names = append(names, name)
 		}
 	}
-	slices.Sort(names)
-	return names, string(answer), nil
+	return cli.Sorted(names), answer, nil
 }
 
 // diffSession reports what the lock allows but the session lost, and what the
 // session gained that the lock does not allow.
 func diffSession(allowed, seen []string) (gone, arrived []string) {
-	allow := map[string]bool{}
-	for _, name := range allowed {
-		allow[name] = true
-	}
-	have := map[string]bool{}
-	for _, name := range seen {
-		have[name] = true
-	}
-	for _, name := range allowed {
-		if !have[name] {
-			gone = append(gone, name)
-		}
-	}
-	for _, name := range seen {
-		if !allow[name] {
-			arrived = append(arrived, name)
-		}
-	}
-	return gone, arrived
+	return cli.DiffSets(allowed, seen)
 }
 
 // arrivalAdvice names the fix for what showed up. A namespaced name came from a
@@ -198,7 +180,7 @@ func arrivalAdvice(arrived []string) string {
 		}
 	}
 	if len(plugins) > 0 {
-		names := slices.Sorted(maps.Keys(plugins))
+		names := cli.SortedKeys(plugins)
 		return fmt.Sprintf("these came from the %s plugin(s); add them to blocked_plugins in %s, then: %s",
 			strings.Join(names, ", "), pinsFile, syncCmd)
 	}
@@ -222,13 +204,12 @@ func lockedSkillNames() ([]string, error) {
 	// file row: asking a session to list cloudflare/references/kv/api.md as a
 	// skill fails every time.
 	var names []string
-	for line := range strings.SplitSeq(strings.TrimSpace(string(data)), "\n") {
+	for _, line := range cli.Lines(string(data)) {
 		if name, _, ok := strings.Cut(line, "\t"); ok && !strings.Contains(name, "/") {
 			names = append(names, name)
 		}
 	}
-	slices.Sort(names)
-	return names, nil
+	return cli.Sorted(names), nil
 }
 
 // sessionLockFile records every skill a session is allowed to have: the ones
@@ -257,7 +238,7 @@ func sessionLock() (names []string, recordedBy string, err error) {
 }
 
 func parseSessionLock(data string) (names []string, recordedBy string) {
-	for line := range strings.SplitSeq(strings.TrimSpace(data), "\n") {
+	for _, line := range cli.Lines(data) {
 		line = strings.TrimSpace(line)
 		switch {
 		case strings.HasPrefix(line, versionLine):
@@ -266,8 +247,7 @@ func parseSessionLock(data string) (names []string, recordedBy string) {
 			names = append(names, line)
 		}
 	}
-	slices.Sort(names)
-	return names, recordedBy
+	return cli.Sorted(names), recordedBy
 }
 
 func writeSessionLock(names []string, recordedBy string) error {

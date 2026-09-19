@@ -26,8 +26,6 @@ import (
 //go:embed usage.md
 var Usage string
 
-func init() { fly.Wait = cloudflare.Wait }
-
 // Run is every deployed-app verb. DIR comes first; the target's own Run
 // reads the flags.
 // The deploy verbs' flags. Both clouds register the same ones, checked verb
@@ -92,23 +90,113 @@ func DeleteVerb(c cli.Call) error { return to(c, "delete") }
 
 // WaitVerb is the one verb here that talks to no cloud: it polls a URL.
 func WaitVerb(c cli.Call) error {
-	if len(c.Args) != 1 {
-		return c.Usagef("needs exactly one URL")
-	}
-	d, _ := time.ParseDuration(c.Value("timeout"))
+	d, _ := c.ValueAs("timeout", time.ParseDuration)
 	return cloudflare.Wait(c.Stdout, c.Args[0], d)
 }
 
-// to sends a verb to whichever cloud the directory deploys to.
+// cloud is what only a target knows: how to reach it. Everything a verb does
+// that is the same on both — print the address, wait for a path after
+// deploying, refuse what a target cannot do — is in to() below, once.
+//
+// Both clouds used to carry a switch over the verbs, and the two switches
+// said the same thing in two wordings: print the URL, deploy then wait, hand
+// the rest straight on. A verb's meaning now lives where the verb does.
+type cloud struct {
+	Before   func(c cli.Call) error           // checked before any verb runs
+	URL      func(c cli.Call) (string, error) // what `url` prints, flags and all
+	Deployed func(c cli.Call) (string, error) // the deployed address, whatever --local says
+	Deploy   func(c cli.Call) error
+	Logs     func(c cli.Call) error
+	Delete   func(c cli.Call) error
+	Smoke    func(c cli.Call) error // nil when the target has no local runtime
+	NoSmoke  string                 // and why, in words a person can act on
+}
+
+// clouds is every target, by the name Target answers with.
+var clouds = map[string]cloud{
+	"cloudflare": {
+		URL: func(c cli.Call) (string, error) {
+			return cloudflare.URL(c.Dir, c.Value("env"), c.Given("deployed"), c.Value("local"), c.Given("refresh"))
+		},
+		Deployed: func(c cli.Call) (string, error) {
+			return cloudflare.URL(c.Dir, c.Value("env"), true, "", false)
+		},
+		Deploy: func(c cli.Call) error { return cloudflare.Deploy(c.Stdout, c.Dir, c.Value("env")) },
+		Logs:   func(c cli.Call) error { return cloudflare.Logs(c.Dir, c.Value("env")) },
+		Delete: func(c cli.Call) error {
+			return cloudflare.Delete(c.Stdin, c.Stdout, c.Dir, c.Value("env"), c.Value("name"), c.Given("yes"))
+		},
+		Smoke: func(c cli.Call) error {
+			d, _ := c.ValueAs("timeout", time.ParseDuration)
+			return cloudflare.Smoke(c.Stdout, c.Dir, c.Value("env"), c.Value("path"), c.Value("expect"), d)
+		},
+	},
+	"fly": {
+		Before: func(c cli.Call) error { return fly.NoEnv(c.Dir, c.Value("env")) },
+		URL: func(c cli.Call) (string, error) {
+			// A Fly app has no local address to work out: --local is whatever
+			// the caller runs it on.
+			if !c.Given("deployed") {
+				return c.Value("local"), nil
+			}
+			return fly.URL(c.Dir)
+		},
+		Deployed: func(c cli.Call) (string, error) { return fly.URL(c.Dir) },
+		Deploy:   func(c cli.Call) error { return fly.Deploy(c.Stdout, c.Dir, c.Args) },
+		Logs:     func(c cli.Call) error { return fly.Logs(c.Dir) },
+		Delete: func(c cli.Call) error {
+			return fly.Destroy(c.Stdin, c.Stdout, c.Dir, c.Value("name"), c.Given("yes"))
+		},
+		NoSmoke: "smoke runs a Worker on local workerd; a Fly app has no local runtime here. dev check DIR tests it, and dev deploy DIR --wait PATH proves it online",
+	},
+}
+
+// to sends a verb to whichever cloud the directory deploys to, and does the
+// part that is the same wherever it went.
 func to(c cli.Call, verb string) error {
 	target, err := Target(c.Dir)
 	if err != nil {
 		return err
 	}
-	if target == "fly" {
-		return fly.Run(verb, c)
+	t := clouds[target]
+	if t.Before != nil {
+		if err := t.Before(c); err != nil {
+			return err
+		}
 	}
-	return cloudflare.Run(verb, c)
+	switch verb {
+	case "url":
+		u, err := t.URL(c)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(c.Stdout, u)
+		return nil
+	case "deploy":
+		if err := t.Deploy(c); err != nil {
+			return err
+		}
+		// Deploying and then proving it answers is one thing a person does,
+		// so it is one flag rather than a second command to remember.
+		if c.Value("wait") == "" {
+			return nil
+		}
+		u, err := t.Deployed(c)
+		if err != nil {
+			return err
+		}
+		return cloudflare.Wait(c.Stdout, u+c.Value("wait"), 2*time.Minute)
+	case "logs":
+		return t.Logs(c)
+	case "delete":
+		return t.Delete(c)
+	case "smoke":
+		if t.Smoke == nil {
+			return fmt.Errorf("%s", t.NoSmoke)
+		}
+		return t.Smoke(c)
+	}
+	return cli.Usagef("%s: unknown verb %q", target, verb)
 }
 
 // Target names the cloud dir deploys to, "cloudflare" or "fly", from the

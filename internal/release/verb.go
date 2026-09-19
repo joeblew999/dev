@@ -38,9 +38,6 @@ func Flags(fs *flag.FlagSet) {
 // Run is `dev release DIR [VERSION]`. cli has parsed DIR and the flags, so
 // what is left is the one positional this verb allows and what to do with it.
 func Run(c cli.Call) error {
-	if len(c.Args) > 1 {
-		return c.Usagef("at most one VERSION")
-	}
 	version := ""
 	if len(c.Args) == 1 {
 		version = c.Args[0]

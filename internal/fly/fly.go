@@ -7,18 +7,17 @@ package fly
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
-	"time"
-
-	"github.com/BurntSushi/toml"
 
 	"github.com/joeblew999/dev/cli"
+	"github.com/joeblew999/dev/cli/tool"
+	"github.com/joeblew999/dev/internal/conf"
 	"github.com/joeblew999/dev/internal/fnox"
 	"github.com/joeblew999/dev/internal/suffix"
 )
@@ -33,49 +32,9 @@ const (
 	OrgEnv = "FLY_ORG"
 )
 
-// Run is every Fly verb but wait. DIR comes first; flags may follow anywhere,
-// and for deploy everything after a bare -- goes to flyctl.
-// Run is every Fly verb. cli has parsed DIR and the flags before this is
-// reached, so each case is the call it makes and nothing else.
-func Run(verb string, c cli.Call) error {
-	if err := noEnv(c.Dir, c.Value("env")); err != nil {
-		return err
-	}
-	switch verb {
-	case "url":
-		if !c.Given("deployed") {
-			fmt.Fprintln(c.Stdout, c.Value("local"))
-			return nil
-		}
-		u, err := URL(c.Dir)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintln(c.Stdout, u)
-		return nil
-	case "deploy":
-		if err := Deploy(c.Stdout, c.Dir, c.Args); err != nil {
-			return err
-		}
-		if c.Value("wait") == "" {
-			return nil
-		}
-		u, err := URL(c.Dir)
-		if err != nil {
-			return err
-		}
-		return Wait(c.Stdout, u+c.Value("wait"), 2*time.Minute)
-	case "logs":
-		return Logs(c.Dir)
-	case "delete":
-		return Destroy(c.Stdin, c.Stdout, c.Dir, c.Value("name"), c.Given("yes"))
-	case "smoke":
-		return fmt.Errorf("smoke runs a Worker on local workerd; a Fly app has no local runtime here. dev check DIR tests it, and dev deploy DIR --wait PATH proves it online")
-	}
-	return cli.Usagef("fly: unknown verb %q", verb)
-}
-
-func noEnv(dir, env string) error {
+// NoEnv refuses --env: a Fly app has one environment, and a second app is a
+// second directory. app checks this before any Fly verb runs.
+func NoEnv(dir, env string) error {
 	if env != "" {
 		return fmt.Errorf("a Fly app has no environments (--env %q): %s deploys one app; a second app is a second directory", env, filepath.Join(dir, ConfigFile))
 	}
@@ -84,12 +43,12 @@ func noEnv(dir, env string) error {
 
 // App is the app dir's fly.toml deploys, with the developer's suffix.
 func App(dir string) (string, error) {
-	var cfg struct {
-		App string `toml:"app"`
-	}
 	path := filepath.Join(dir, ConfigFile)
-	if _, err := toml.DecodeFile(path, &cfg); err != nil {
-		return "", fmt.Errorf("%s: %w", path, err)
+	cfg, err := conf.Load[struct {
+		App string `toml:"app"`
+	}](path)
+	if err != nil {
+		return "", err
 	}
 	if cfg.App == "" {
 		return "", fmt.Errorf("%s has no app; add: app = \"<name>\"", path)
@@ -111,10 +70,7 @@ func URL(dir string) (string, error) {
 // explicitly; the committed fly.toml keeps the shared name. extra goes to
 // flyctl as typed (--ha=false, --remote-only, ...).
 func Deploy(out io.Writer, dir string, extra []string) error {
-	if err := installed(); err != nil {
-		return err
-	}
-	app, err := App(dir)
+	app, err := ready(dir)
 	if err != nil {
 		return err
 	}
@@ -136,11 +92,8 @@ func Deploy(out io.Writer, dir string, extra []string) error {
 // Destroy removes the app dir's fly.toml names, suffix included, or name
 // when given, with its machines and volumes. It says so and asks, unless yes.
 func Destroy(stdin io.Reader, out io.Writer, dir, name string, yes bool) error {
-	if err := installed(); err != nil {
-		return err
-	}
 	if name == "" {
-		app, err := App(dir)
+		app, err := ready(dir)
 		if err != nil {
 			return err
 		}
@@ -166,20 +119,15 @@ func ensureApp(out io.Writer, app string) error {
 	if err := fnox.Exec(".", nil, &list, FlyctlBin, "apps", "list", "--json"); err != nil {
 		return fmt.Errorf("flyctl apps list failed: %w. It needs FLY_API_TOKEN in fnox (a token from: flyctl tokens create org), or a login from: flyctl auth login", err)
 	}
-	var apps []struct {
+	type flyApp struct {
 		Name string `json:"Name"`
 	}
-	text := list.String()
-	if i := strings.Index(text, "["); i >= 0 {
-		text = text[i:]
+	apps, err := cli.DecodeJSON[[]flyApp]("flyctl's app list", list.String())
+	if err != nil {
+		return err
 	}
-	if err := json.Unmarshal([]byte(text), &apps); err != nil {
-		return fmt.Errorf("reading flyctl's app list: %w", err)
-	}
-	for _, a := range apps {
-		if a.Name == app {
-			return nil
-		}
+	if slices.ContainsFunc(apps, func(a flyApp) bool { return a.Name == app }) {
+		return nil
 	}
 	args := []string{FlyctlBin, "apps", "create", app}
 	if org := os.Getenv(OrgEnv); org != "" {
@@ -194,29 +142,31 @@ func ensureApp(out io.Writer, app string) error {
 
 // Logs streams the deployed app's logs in the foreground until interrupted.
 func Logs(dir string) error {
-	if err := installed(); err != nil {
-		return err
-	}
-	app, err := App(dir)
+	app, err := ready(dir)
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(fnox.Bin, "exec", "--", FlyctlBin, "logs", "--app", app)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	return cmd.Run()
+	return tool.Attached("", fnox.Bin, "exec", "--", FlyctlBin, "logs", "--app", app)
 }
 
 // PutSecret is `flyctl secrets import`, which reads NAME=VALUE lines on stdin
 // and releases the app with them, so the value is never an argument.
 func PutSecret(dir, name, value string) error {
-	if err := installed(); err != nil {
-		return err
-	}
-	app, err := App(dir)
+	app, err := ready(dir)
 	if err != nil {
 		return err
 	}
 	return fnox.Exec(".", strings.NewReader(name+"="+value+"\n"), io.Discard, FlyctlBin, "secrets", "import", "--app", app)
+}
+
+// ready is what every verb needs before it can do anything: flyctl on PATH,
+// and the app this directory names. Four verbs opened with the same six
+// lines, which is four places to forget one of them.
+func ready(dir string) (string, error) {
+	if err := installed(); err != nil {
+		return "", err
+	}
+	return App(dir)
 }
 
 func installed() error {
@@ -230,5 +180,4 @@ func installed() error {
 // package app wires it, since this package must not import that one.
 var (
 	lookPath = exec.LookPath
-	Wait     func(out io.Writer, url string, timeout time.Duration) error
 )

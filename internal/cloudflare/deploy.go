@@ -5,11 +5,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
 
+	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/fnox"
 	"github.com/joeblew999/dev/internal/suffix"
 )
@@ -126,8 +126,7 @@ func created(before, after []byte) ([]string, error) {
 		}
 		out = append(out, line)
 	}
-	slices.Sort(out)
-	return out, nil
+	return cli.Sorted(out), nil
 }
 
 // entriesOf is an array of tables however the decoder hands it back: inline
@@ -137,13 +136,10 @@ func entriesOf(v any) []map[string]any {
 	case []map[string]any:
 		return arr
 	case []any:
-		var out []map[string]any
-		for _, e := range arr {
-			if m, ok := e.(map[string]any); ok {
-				out = append(out, m)
-			}
-		}
-		return out
+		return cli.Collect(arr, func(e any) (map[string]any, bool) {
+			m, ok := e.(map[string]any)
+			return m, ok
+		})
 	}
 	return nil
 }

@@ -2,17 +2,16 @@ package cloudflare
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
-	"github.com/BurntSushi/toml"
-
+	"github.com/joeblew999/dev/cli"
+	"github.com/joeblew999/dev/internal/conf"
 	"github.com/joeblew999/dev/internal/fnox"
 	"github.com/joeblew999/dev/internal/suffix"
 )
@@ -50,9 +49,9 @@ func (c wranglerConfig) kvBindings(env string) []kvBinding {
 }
 
 func readWrangler(path string) (wranglerConfig, error) {
-	var cfg wranglerConfig
-	if _, err := toml.DecodeFile(path, &cfg); err != nil {
-		return cfg, fmt.Errorf("%s: %w", path, err)
+	cfg, err := conf.Load[wranglerConfig](path)
+	if err != nil {
+		return cfg, err
 	}
 	if cfg.Name == "" {
 		return cfg, fmt.Errorf("%s has no name; add one", path)
@@ -182,12 +181,12 @@ type localConfig struct {
 }
 
 func readLocal(path string) (map[string]string, error) {
-	var c localConfig
-	if _, err := toml.DecodeFile(path, &c); err != nil {
-		if os.IsNotExist(err) {
+	c, err := conf.Load[localConfig](path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
 			return map[string]string{}, nil
 		}
-		return nil, fmt.Errorf("%s: %w (it is this clone's file; fix or delete it)", path, err)
+		return nil, fmt.Errorf("%w (it is this clone's file; fix or delete it)", err)
 	}
 	if c.Env == nil {
 		c.Env = map[string]string{}
@@ -201,7 +200,7 @@ func writeLocal(path, key, value string) error {
 		return err
 	}
 	env[key] = value
-	keys := slices.Sorted(maps.Keys(env))
+	keys := cli.SortedKeys(env)
 	var b strings.Builder
 	b.WriteString("# Written by `dev url` from the Cloudflare account in fnox. Gitignored: it is\n")
 	b.WriteString("# this clone's. After switching accounts: dev url DIR --deployed --refresh\n")

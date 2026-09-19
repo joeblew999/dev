@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -19,6 +18,8 @@ import (
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/cloudflare"
 	"github.com/joeblew999/dev/internal/fnox"
+
+	"github.com/joeblew999/dev/cli/tool"
 )
 
 // BinDir is where every command's binary is built and run from, under a dot
@@ -50,14 +51,18 @@ const (
 // stdout is for data, and a task that depends on a build may be piped.
 func run(out io.Writer, dir string, env []string, name string, args ...string) error {
 	fmt.Fprintf(os.Stderr, "$ %s %s\n", name, strings.Join(args, " "))
-	cmd := exec.Command(name, args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), env...)
-	cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s %s (in %s): %w", name, strings.Join(args, " "), dir, err)
+	// Stdout to stderr on purpose: a build's output is progress, and stdout
+	// belongs to whatever the task piping this is building.
+	return tool.Cmd{Bin: name, Args: args, Dir: dir, Env: env}.Stream(os.Stderr)
+}
+
+// generate runs the gsx code generator when the directory has gsx sources.
+// Both build paths need it and both had written the same four lines.
+func generate(out io.Writer, d Dir) error {
+	if !d.GSX {
+		return nil
 	}
-	return nil
+	return run(out, d.Path, nil, GoBin, "tool", "gsx", "generate", "-q")
 }
 
 // Build builds the directory's binary: npm and gsx first where they apply,
@@ -85,10 +90,8 @@ func Build(out io.Writer, path string, asWorker bool, env string) error {
 			return err
 		}
 	}
-	if d.GSX {
-		if err := run(out, d.Path, nil, GoBin, "tool", "gsx", "generate", "-q"); err != nil {
-			return err
-		}
+	if err := generate(out, d); err != nil {
+		return err
 	}
 	if err := cli.Ignore(d.Root, BinDir); err != nil {
 		return err
@@ -110,10 +113,8 @@ func buildWorker(out io.Writer, d Dir, env string) error {
 	if !d.Wrangler {
 		return fmt.Errorf("%s has no wrangler.toml; it is not a Worker", d.Path)
 	}
-	if d.GSX {
-		if err := run(out, d.Path, nil, GoBin, "tool", "gsx", "generate", "-q"); err != nil {
-			return err
-		}
+	if err := generate(out, d); err != nil {
+		return err
 	}
 	var err error
 	{

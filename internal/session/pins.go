@@ -2,10 +2,10 @@ package session
 
 import (
 	"fmt"
-	"maps"
-	"slices"
 
-	"github.com/BurntSushi/toml"
+	"github.com/joeblew999/dev/internal/conf"
+
+	"github.com/joeblew999/dev/cli"
 )
 
 // pins is everything session.toml says: named sources, each a GitHub repo at
@@ -45,13 +45,12 @@ type sourcePins struct {
 // place a skill or a pin is named. Unknown keys fail: a typo must not silently
 // drop a source.
 func loadPins() (pins, error) {
-	var p pins
-	meta, err := toml.DecodeFile(pinsFile, &p)
+	p, unknown, err := conf.LoadStrict[pins](pinsFile)
 	if err != nil {
-		return pins{}, fmt.Errorf("%s: %w; fix the file, then: "+syncCmd, pinsFile, err)
+		return pins{}, fmt.Errorf("%w; fix the file, then: "+syncCmd, err)
 	}
-	if undecoded := meta.Undecoded(); len(undecoded) > 0 {
-		return pins{}, fmt.Errorf("%s: unknown key %q; fix the file, then: "+syncCmd, pinsFile, undecoded[0])
+	if len(unknown) > 0 {
+		return pins{}, fmt.Errorf("%s: unknown key %q; fix the file, then: "+syncCmd, pinsFile, unknown[0])
 	}
 	names := p.names()
 	for _, name := range names {
@@ -71,5 +70,5 @@ func loadPins() (pins, error) {
 
 // names returns source names in sorted order, so sync and check are stable.
 func (p pins) names() []string {
-	return slices.Sorted(maps.Keys(p.Source))
+	return cli.SortedKeys(p.Source)
 }

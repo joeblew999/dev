@@ -5,12 +5,15 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/joeblew999/dev/cli/tool"
+
+	"github.com/joeblew999/dev/cli"
 )
 
 // Claude Code reads .claude/skills when a session starts, so a session older
@@ -59,7 +62,8 @@ func newestModTime(dir string) (time.Time, bool) {
 // repo. It shells out to ps, which both macOS and Linux have; anything it cannot
 // work out is skipped, because this is only a warning.
 func claudeSessions(now time.Time) []session {
-	out, err := exec.Command(PsBin, "-eo", "pid=,etime=,command=").Output()
+	res, err := tool.Cmd{Bin: PsBin, Args: []string{"-eo", "pid=,etime=,command="}, Quiet: true}.Capture()
+	out := res.Out
 	if err != nil {
 		return nil
 	}
@@ -69,7 +73,7 @@ func claudeSessions(now time.Time) []session {
 	}
 
 	var sessions []session
-	for line := range strings.SplitSeq(string(out), "\n") {
+	for _, line := range cli.Lines(out) {
 		fields := strings.Fields(line)
 		if len(fields) < 3 || !isClaudeBinary(fields[2]) {
 			continue
@@ -128,11 +132,12 @@ func processCwd(pid int) string {
 		}
 		return ""
 	}
-	out, err := exec.Command(LsofBin, "-a", "-p", strconv.Itoa(pid), "-d", "cwd", "-Fn").Output()
+	res, err := tool.Cmd{Bin: LsofBin, Args: []string{"-a", "-p", strconv.Itoa(pid), "-d", "cwd", "-Fn"}, Quiet: true}.Capture()
+	out := res.Out
 	if err != nil {
 		return ""
 	}
-	for line := range strings.SplitSeq(string(out), "\n") {
+	for _, line := range cli.Lines(out) {
 		if after, ok := strings.CutPrefix(line, "n"); ok {
 			return after
 		}

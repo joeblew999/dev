@@ -13,15 +13,16 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 
-	"github.com/BurntSushi/toml"
+	"github.com/joeblew999/dev/internal/conf"
 
 	"github.com/joeblew999/dev/internal/cloudflare"
 	"github.com/joeblew999/dev/internal/fly"
+
+	"github.com/joeblew999/dev/cli/tool"
 )
 
 // Dir is what one command directory contains.
@@ -79,26 +80,24 @@ const cliPath = "github.com/joeblew999/dev/cli"
 // importsCLI reports whether the directory's package depends on cliPath. A
 // directory go list cannot read is not one; go build says why right after.
 func importsCLI(dir string) bool {
-	cmd := exec.Command(GoBin, "list", "-deps", "-f", "{{.ImportPath}}", ".")
-	cmd.Dir = dir
-	out, err := cmd.Output()
+	res, err := tool.Cmd{Bin: GoBin, Args: []string{"list", "-deps", "-f", "{{.ImportPath}}", "."}, Dir: dir, Combined: true, Quiet: true}.Capture()
 	if err != nil {
 		return false
 	}
-	return slices.Contains(strings.Split(string(out), "\n"), cliPath)
+	return slices.Contains(strings.Split(res.Out, "\n"), cliPath)
 }
 
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 func mains(file string) (map[string]string, error) {
-	var cfg struct {
+	cfg, err := conf.Load[struct {
 		Main string `toml:"main"`
 		Env  map[string]struct {
 			Main string `toml:"main"`
 		} `toml:"env"`
-	}
-	if _, err := toml.DecodeFile(file, &cfg); err != nil {
-		return nil, fmt.Errorf("%s: %w", file, err)
+	}](file)
+	if err != nil {
+		return nil, err
 	}
 	if cfg.Main == "" {
 		return nil, fmt.Errorf("%s has no main", file)
@@ -116,8 +115,6 @@ func mains(file string) (map[string]string, error) {
 // wasmOnly reports whether the directory's Go files are all behind js && wasm,
 // as a Worker entry point's are.
 func wasmOnly(dir string) bool {
-	cmd := exec.Command(GoBin, "list", "-f", "{{.Name}}", ".")
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	return err != nil && strings.Contains(string(out), "build constraints exclude all Go files")
+	res, _ := tool.Cmd{Bin: GoBin, Args: []string{"list", "-f", "{{.Name}}", "."}, Dir: dir, Combined: true, Quiet: true}.Capture()
+	return strings.Contains(res.Out, "build constraints exclude all Go files")
 }

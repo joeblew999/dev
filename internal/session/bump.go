@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
+
+	"github.com/joeblew999/dev/cli/tool"
+
+	"github.com/joeblew999/dev/cli"
 )
 
 // Bump moves every github source's pin in session.toml to upstream HEAD. It
@@ -75,7 +78,8 @@ func Bump(out io.Writer, sources []string) error {
 
 // lsRemoteHead returns upstream HEAD without cloning.
 func lsRemoteHead(repo string) (string, error) {
-	out, err := exec.Command(GitBin, "ls-remote", "https://github.com/"+repo, "HEAD").Output()
+	res, err := tool.Cmd{Bin: GitBin, Args: []string{"ls-remote", "https://github.com/" + repo, "HEAD"}}.Capture()
+	out := res.Out
 	if err != nil {
 		return "", fmt.Errorf("git ls-remote https://github.com/%s HEAD: %w", repo, err)
 	}
@@ -112,7 +116,7 @@ func rewriteRefs(path string, p pins) error {
 	}
 	var out []string
 	var section string
-	for line := range strings.SplitSeq(string(data), "\n") {
+	for _, line := range cli.Lines(string(data)) {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
 			section = strings.Trim(trimmed, "[]")

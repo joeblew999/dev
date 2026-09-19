@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/joeblew999/dev/cli/tool"
 )
 
 // chromePaths are where a headless-capable browser usually lives, per OS. The
@@ -86,13 +88,11 @@ func probe(out io.Writer, server, probe, path string) error {
 	if err != nil {
 		return err
 	}
-	app := exec.Command(server)
-	app.Env = append(os.Environ(), fmt.Sprintf(GoPortEnv+"=%d", appPort))
-	app.Stdout, app.Stderr = io.Discard, os.Stderr
-	if err := app.Start(); err != nil {
+	app, err := tool.Cmd{Bin: server, Env: []string{fmt.Sprintf(GoPortEnv+"=%d", appPort)}}.Start(io.Discard, os.Stderr)
+	if err != nil {
 		return fmt.Errorf("start %s: %w", server, err)
 	}
-	defer stop(app)
+	defer tool.Stop(app)
 
 	url := fmt.Sprintf("http://127.0.0.1:%d%s", appPort, path)
 	if err := waitFor(url, 15*time.Second); err != nil {
@@ -109,19 +109,18 @@ func probe(out io.Writer, server, probe, path string) error {
 	}
 	defer os.RemoveAll(profile)
 
-	browser := exec.Command(chrome,
+	browser, err := tool.Cmd{Bin: chrome, Args: []string{
 		"--headless",
 		"--disable-gpu",
 		"--no-first-run",
-		"--user-data-dir="+profile,
+		"--user-data-dir=" + profile,
 		fmt.Sprintf("--remote-debugging-port=%d", debugPort),
 		"about:blank",
-	)
-	browser.Stdout, browser.Stderr = io.Discard, io.Discard
-	if err := browser.Start(); err != nil {
+	}}.Start(io.Discard, io.Discard)
+	if err != nil {
 		return fmt.Errorf("start %s: %w", chrome, err)
 	}
-	defer stop(browser)
+	defer tool.Stop(browser)
 
 	endpoint := fmt.Sprintf("http://127.0.0.1:%d", debugPort)
 	if err := waitFor(endpoint+"/json/list", 20*time.Second); err != nil {
@@ -129,9 +128,7 @@ func probe(out io.Writer, server, probe, path string) error {
 	}
 
 	fmt.Fprintf(out, "%s driving %s\n\n", filepath.Base(chrome), url)
-	node := exec.Command(NodeBin, probe, endpoint, url)
-	node.Stdout, node.Stderr = out, os.Stderr
-	return node.Run()
+	return tool.Cmd{Bin: NodeBin, Args: []string{probe, endpoint, url}}.Stream(out)
 }
 
 // freePort asks the kernel for a port nobody is using, so two developers (or
@@ -161,11 +158,4 @@ func waitFor(url string, timeout time.Duration) error {
 		time.Sleep(100 * time.Millisecond)
 	}
 	return last
-}
-
-func stop(cmd *exec.Cmd) {
-	if cmd.Process != nil {
-		_ = cmd.Process.Kill()
-		_, _ = cmd.Process.Wait()
-	}
 }

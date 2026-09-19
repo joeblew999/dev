@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 
 	"golang.org/x/term"
@@ -21,6 +20,8 @@ import (
 	"github.com/joeblew999/dev/internal/app"
 	"github.com/joeblew999/dev/internal/fnox"
 	"github.com/joeblew999/dev/internal/gitrepo"
+
+	"github.com/joeblew999/dev/cli/tool"
 )
 
 // Usage is what dev prints for these verbs. It is markdown in a file beside
@@ -65,9 +66,6 @@ func PushFlags(fs *flag.FlagSet) {
 // parses what each declared in Subs, so none of them builds a FlagSet or
 // pulls a directory out of the arguments for itself.
 func runSet(c cli.Call) error {
-	if len(c.Args) != 1 {
-		return c.Usagef("give the secret's name or its owner")
-	}
 	name, err := Resolve(c.Value("names"), c.Args[0])
 	if err != nil {
 		return err
@@ -76,16 +74,10 @@ func runSet(c cli.Call) error {
 }
 
 func runPush(c cli.Call) error {
-	if len(c.Args) > 0 {
-		return c.Usagef("takes only the directory")
-	}
 	return Push(c.Stdin, c.Stdout, c.Dir, c.Value("env"), c.Value("fix"))
 }
 
 func runCI(c cli.Call) error {
-	if len(c.Args) == 0 {
-		return c.Usagef("give the names to push")
-	}
 	for _, name := range c.Args {
 		v, err := fnox.Get(name)
 		if err != nil || v == "" {
@@ -104,7 +96,7 @@ func runCI(c cli.Call) error {
 // name, a name maps to itself, anything else is an error naming what exists.
 func Resolve(names, arg string) (string, error) {
 	var known []string
-	for line := range strings.SplitSeq(names, "\n") {
+	for _, line := range cli.Lines(names) {
 		fields := strings.Fields(line)
 		if len(fields) == 0 {
 			continue
@@ -225,10 +217,8 @@ var CI = func(name, value string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(GhBin, "secret", "set", name, "--repo", slug)
-	cmd.Stdin = strings.NewReader(value)
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	err = tool.Cmd{Bin: GhBin, Pin: `gh = "latest"`, Args: []string{"secret", "set", name, "--repo", slug}, Stdin: strings.NewReader(value)}.Stream(io.Discard)
+	if err != nil {
 		return fmt.Errorf("gh secret set %s failed: %w (gh must be logged in with access to this repo)", name, err)
 	}
 	return nil

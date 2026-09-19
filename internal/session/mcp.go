@@ -7,15 +7,19 @@ package session
 import (
 	"fmt"
 	"io"
-	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/joeblew999/dev/cli"
+
+	"github.com/joeblew999/dev/cli/tool"
 )
 
 // MCP runs `claude mcp list` and fails on any server that does not connect.
 func MCP(stdout, stderr io.Writer) error {
-	out, err := exec.Command(ClaudeBin, "mcp", "list").CombinedOutput()
-	fmt.Fprint(stdout, string(out))
+	res, err := tool.Cmd{Bin: ClaudeBin, Pin: claudePin, Args: []string{"mcp", "list"}, Combined: true}.Capture()
+	out := res.Out
+	fmt.Fprint(stdout, out)
 	if err != nil && len(out) == 0 {
 		return fmt.Errorf("claude mcp list: %w (is Claude Code installed?)", err)
 	}
@@ -37,11 +41,10 @@ var unusable = regexp.MustCompile(`(?i)needs authentication|failed to connect|âœ
 // Unusable returns the lines of a `claude mcp list` report naming a server
 // that a fresh clone could not use.
 func Unusable(report string) []string {
-	var bad []string
-	for line := range strings.SplitSeq(report, "\n") {
+	return cli.Collect(strings.Split(report, "\n"), func(line string) (string, bool) {
 		if unusable.MatchString(line) {
-			bad = append(bad, strings.TrimSpace(line))
+			return strings.TrimSpace(line), true
 		}
-	}
-	return bad
+		return "", false
+	})
 }

@@ -8,18 +8,20 @@ package session
 
 import (
 	_ "embed"
-	"io"
-	"strings"
-
-	"github.com/BurntSushi/toml"
+	"flag"
 
 	"github.com/joeblew999/dev/cli"
+	"github.com/joeblew999/dev/internal/conf"
 )
 
 // The binaries session shells out to: claude runs the session checks,
 // git reads remotes and upstream refs, ps and lsof find live sessions.
 const (
 	ClaudeBin = "claude"
+	// claudePin is what installs it, quoted when it is missing. Claude Code
+	// is installed by its own installer rather than by mise, so this names
+	// that instead of a [tools] line.
+	claudePin = "install Claude Code: https://claude.com/product/claude-code"
 	GitBin    = "git"
 	PsBin     = "ps"
 	LsofBin   = "lsof"
@@ -38,52 +40,39 @@ var syncCmd = "mise run session:sync"
 //go:embed usage.md
 var Usage string
 
-// Run is `dev session sync|check|verify|bump|mcp`.
-// Subs are session's subcommands. Only verify takes a flag, and it parses it
-// by hand rather than through a FlagSet, so it is declared here as the
-// positional it really is.
+// Subs are session's subcommands, each declaring what it takes the way every
+// other verb on the stack does: cli parses the flags and the positionals, so
+// this package no longer carries a switch over args[0], a requireNoArgs, or a
+// hand-rolled reader for one bool flag. That trio was the pre-Call shape, and
+// it is why session sat out of the verb table while every other package moved.
 var Subs = map[string]cli.Verb{
-	"sync":   {},
-	"check":  {},
-	"verify": {Args: "[--update]"},
-	"bump":   {Args: "[source]"},
-	"mcp":    {},
+	"sync":   {Run: withPins(func(c cli.Call) error { return Sync(c.Stdout) }), Desc: "write .claude/skills and the .claude/settings.json keys session.toml implies"},
+	"check":  {Run: withPins(func(c cli.Call) error { return Check(c.Stdout) }), Desc: "fail when either has drifted from session.toml"},
+	"verify": {Run: withPins(runVerify), Flags: VerifyFlags, Desc: "hold a fresh Claude Code session against SESSION.lock"},
+	"bump":   {Run: withPins(runBump), Args: "[SOURCE...]", Desc: "move a pin in session.toml to upstream HEAD"},
+	"mcp":    {Run: withPins(func(c cli.Call) error { return MCP(c.Stdout, c.Stderr) }), Desc: "every MCP server .mcp.json declares connects"},
 }
 
-func Run(verb string, args []string, stdout, stderr io.Writer) error {
-	if cli.HelpRequested(args) {
-		return cli.ErrHelp
+// VerifyFlags is verify's only flag. cli.Bool takes "" as false, so a mise
+// task may pass `--update=$usage_update` with the variable unset — which is
+// the whole reason this package once read the flag by hand.
+func VerifyFlags(fs *flag.FlagSet) {
+	fs.Var(new(cli.Bool), "update", "record this session in SESSION.lock instead of only reporting")
+}
+
+func runVerify(c cli.Call) error { return Verify(c.Stdout, c.Given("update")) }
+
+func runBump(c cli.Call) error { return Bump(c.Stdout, c.Args) }
+
+// withPins reads session.toml's sync_command before the subcommand runs, so
+// every error that a sync would fix names this repo's own way of running one.
+// A wrapper rather than a line at the top of five functions: it is one fact,
+// and five copies of it drift the moment a sixth subcommand is written.
+func withPins(run cli.Runner) cli.Runner {
+	return func(c cli.Call) error {
+		applySyncCommand()
+		return run(c)
 	}
-	applySyncCommand()
-	if len(args) == 0 {
-		return cli.Usagef("session: sync, check, verify, bump or mcp")
-	}
-	switch args[0] {
-	case "sync":
-		if err := requireNoArgs(args); err != nil {
-			return err
-		}
-		return Sync(stdout)
-	case "check":
-		if err := requireNoArgs(args); err != nil {
-			return err
-		}
-		return Check(stdout)
-	case "verify":
-		update, ok := updateFlag(args[1:])
-		if !ok {
-			return cli.Usagef("session verify takes only --update")
-		}
-		return Verify(stdout, update)
-	case "bump":
-		return Bump(stdout, args[1:])
-	case "mcp":
-		if err := requireNoArgs(args); err != nil {
-			return err
-		}
-		return MCP(stdout, stderr)
-	}
-	return cli.Usagef("session: unknown subcommand %q", args[0])
 }
 
 // applySyncCommand takes sync_command from session.toml before anything runs,
@@ -91,40 +80,10 @@ func Run(verb string, args []string, stdout, stderr io.Writer) error {
 // still name this repo's own way of running a sync. A broken or missing file
 // is not this function's business; whatever runs next reports it properly.
 func applySyncCommand() {
-	var config struct {
+	config, err := conf.Load[struct {
 		SyncCommand string `toml:"sync_command"`
-	}
-	if _, err := toml.DecodeFile(pinsFile, &config); err == nil && config.SyncCommand != "" {
+	}](pinsFile)
+	if err == nil && config.SyncCommand != "" {
 		syncCmd = config.SyncCommand
 	}
-}
-
-func requireNoArgs(args []string) error {
-	if len(args) != 1 {
-		return cli.Usagef("session %s takes no arguments", args[0])
-	}
-	return nil
-}
-
-// updateFlag reads verify's only flag. A mise task passes
-// `--update=$usage_update`, which is `--update=` when nobody gave the flag.
-func updateFlag(args []string) (update, ok bool) {
-	if len(args) == 0 {
-		return false, true
-	}
-	if len(args) != 1 {
-		return false, false
-	}
-	name, value, given := strings.Cut(args[0], "=")
-	if name != "--update" {
-		return false, false
-	}
-	if !given {
-		return true, true // a bare --update means yes
-	}
-	var b cli.Bool
-	if err := b.Set(value); err != nil {
-		return false, false
-	}
-	return bool(b), true
 }

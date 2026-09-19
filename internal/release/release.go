@@ -17,12 +17,12 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/joeblew999/dev/cli"
+	"github.com/joeblew999/dev/cli/tool"
 	"github.com/joeblew999/dev/internal/gitrepo"
 	"github.com/joeblew999/dev/internal/secrets"
 )
@@ -111,11 +111,7 @@ var binaryLine = regexp.MustCompile(`(?m)^\s*binary:\s*"?([^"\s]+)"?\s*$`)
 
 // binaries is every `binary:` a goreleaser config names, in order.
 func binaries(config []byte) []string {
-	var out []string
-	for _, m := range binaryLine.FindAllSubmatch(config, -1) {
-		out = append(out, string(m[1]))
-	}
-	return out
+	return cli.Map(binaryLine.FindAllSubmatch(config, -1), func(m [][]byte) string { return string(m[1]) })
 }
 
 // goreleaserConfig is the one every repo on this stack would otherwise copy:
@@ -156,15 +152,11 @@ changelog:
 
 // run streams a command's output; the caller sees goreleaser, packslip and gh
 // exactly as if they had run them by hand.
-func run(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	return cmd.Run()
-}
+func run(name string, args ...string) error { return tool.Attached("", name, args...) }
 
 func out(name string, args ...string) (string, error) {
-	raw, err := exec.Command(name, args...).Output()
-	return strings.TrimSpace(string(raw)), err
+	res, err := tool.Cmd{Bin: name, Args: args, Quiet: true}.Capture()
+	return strings.TrimSpace(res.Out), err
 }
 
 // slug is owner/repo, from the origin remote.
@@ -224,7 +216,7 @@ func (r *release) snapshot() error {
 		return err
 	}
 	version, tag := snapshotVersion(describe)
-	commit, err := out("git", "rev-parse", "HEAD")
+	commit, err := head()
 	if err != nil {
 		return err
 	}
@@ -297,7 +289,7 @@ func (r *release) publish(version string) error {
 	if err := run("git", "push", "origin", "refs/tags/"+tag); err != nil {
 		return err
 	}
-	commit, err := out("git", "rev-parse", "HEAD")
+	commit, err := head()
 	if err != nil {
 		return err
 	}
@@ -358,9 +350,21 @@ func (r *release) publish(version string) error {
 // This repo published v2.0.0 and v3.0.0 before anything checked, and found
 // out when a consumer could not import them. Nothing here can unpublish a
 // tag, so the check is before one is made.
-func majorFitsModule(tag string) error {
+// majorOf is a tag's major version, 0 when it has none this cares about. Two
+// checks asked the same question and each wrote the Sscanf that answers it.
+// head is the commit a release is cut from.
+func head() (string, error) { return out("git", "rev-parse", "HEAD") }
+
+func majorOf(tag string) int {
 	var major int
-	if _, err := fmt.Sscanf(tag, "v%d.", &major); err != nil || major < 2 {
+	if _, err := fmt.Sscanf(tag, "v%d.", &major); err != nil {
+		return 0
+	}
+	return major
+}
+
+func majorFitsModule(tag string) error {
+	if majorOf(tag) < 2 {
 		return nil
 	}
 	path, err := modulePath()
@@ -373,8 +377,8 @@ func majorFitsModule(tag string) error {
 // majorFits is the rule itself, given the path, so a test can ask it without
 // a go.mod to read.
 func majorFits(tag, path string) error {
-	var major int
-	if _, err := fmt.Sscanf(tag, "v%d.", &major); err != nil || major < 2 {
+	major := majorOf(tag)
+	if major < 2 {
 		return nil
 	}
 	want := fmt.Sprintf("/v%d", major)
@@ -391,7 +395,7 @@ func modulePath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("reading go.mod to check the version: %w", err)
 	}
-	for line := range strings.SplitSeq(string(data), "\n") {
+	for _, line := range cli.Lines(string(data)) {
 		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "module "); ok {
 			return strings.TrimSpace(rest), nil
 		}

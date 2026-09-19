@@ -10,7 +10,6 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -106,19 +105,4 @@ func readDir(dir string) (skillFiles, error) {
 func isSymlink(p string) bool {
 	info, err := os.Lstat(p)
 	return err == nil && info.Mode()&os.ModeSymlink != 0
-}
-
-func run(dir, name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	cmd.Dir = dir
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-func output(dir, name string, args ...string) (string, error) {
-	cmd := exec.Command(name, args...)
-	cmd.Dir = dir
-	cmd.Stderr = os.Stderr
-	out, err := cmd.Output()
-	return strings.TrimSpace(string(out)), err
 }

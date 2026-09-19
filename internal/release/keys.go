@@ -24,6 +24,8 @@ import (
 
 	"github.com/joeblew999/dev/internal/fnox"
 	"github.com/joeblew999/dev/internal/secrets"
+
+	"github.com/joeblew999/dev/cli"
 )
 
 // signingKey writes the key to a file packslip can read and returns its path,
@@ -56,7 +58,7 @@ func Pubkey(dir string) string {
 	if err != nil {
 		return ""
 	}
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	lines := cli.Lines(string(data))
 	return strings.TrimSpace(lines[len(lines)-1])
 }
 

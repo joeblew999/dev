@@ -6,8 +6,9 @@ import (
 	"io"
 	"os"
 	"reflect"
-	"slices"
 	"strings"
+
+	"github.com/joeblew999/dev/cli"
 )
 
 // The repo's own Claude Code settings. Only the keys below are written here;
@@ -85,7 +86,7 @@ func checkSettings(c claudePins) error {
 	}
 	if diff := diffSettings(have, wantSettings(c)); len(diff) > 0 {
 		return fmt.Errorf("%s does not match [claude] in %s:\n%sfix with: "+syncCmd,
-			settingsFile, pinsFile, indent(strings.Join(diff, "\n")))
+			settingsFile, pinsFile, cli.Indent(strings.Join(diff, "\n")))
 	}
 	return nil
 }
@@ -93,21 +94,7 @@ func checkSettings(c claudePins) error {
 // diffSettings compares only the generated keys; the rest of the file is none
 // of this package's business.
 func diffSettings(have, want map[string]any) []string {
-	var diff []string
-	for _, key := range ownedKeys {
-		haveValue, haveOK := have[key]
-		wantValue, wantOK := want[key]
-		switch {
-		case wantOK && !haveOK:
-			diff = append(diff, "missing: "+key)
-		case !wantOK && haveOK:
-			diff = append(diff, "unexpected: "+key)
-		case wantOK && !reflect.DeepEqual(haveValue, wantValue):
-			diff = append(diff, "changed: "+key)
-		}
-	}
-	slices.Sort(diff)
-	return diff
+	return cli.DiffKeys(ownedKeys, have, want, reflect.DeepEqual)
 }
 
 // readSettings returns the settings file, or an empty set when there is none
@@ -158,9 +145,8 @@ func checkPortablePaths() error {
 		}
 	}
 	if len(bad) > 0 {
-		slices.Sort(bad)
 		return fmt.Errorf("a command is named by absolute path, so it only works on the machine that wrote it:\n%sname it bare (\"mise\", not \"/opt/homebrew/bin/mise\") so PATH finds it in every clone",
-			indent(strings.Join(bad, "\n")))
+			cli.Indent(strings.Join(cli.Sorted(bad), "\n")))
 	}
 	return nil
 }

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/joeblew999/dev/cli"
 )
 
 func writeFile(name, content string) error {
@@ -247,8 +249,11 @@ func TestSessionLockRecordsWhichClaudeCodeWroteIt(t *testing.T) {
 }
 
 // A bare --update once parsed as --update= and so as false: verify refused
-// the very change it was asked to record.
-func TestUpdateFlag(t *testing.T) {
+// the very change it was asked to record. The flag is registered with cli
+// now, so this drives the real registration rather than a reader beside it —
+// including the `--update=` a mise task sends when its variable is unset, and
+// the stray positional cli rejects for a verb that declares no Args.
+func TestVerifyUpdateFlag(t *testing.T) {
 	for _, c := range []struct {
 		args       []string
 		update, ok bool
@@ -257,11 +262,25 @@ func TestUpdateFlag(t *testing.T) {
 		{[]string{"--update"}, true, true},
 		{[]string{"--update=true"}, true, true},
 		{[]string{"--update=false"}, false, true},
+		{[]string{"--update="}, false, true},
 		{[]string{"--other"}, false, false},
 		{[]string{"--update", "x"}, false, false},
 	} {
-		if update, ok := updateFlag(c.args); update != c.update || ok != c.ok {
-			t.Errorf("updateFlag(%q) = %v, %v; want %v, %v", c.args, update, ok, c.update, c.ok)
+		fs := cli.Flags("session verify", io.Discard)
+		VerifyFlags(fs)
+		rest, err := cli.ParseInterleaved(fs, c.args)
+		if err == nil && len(rest) > 0 {
+			err = cli.Usagef("session verify: takes no arguments")
+		}
+		if ok := err == nil; ok != c.ok {
+			t.Errorf("parse(%q) error %v; want ok %v", c.args, err, c.ok)
+			continue
+		}
+		if err != nil {
+			continue
+		}
+		if got := cli.Given(fs, "update"); got != c.update {
+			t.Errorf("parse(%q) update %v; want %v", c.args, got, c.update)
 		}
 	}
 }
