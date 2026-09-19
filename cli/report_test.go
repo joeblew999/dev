@@ -4,6 +4,7 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"io"
@@ -272,3 +273,64 @@ func TestReportFlagsAreRegistered(t *testing.T) {
 }
 
 var _ = flag.ErrHelp
+
+// Finish is the tail every checking verb shares, so what it promises is held
+// here rather than in whichever verb was written first.
+func TestFinishIsTheWholeTail(t *testing.T) {
+	dir := t.TempDir()
+	var out bytes.Buffer
+	c := reportCall(t, "--record", dir, "--quiet")
+	c.Stdout = &out
+
+	r := NewReport("tool", "a target")
+	r.Add(Finding{Tool: "t", Severity: SevWarning, ID: "w", Message: "m"})
+	wrote := false
+	err := c.Finish(r, time.Now(), func(*Report) { wrote = true })
+
+	// A warning does not fail the default gate, and the prose renderer runs
+	// because nothing asked for JSON.
+	if err != nil {
+		t.Errorf("a warning failed the default gate: %v", err)
+	}
+	if !wrote {
+		t.Error("the prose renderer did not run")
+	}
+	if r.Outcome != "pass" || r.BySeverity[SevWarning] != 1 {
+		t.Errorf("report = %s %v; want pass with one warning", r.Outcome, r.BySeverity)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "latest.json")); err != nil {
+		t.Errorf("--record wrote nothing: %v", err)
+	}
+
+	// An error fails, and a verb with a better sentence than the counts says
+	// it instead.
+	bad := NewReport("tool", "a target")
+	bad.Add(Finding{Severity: SevError, ID: "e"})
+	bad.Fail = "fix it with: some command"
+	if err := c.Finish(bad, time.Now(), nil); err == nil || err.Error() != "fix it with: some command" {
+		t.Errorf("err = %v; want the report's own sentence", err)
+	}
+
+	// Without one, the counts are the sentence.
+	plain := NewReport("tool", "a target")
+	plain.Add(Finding{Severity: SevError, ID: "e"})
+	err = c.Finish(plain, time.Now(), nil)
+	if err == nil || !strings.Contains(err.Error(), "1 error") {
+		t.Errorf("err = %v; want the counts", err)
+	}
+
+	// Asking for JSON means the prose renderer is not called at all.
+	js := reportCall(t, "--json")
+	var jsOut bytes.Buffer
+	js.Stdout = &jsOut
+	called := false
+	if err := js.Finish(NewReport("tool", "t"), time.Now(), func(*Report) { called = true }); err != nil {
+		t.Fatal(err)
+	}
+	if called {
+		t.Error("the prose renderer ran for a JSON answer")
+	}
+	if !strings.Contains(jsOut.String(), `"outcome"`) {
+		t.Errorf("stdout is not the report: %q", jsOut.String())
+	}
+}

@@ -95,6 +95,10 @@ type Report struct {
 	Took    string    `json:"took"`
 	TookMs  int64     `json:"tookMs"`
 
+	// Fail is what to say when the gate trips, for a verb whose failure has
+	// a better sentence than the counts. Empty is the counts.
+	Fail string `json:"-"`
+
 	BySeverity map[string]int `json:"bySeverity"`
 	ByTool     map[string]int `json:"byTool"`
 	Steps      []Step         `json:"steps"`
@@ -145,6 +149,55 @@ func (r *Report) Done(started time.Time, failOn string) {
 	r.Outcome = "pass"
 	if r.Failed(failOn) {
 		r.Outcome = "fail"
+	}
+}
+
+// Finish is the tail every checking verb shares: total the report, answer in
+// the shape asked for, keep the run when asked and say what moved since the
+// last one, then fail when something must be fixed.
+//
+// write is the only part that differs — how this verb says it in prose —
+// and a verb that answers in JSON never calls it.
+func (c Call) Finish(r *Report, started time.Time, write func(*Report)) error {
+	r.Sort()
+	r.Done(started, c.Value("fail-on"))
+	if c.WantsJSON() {
+		if err := c.EmitJSON(r); err != nil {
+			return err
+		}
+	} else if write != nil {
+		write(r)
+	}
+	if path, err := c.Record(r); err == nil && path != "" && !c.Given("quiet") {
+		fmt.Fprintf(c.Stderr, "recorded: %s\n", path)
+		if prev, ok := c.Previous(r, path); ok {
+			c.drift(prev, r)
+		}
+	}
+	if r.Outcome == "pass" {
+		return nil
+	}
+	if r.Fail != "" {
+		return fmt.Errorf("%s", r.Fail)
+	}
+	return fmt.Errorf("%s: %s, %s", r.Target,
+		Plural(r.BySeverity[SevError], "error"), Plural(r.BySeverity[SevWarning], "warning"))
+}
+
+// drift says what moved since the last recorded run: the point of keeping a
+// history is seeing which way things went, not the total.
+func (c Call) drift(prev, cur *Report) {
+	fixed, arrived := Drift(prev, cur)
+	if len(fixed)+len(arrived) == 0 {
+		fmt.Fprintf(c.Stderr, "  no change since %s\n", prev.RanAt.Format(time.RFC3339))
+		return
+	}
+	fmt.Fprintf(c.Stderr, "\n  since %s\n", prev.RanAt.Format(time.RFC3339))
+	for _, f := range fixed {
+		fmt.Fprintf(c.Stderr, "    FIXED  %-12s %s\n", f.Tool, Or(f.ID, f.Message))
+	}
+	for _, f := range arrived {
+		fmt.Fprintf(c.Stderr, "    NEW    %-12s %s — %s\n", f.Tool, f.ID, f.Message)
 	}
 }
 

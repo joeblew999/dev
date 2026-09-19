@@ -114,7 +114,7 @@ func runCheck(c cli.Call) error {
 		return err
 	}
 	Audit(c, rep, c.Args[0], maxPages, pick)
-	return finish(c, rep, started)
+	return c.Finish(rep, started, func(r *cli.Report) { write(c, r) })
 }
 
 // runWrite is `dev seo write DIR`.
@@ -138,7 +138,7 @@ func runWrite(c cli.Call) error {
 	if err := Write(c, c.Dir, site, rep, pick); err != nil {
 		return err
 	}
-	return finish(c, rep, started)
+	return c.Finish(rep, started, func(r *cli.Report) { write(c, r) })
 }
 
 // runValidate is `dev seo validate DIR`.
@@ -150,7 +150,7 @@ func runValidate(c cli.Call) error {
 	if err := Validate(c.Dir, originOf(c.Value("url")), rep, pick); err != nil {
 		return err
 	}
-	return finish(c, rep, started)
+	return c.Finish(rep, started, func(r *cli.Report) { write(c, r) })
 }
 
 // sitemapURLs is what the sitemap should list: an explicit file when given —
@@ -173,51 +173,6 @@ func sitemapURLs(c cli.Call, url string) ([]string, error) {
 		return nil, c.Usagef("--urls: %s lists no URLs", file)
 	}
 	return cli.Map(urls, strings.TrimSpace), nil
-}
-
-// finish is the tail every subcommand shares: total the report, answer in the
-// shape asked for, keep a record when asked, and fail when something must be
-// fixed.
-func finish(c cli.Call, rep *cli.Report, started time.Time) error {
-	rep.Sort()
-	rep.Done(started, c.Value("fail-on"))
-	if c.WantsJSON() {
-		if err := c.EmitJSON(rep); err != nil {
-			return err
-		}
-	} else {
-		write(c, rep)
-	}
-	if path, err := c.Record(rep); err == nil && path != "" {
-		if !c.Given("quiet") {
-			fmt.Fprintf(c.Stderr, "recorded: %s\n", path)
-		}
-		if prev, ok := c.Previous(rep, path); ok {
-			drift(c, prev, rep)
-		}
-	}
-	if rep.Outcome != "pass" {
-		return fmt.Errorf("%s: %s, %s", rep.Target,
-			cli.Plural(rep.BySeverity[cli.SevError], "error"), cli.Plural(rep.BySeverity[cli.SevWarning], "warning"))
-	}
-	return nil
-}
-
-// drift says what moved since the last recorded run, which is the point of
-// keeping a history: a total says where you are, a diff says which way.
-func drift(c cli.Call, prev, cur *cli.Report) {
-	fixed, arrived := cli.Drift(prev, cur)
-	if len(fixed)+len(arrived) == 0 {
-		fmt.Fprintf(c.Stderr, "  no change since %s\n", prev.RanAt.Format(time.RFC3339))
-		return
-	}
-	fmt.Fprintf(c.Stderr, "\n  since %s\n", prev.RanAt.Format(time.RFC3339))
-	for _, f := range fixed {
-		fmt.Fprintf(c.Stderr, "    FIXED  %-12s %s\n", f.Tool, f.ID)
-	}
-	for _, f := range arrived {
-		fmt.Fprintf(c.Stderr, "    NEW    %-12s %s — %s\n", f.Tool, f.ID, f.Message)
-	}
 }
 
 // Audit runs every selected checker against url and merges what they found.

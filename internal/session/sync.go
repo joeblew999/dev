@@ -106,25 +106,8 @@ func Check(c cli.Call) error {
 		rep.Ran(step)
 	}
 	warnStaleSessions(c.Stderr, time.Now())
-	rep.Sort()
-	rep.Done(started, c.Value("fail-on"))
-	if c.WantsJSON() {
-		if err := c.EmitJSON(rep); err != nil {
-			return err
-		}
-	} else {
-		writeReport(c, rep)
-	}
-	if path, err := c.Record(rep); err == nil && path != "" && !c.Given("quiet") {
-		fmt.Fprintf(c.Stderr, "recorded: %s\n", path)
-		if prev, ok := c.Previous(rep, path); ok {
-			drift(c, prev, rep)
-		}
-	}
-	if rep.Outcome != "pass" {
-		return fmt.Errorf("%s does not match session.toml; fix with: "+syncCmd, skillsDir)
-	}
-	return nil
+	rep.Fail = skillsDir + " does not match session.toml; fix with: " + syncCmd
+	return c.Finish(rep, started, func(r *cli.Report) { writeReport(c, r) })
 }
 
 // lockedSkills is the vendored skills against what the lock records.
@@ -165,17 +148,6 @@ func writeReport(c cli.Call, r *cli.Report) {
 	}
 	fmt.Fprintf(c.Stdout, "%s in %s: %s\n", r.Outcome, r.Took,
 		cli.Plural(r.BySeverity[cli.SevError], "problem"))
-}
-
-// drift says what moved since the last recorded run.
-func drift(c cli.Call, prev, cur *cli.Report) {
-	fixed, arrived := cli.Drift(prev, cur)
-	for _, f := range fixed {
-		fmt.Fprintf(c.Stderr, "    FIXED  %s\n", f.Message)
-	}
-	for _, f := range arrived {
-		fmt.Fprintf(c.Stderr, "    NEW    %s\n", f.Message)
-	}
 }
 
 // pinnedSkills collects every skill at its pinned version. The lock records
