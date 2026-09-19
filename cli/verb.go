@@ -104,7 +104,7 @@ func (v Verb) parse(verb string, args []string, stdout, stderr io.Writer) (Call,
 			return c, err
 		}
 		c.Dir, c.Args = dir, rest
-		return c, nil
+		return c, v.checkArgs(verb, rest, 1)
 	}
 	if HelpRequested(args) {
 		fs.Usage()
@@ -114,6 +114,61 @@ func (v Verb) parse(verb string, args []string, stdout, stderr io.Writer) (Call,
 	if err != nil {
 		return c, Usagef("%s: %v", verb, err)
 	}
+	// Args is the one place that knows what a verb takes, so cli holds a call
+	// to it rather than each verb opening with its own length check. Four
+	// verbs had written one, in four wordings, and every other verb that
+	// should have had one silently ignored whatever it was handed.
+	if err := v.checkArgs(verb, rest, 0); err != nil {
+		return c, err
+	}
 	c.Args = rest
 	return c, nil
+}
+
+// checkArgs holds a call to what Args declares. A bare word is required, a
+// [bracketed] one optional, and one ending in ... takes the rest — the shapes
+// a manual already used, now read rather than only printed.
+func (v Verb) checkArgs(verb string, rest []string, skip int) error {
+	need, most, variadic := v.arity(skip)
+	switch {
+	case len(rest) < need:
+		return Usagef("%s: needs %s", verb, v.Args)
+	case !variadic && len(rest) > most && v.Args == "":
+		return Usagef("%s: takes no arguments", verb)
+	case !variadic && len(rest) > most:
+		return Usagef("%s: takes %s", verb, v.Args)
+	}
+	return nil
+}
+
+// arity reads Args: how many positionals are required, how many are accepted,
+// and whether the last one swallows the rest.
+// Skip is how many leading words are already accounted for: one for a verb
+// whose Args begin with DIR, since cli pulled the directory out before this.
+func (v Verb) arity(skip int) (need, most int, variadic bool) {
+	words := strings.Fields(v.Args)
+	if skip < len(words) {
+		words = words[skip:]
+	} else {
+		words = nil
+	}
+	for _, word := range words {
+		switch {
+		case word == "--" || strings.HasPrefix(word, "[--"):
+			// Everything after a bare -- belongs to the program being run.
+			return need, most, true
+		case strings.HasSuffix(word, "..."):
+			// NAME... is one or more; [SOURCE...] is none or more.
+			if !strings.HasPrefix(word, "[") {
+				need++
+			}
+			return need, most, true
+		case strings.HasPrefix(word, "["):
+			most++
+		default:
+			need++
+			most++
+		}
+	}
+	return need, most, variadic
 }

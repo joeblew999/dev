@@ -214,7 +214,7 @@ func TestFlattenLeavesLegacyTextUnchanged(t *testing.T) {
 func TestHelpIsNotAnError(t *testing.T) {
 	c := testHelpCommand()
 	var out, errOut strings.Builder
-	if code := c.run([]string{"go", "--help"}, &out, &errOut); code != 0 {
+	if code := c.Run([]string{"go", "--help"}, &out, &errOut); code != 0 {
 		t.Errorf("--help exited %d, want 0", code)
 	}
 	if !strings.Contains(out.String(), "what it is for") {
@@ -247,7 +247,7 @@ func TestTopLevelHelpAnswersRatherThanCorrects(t *testing.T) {
 		{nil, 2, false},
 	} {
 		var out, errOut strings.Builder
-		got := c.run(tc.args, &out, &errOut)
+		got := c.Run(tc.args, &out, &errOut)
 		if got != tc.code {
 			t.Errorf("run(%v) exited %d, want %d", tc.args, got, tc.code)
 		}

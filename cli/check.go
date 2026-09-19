@@ -57,13 +57,17 @@ func CheckSkill(t TB, c Command) {
 // read). Keeping the list closed is what stops Flatten growing into a
 // markdown engine: a new construct is a decision, not a patch.
 //
+// banned is a shape the terminal rendering cannot read, and the name it is
+// called in the complaint. Both tables below declared this same struct.
+type banned struct {
+	name string
+	re   *regexp.Regexp
+}
+
 // bannedLines are whole-line shapes, matched on the line as written. They
 // cannot be matched after inline code is blanked, because a fence is itself
 // backticks: blanking would eat it and the check would pass.
-var bannedLines = []struct {
-	name string
-	re   *regexp.Regexp
-}{
+var bannedLines = []banned{
 	{"a code fence", regexp.MustCompile("^\\s*```")},
 	{"a table", regexp.MustCompile(`^\s*\|`)},
 	{"a numbered list", regexp.MustCompile(`^\s*\d+\.\s`)},
@@ -74,10 +78,7 @@ var bannedLines = []struct {
 
 // bannedSpans are inline shapes, matched only outside inline code, so that
 // what a code span protects is never mistaken for markup.
-var bannedSpans = []struct {
-	name string
-	re   *regexp.Regexp
-}{
+var bannedSpans = []banned{
 	{"a link or image", regexp.MustCompile(`!?\[[^\]]*\]\([^)]*\)`)},
 	{"emphasis (* and _ stay literal here, so globs stay globs)", regexp.MustCompile(`\*\*?[^*\s][^*]*\*\*?|(^|\s)_[^_]+_(\s|$)`)},
 }
@@ -110,7 +111,7 @@ var inlineCode = regexp.MustCompile("`[^`]*`")
 func CheckUsage(t TB, c Command) {
 	t.Helper()
 	verbs := c.all()
-	for _, name := range sortedVerbs(verbs) {
+	for _, name := range SortedKeys(verbs) {
 		for _, problem := range usageProblems(verbs[name].Usage) {
 			t.Errorf("%s %s usage: %s", c.Name, name, problem)
 		}
@@ -124,16 +125,20 @@ func CheckUsage(t TB, c Command) {
 // messages naming the line and its fix.
 func usageProblems(md string) []string {
 	var out []string
-	for i, line := range strings.Split(strings.TrimRight(md, "\n"), "\n") {
-		for _, b := range bannedLines {
-			if b.re.MatchString(line) {
-				out = append(out, fmt.Sprintf("line %d uses %s, which the terminal rendering does not read: %q", i+1, b.name, line))
-			}
-		}
+	for i, line := range Lines(md) {
+		// Some patterns are read on the line as written and some with inline
+		// code removed, because a `*` inside backticks is literal while a
+		// heading is a heading wherever it is. The complaint is the same
+		// either way, so it is written once.
 		bare := inlineCode.ReplaceAllString(line, "")
-		for _, b := range bannedSpans {
-			if b.re.MatchString(bare) {
-				out = append(out, fmt.Sprintf("line %d uses %s, which the terminal rendering does not read: %q", i+1, b.name, line))
+		for _, scan := range []struct {
+			banned []banned
+			text   string
+		}{{bannedLines, line}, {bannedSpans, bare}} {
+			for _, b := range scan.banned {
+				if b.re.MatchString(scan.text) {
+					out = append(out, fmt.Sprintf("line %d uses %s, which the terminal rendering does not read: %q", i+1, b.name, line))
+				}
 			}
 		}
 	}
@@ -144,7 +149,7 @@ func usageProblems(md string) []string {
 // naming the line and its fix.
 func angleProblems(md string) []string {
 	var out []string
-	for i, line := range strings.Split(strings.TrimRight(md, "\n"), "\n") {
+	for i, line := range Lines(md) {
 		bare := inlineCode.ReplaceAllString(line, "")
 		for _, m := range angles.FindAllString(bare, -1) {
 			out = append(out, fmt.Sprintf("line %d has %s outside inline code; a markdown renderer eats it as an HTML tag, so write it as `%s`: %q", i+1, m, m, line))
@@ -182,7 +187,7 @@ func blankFrontmatter(md string) string {
 func CheckDescribed(t TB, c Command) {
 	t.Helper()
 	verbs := c.all()
-	for _, name := range sortedVerbs(verbs) {
+	for _, name := range SortedKeys(verbs) {
 		described(t, c, verbs[name], name)
 		for line := range strings.SplitSeq(verbs[name].Usage, "\n") {
 			if strings.HasPrefix(strings.TrimSpace(line), "- ") {
@@ -200,7 +205,7 @@ func described(t TB, c Command, v Verb, path string) {
 		}
 		return
 	}
-	for _, sub := range sortedVerbs(v.Subs) {
+	for _, sub := range SortedKeys(v.Subs) {
 		described(t, c, v.Subs[sub], path+" "+sub)
 	}
 }

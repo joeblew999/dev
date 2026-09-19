@@ -59,9 +59,6 @@ func rel(p string) string {
 // --check say which is stale and how to fix it.
 func (c Command) skill(call Call) error {
 	check := call.Given("check")
-	if len(call.Args) > 0 {
-		return call.Usagef("takes only --check")
-	}
 	// Both branches below answer from prose compiled into this binary, so
 	// neither means anything if the binary is behind its sources: writing
 	// would rewrite every copy from old bytes and report success, and
@@ -161,9 +158,6 @@ func skillPaths(root, name string) []string {
 
 // version is `<Name> version`.
 func (c Command) version(call Call) error {
-	if len(call.Args) > 0 {
-		return call.Usagef("takes no arguments")
-	}
 	fmt.Fprintln(call.Stdout, c.Version)
 	return nil
 }

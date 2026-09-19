@@ -7,12 +7,16 @@ package cli
 
 import (
 	"bufio"
+	"cmp"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
+	"slices"
 	"strings"
+	"time"
 )
 
 // Runner is every dev command: the verb it was called as, the arguments after
@@ -35,6 +39,35 @@ type Call struct {
 
 	Stdin          io.Reader
 	Stdout, Stderr io.Writer
+
+	// Started is when cli began running this verb. A verb that reports in
+	// JSON puts its own elapsed time in the report from it, so what a person
+	// reads on stderr and what a machine reads in the file are the same run.
+	Started time.Time
+}
+
+// Elapsed is how long this verb has been running. Zero when nothing set
+// Started, so a Call built by hand in a test reports no time rather than the
+// centuries since the zero instant.
+func (c Call) Elapsed() time.Duration {
+	if c.Started.IsZero() {
+		return 0
+	}
+	return time.Since(c.Started)
+}
+
+// Took is a duration as a person reads one at the end of a run: milliseconds
+// while that is the interesting digit, then seconds, then whole seconds once
+// a run is long enough that nobody is counting them.
+func Took(d time.Duration) string {
+	switch {
+	case d < time.Second:
+		return d.Round(time.Millisecond).String()
+	case d < time.Minute:
+		return d.Round(10 * time.Millisecond).String()
+	default:
+		return d.Round(time.Second).String()
+	}
 }
 
 // Value is a parsed flag's value by name.
@@ -211,4 +244,277 @@ func Value(fs *flag.FlagSet, name string) string {
 // Given reports whether a bool flag registered by name is set.
 func Given(fs *flag.FlagSet, name string) bool {
 	return Value(fs, name) == "true"
+}
+
+// ValueAs parses a named flag's value with parse, for flags that are not
+// strings: durations, ints, and the like. It is a generic method, which Go
+// 1.27 allows: before, this had to be a generic function taking the Call,
+// and every call site read as ValueAs(c, ...) rather than c.ValueAs(...).
+//
+// An unregistered name or a parse failure returns the zero value and the
+// parse error, so a verb that wants the zero value on failure ignores the
+// error the same way it does with Value plus ParseDuration today.
+func (c Call) ValueAs[T any](name string, parse func(string) (T, error)) (T, error) {
+	return ValueAs(c.Flags, name, parse)
+}
+
+// ValueAs parses a flag's value from its FlagSet with parse. A verb that
+// holds only the set calls this; a verb with a Call calls the method.
+func ValueAs[T any](fs *flag.FlagSet, name string, parse func(string) (T, error)) (T, error) {
+	var zero T
+	f := fs.Lookup(name)
+	if f == nil {
+		return zero, fmt.Errorf("no flag %q", name)
+	}
+	return parse(f.Value.String())
+}
+
+// SortedKeys is every key of m in order. Five call sites wrote
+// slices.Sorted(maps.Keys(m)) by hand, which is one idea in five places —
+// the thing this stack keeps deleting. The constraint is cmp.Ordered rather
+// than any, because sorting needs it and the compiler should say so.
+func SortedKeys[M ~map[K]V, K cmp.Ordered, V any](m M) []K {
+	return slices.Sorted(maps.Keys(m))
+}
+
+// Sorted sorts s in place and returns it, so a diff builder ends with
+// `return Sorted(diff)` instead of a Sort line plus a return line. Every
+// diff in the tree ended that way, which is one idea in eight places.
+func Sorted[S ~[]E, E cmp.Ordered](s S) S {
+	slices.Sort(s)
+	return s
+}
+
+// SortedDesc is every item deepest-first, for removing empty directories
+// after their contents: a directory goes after what it holds.
+func SortedDesc[S ~[]E, E cmp.Ordered](s S) S {
+	slices.Sort(s)
+	slices.Reverse(s)
+	return s
+}
+
+// SortedBy is Sorted for items that are not ordered on their own: the same
+// sort-then-return shape, with the comparison the caller's. A struct slice
+// ended with slices.SortFunc plus a return in as many places as an ordered
+// one ended with slices.Sort, and only the ordered half had a helper.
+func SortedBy[S ~[]E, E any](s S, cmp func(a, b E) int) S {
+	slices.SortFunc(s, cmp)
+	return s
+}
+
+// Map rewrites each item, so a titles-from-bindings loop is one call rather
+// than a var plus a range.
+func Map[T, U any](items []T, f func(T) U) []U {
+	out := make([]U, 0, len(items))
+	for _, item := range items {
+		out = append(out, f(item))
+	}
+	return out
+}
+
+// Collect keeps the rewrites that succeed, so a decoder that hands back
+// []any collapses to one call rather than a switch plus a loop.
+func Collect[T, U any](items []T, f func(T) (U, bool)) []U {
+	var out []U
+	for _, item := range items {
+		if v, ok := f(item); ok {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// ToSet is the membership set for items, so a diff stops opening with the
+// same four-line loop that builds one map per side.
+func ToSet[T comparable](items []T) map[T]bool {
+	set := make(map[T]bool, len(items))
+	for _, item := range items {
+		set[item] = true
+	}
+	return set
+}
+
+// Unique keeps the first of each item, so an Order list with a repeated
+// name degrades to one entry rather than printing a verb twice.
+func Unique[T comparable](items []T) []T {
+	seen := make(map[T]bool, len(items))
+	var out []T
+	for _, item := range items {
+		if !seen[item] {
+			seen[item] = true
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+// Filter keeps what keep wants, so collecting one skill's files stops
+// opening with the same loop over every file in the set.
+func Filter[T any](items []T, keep func(T) bool) []T {
+	var out []T
+	for _, item := range items {
+		if keep(item) {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+// Nearest is the candidate closest to s, or "" when none is close enough. A
+// mistyped verb or tool name should name itself rather than print a wall of
+// usage: the reader already knows what they meant.
+//
+// The bound is one edit, and a second for every eight characters typed: a
+// typo is a slip of a key or two, however long the word. Half the length was
+// too generous — it offered "warning" for "everything", which is not a
+// correction but a guess, and a wrong guess is worse than none.
+func Nearest(s string, candidates []string) string {
+	best, score := "", 2+len(s)/8
+	for _, c := range candidates {
+		if d := editDistance(s, c); d < score {
+			best, score = c, d
+		}
+	}
+	return best
+}
+
+// editDistance is Levenshtein, two rows rather than a matrix.
+func editDistance(a, b string) int {
+	prev, cur := make([]int, len(b)+1), make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			cur[j] = min(cur[j-1]+1, prev[j]+1, prev[j-1]+cost)
+		}
+		copy(prev, cur)
+	}
+	return prev[len(b)]
+}
+
+// Lines is a text's lines with the blank tail every file ends with dropped.
+//
+// Not strings.Lines, which keeps the newline on each line and is an iterator:
+// a caller reading a config, a lock file or a tool's output wants the lines
+// without them, and half of these callers also want an index. Eleven places
+// had written strings.SplitSeq(strings.TrimSpace(s), "\n") or a variant, and
+// the variants did not agree about the blank line at the end.
+func Lines(s string) []string {
+	s = strings.TrimRight(s, "\n")
+	if s == "" {
+		return nil
+	}
+	return strings.Split(s, "\n")
+}
+
+// CountBy tallies items by whatever key names them — a severity, a tool, a
+// status code. The key func decides the map's type, so one func answers every
+// "how many of each" a report asks.
+func CountBy[K comparable, T any](items []T, key func(T) K) map[K]int {
+	out := map[K]int{}
+	for _, item := range items {
+		out[key(item)]++
+	}
+	return out
+}
+
+// Without drops every skip from items, so skipping the lock file is one
+// call rather than a DeleteFunc line with its own closure.
+func Without[T comparable](items []T, skip ...T) []T {
+	omit := ToSet(skip)
+	return Filter(items, func(item T) bool { return !omit[item] })
+}
+
+// DiffSets reports what allowed lost and what seen gained: the set diff
+// every check is really asking. Gone comes in allowed's order, arrived in
+// seen's, so the answer reads the way the inputs did.
+func DiffSets[T comparable](allowed, seen []T) (gone, arrived []T) {
+	allow, have := ToSet(allowed), ToSet(seen)
+	for _, name := range allowed {
+		if !have[name] {
+			gone = append(gone, name)
+		}
+	}
+	for _, name := range seen {
+		if !allow[name] {
+			arrived = append(arrived, name)
+		}
+	}
+	return gone, arrived
+}
+
+// DiffMaps describes how have differs from want: missing, changed, then
+// unexpected. Equal says when two values match, so one func covers bytes,
+// hashes and DeepEqual alike. Keys print with %v, because the diff is text
+// and the key type is only ever string here. Names in ignore are skipped on
+// both sides, so a lock hash never compares against the lock file itself.
+func DiffMaps[M1 ~map[K]V1, M2 ~map[K]V2, K cmp.Ordered, V1, V2 any](have M1, want M2, equal func(h V1, w V2) bool, ignore ...K) []string {
+	omit := ToSet(ignore)
+	var diff []string
+	for k, w := range want {
+		if omit[k] {
+			continue
+		}
+		h, ok := have[k]
+		switch {
+		case !ok:
+			diff = append(diff, fmt.Sprintf("missing: %v", k))
+		case !equal(h, w):
+			diff = append(diff, fmt.Sprintf("changed: %v", k))
+		}
+	}
+	for k := range have {
+		if omit[k] {
+			continue
+		}
+		if _, ok := want[k]; !ok {
+			diff = append(diff, fmt.Sprintf("unexpected: %v", k))
+		}
+	}
+	return Sorted(diff)
+}
+
+// Pick is the sub-map of m over keys, so a check that owns three keys of a
+// file every tool writes to compares those and leaves the rest alone. A key
+// that is not in m is not in the result, which is what makes Pick composable
+// with a diff: absent stays absent rather than becoming a zero value.
+func Pick[M ~map[K]V, K comparable, V any](m M, keys []K) M {
+	out := make(M, len(keys))
+	for _, k := range keys {
+		if v, ok := m[k]; ok {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// DiffKeys describes how have differs from want over exactly keys, so a
+// settings check that owns three keys stops opening with its own loop over
+// them. Equal is reflect.DeepEqual here and bytes.Equal elsewhere.
+//
+// It is DiffMaps over both sides narrowed to those keys, rather than a second
+// walk with its own switch: missing, changed and unexpected are one
+// vocabulary, and two implementations of it drift the first time one of the
+// three words is reworded.
+func DiffKeys[M ~map[K]V, K cmp.Ordered, V any](keys []K, have, want M, equal func(a, b V) bool) []string {
+	return DiffMaps(Pick(have, keys), Pick(want, keys), equal)
+}
+
+// Indent prefixes every line with two spaces, for error bodies that list
+// what differs. Session had its own copy of this; cli owns it now, so both
+// read the same two spaces. It is Indent with a capital, because the
+// lowercase indent here is the four-space continuation under a signature —
+// a different shape for a different reader.
+func Indent(s string) string {
+	var b strings.Builder
+	for _, line := range Lines(s) {
+		b.WriteString("  " + line + "\n")
+	}
+	return b.String()
 }

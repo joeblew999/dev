@@ -24,7 +24,7 @@ func Ignore(root string, entries ...string) error {
 		return err
 	}
 	have := map[string]bool{}
-	for line := range strings.SplitSeq(string(data), "\n") {
+	for _, line := range Lines(string(data)) {
 		if p := pattern(line); p != "" {
 			have[p] = true
 		}

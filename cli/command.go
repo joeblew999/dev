@@ -8,8 +8,8 @@ import (
 	"io"
 	"maps"
 	"os"
-	"slices"
 	"strings"
+	"time"
 )
 
 // VerbMarker is the line in a command's Skill that the rendered verbs
@@ -65,11 +65,14 @@ type Command struct {
 // Main runs c as a program and exits: 0 on success, 1 on an error, 2 on a
 // usage error, an unknown verb, or no verb when c names no Default.
 func Main(c Command) {
-	os.Exit(c.run(os.Args[1:], os.Stdout, os.Stderr))
+	os.Exit(c.Run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
-// run is Main without the exit, so a test can see the code.
-func (c Command) run(args []string, stdout, stderr io.Writer) int {
+// Run is Main without the exit: it runs the command and returns the code,
+// so a test can drive the whole thing — flags parsed as a person's would be,
+// arguments held to what each verb declares — and read what came back. Every
+// command on the stack gets that from declaring its table.
+func (c Command) Run(args []string, stdout, stderr io.Writer) int {
 	verbs := c.all()
 	if c.Default != "" && (len(args) == 0 || strings.HasPrefix(args[0], "-")) {
 		args = append([]string{c.Default}, args...)
@@ -89,19 +92,28 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 	verb, rest := args[0], args[1:]
 	v, ok := verbs[verb]
 	if !ok {
-		fmt.Fprintf(stderr, "unknown verb %q\n\n%s", verb, c.index())
+		near := ""
+		if n := Nearest(verb, SortedKeys(verbs)); n != "" {
+			near = fmt.Sprintf("did you mean %q?\n\n", n)
+		}
+		fmt.Fprintf(stderr, "unknown verb %q\n%s\n%s", verb, near, c.index())
 		return 2
 	}
 	// A subcommand it declares runs itself. Without this a package lists its
 	// subcommands in Subs and then names them again in a switch, and the two
 	// lists drift — which is a fact stated twice, the thing this stack keeps
 	// deleting.
-	run, path := v.Run, c.Name+" "+verb
+	// spec is what the arguments are parsed against: the verb, or the
+	// subcommand once one is matched. A subcommand declares its own Args and
+	// Flags, and parsing the parent's instead registered none of them — so
+	// `secrets set --env prod` was refused by the binary while the manual,
+	// which renders from the same declaration, advertised the flag.
+	run, spec, path := v.Run, v, c.Name+" "+verb
 	named := ""
 	if len(rest) > 0 && !strings.HasPrefix(rest[0], "-") {
 		named = rest[0]
 		if sub, ok := v.Subs[named]; ok && sub.Run != nil {
-			run, path, rest = sub.Run, path+" "+named, rest[1:]
+			run, spec, path, rest = sub.Run, sub, path+" "+named, rest[1:]
 		}
 	}
 	if run == nil {
@@ -115,9 +127,17 @@ func (c Command) run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "error: %s\n\n%s", what, Flatten(c.sectionFor(verb)))
 		return 2
 	}
-	call, err := v.parse(path, rest, stdout, stderr)
+	call, err := spec.parse(path, rest, stdout, stderr)
 	if err == nil {
+		// Every run is timed. A person wants to know a crawl took nine
+		// seconds and a build two, and nobody adds that per verb — so cli
+		// does it once, for every command on the stack. It goes to stderr
+		// because stdout is the verb's data and may be piped.
+		call.Started = time.Now()
 		err = run(call)
+		if !errors.Is(err, ErrHelp) {
+			fmt.Fprintf(stderr, "%s: %s\n", path, Took(call.Elapsed()))
+		}
 	}
 	if errors.Is(err, ErrHelp) {
 		// The flag package has printed each flag and what it means; this adds
@@ -171,7 +191,7 @@ func (c Command) all() map[string]Verb {
 	maps.Copy(m, c.Verbs)
 	own := c.ownUsage()
 	m["skill"] = Verb{Run: c.skill, Flags: checkFlag, Desc: "rewrite the manual from the verbs, in all three places it is read", Usage: own}
-	m["skills"] = Verb{Run: c.skills, Desc: "list what every agent in this repo can read, and where each came from", Usage: own}
+	m["skills"] = Verb{Run: c.skills, Flags: JSONFlags, Desc: "list what every agent in this repo can read, and where each came from", Usage: own}
 	m["version"] = Verb{Run: c.version, Desc: "print the version, to tell a release from a local build", Usage: own}
 	return m
 }
@@ -182,27 +202,19 @@ var usageTemplate string
 // ownUsage is the usage of skill and version, in the shape the others use.
 func (c Command) ownUsage() string { return usageTemplate }
 
-// sortedVerbs is the table's names in order. Verbs is a map, so it has none
-// of its own; everything that walks the table walks it through here, so the
-// manual, the index and CheckUsage all agree.
-func sortedVerbs(verbs map[string]Verb) []string {
-	return slices.Sorted(maps.Keys(verbs))
-}
-
 // manualOrder is the verb names in the order the manual reads them: Order
 // first, for the groups that earned a place, then the rest by name. A name in
 // Order that is not a verb is skipped rather than fatal, so renaming a verb
 // degrades to the old ordering instead of breaking the build.
 func (c Command) manualOrder(verbs map[string]Verb) []string {
 	var names []string
-	listed := map[string]bool{}
-	for _, name := range c.Order {
-		if _, ok := verbs[name]; ok && !listed[name] {
-			listed[name] = true
+	for _, name := range Unique(c.Order) {
+		if _, ok := verbs[name]; ok {
 			names = append(names, name)
 		}
 	}
-	for _, name := range sortedVerbs(verbs) {
+	listed := ToSet(names)
+	for _, name := range SortedKeys(verbs) {
 		if !listed[name] {
 			names = append(names, name)
 		}

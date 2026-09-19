@@ -48,7 +48,7 @@ func TestRun(t *testing.T) {
 	}
 	for _, tc := range cases {
 		var out, errb bytes.Buffer
-		if code := c.run(tc.args, &out, &errb); code != tc.code {
+		if code := c.Run(tc.args, &out, &errb); code != tc.code {
 			t.Errorf("%v: exit %d, want %d (stderr %q)", tc.args, code, tc.code, errb.String())
 		}
 		if out.String() != tc.stdout {
@@ -73,7 +73,7 @@ func TestDefault(t *testing.T) {
 
 	// No verb runs the default one.
 	var out, errb bytes.Buffer
-	if code := c.run(nil, &out, &errb); code != 0 || out.String() != "built\n" {
+	if code := c.Run(nil, &out, &errb); code != 0 || out.String() != "built\n" {
 		t.Errorf("no verb: exit %d, stdout %q, stderr %q", code, out.String(), errb.String())
 	}
 
@@ -83,7 +83,7 @@ func TestDefault(t *testing.T) {
 	// could not tell -v from nothing.
 	out.Reset()
 	errb.Reset()
-	if code := c.run([]string{"-v"}, &out, &errb); code != 2 ||
+	if code := c.Run([]string{"-v"}, &out, &errb); code != 2 ||
 		!strings.Contains(errb.String(), "not defined: -v") {
 		t.Errorf("unknown flag: exit %d, stderr %q", code, errb.String())
 	}
@@ -111,10 +111,10 @@ func TestSkillRoundTrip(t *testing.T) {
 	t.Chdir(cmd) // where go test would run: the manual still lands at the root
 
 	var out, errb bytes.Buffer
-	if code := c.run([]string{"skill", "--check"}, &out, &errb); code != 1 || !strings.Contains(errb.String(), "is stale; regenerate it with: tool skill") {
+	if code := c.Run([]string{"skill", "--check"}, &out, &errb); code != 1 || !strings.Contains(errb.String(), "is stale; regenerate it with: tool skill") {
 		t.Fatalf("check before write: exit %d, stderr %q", code, errb.String())
 	}
-	if code := c.run([]string{"skill"}, &out, &errb); code != 0 {
+	if code := c.Run([]string{"skill"}, &out, &errb); code != 0 {
 		t.Fatalf("skill: exit %d, stderr %q", code, errb.String())
 	}
 	for _, dir := range []string{ShippedDir, ClaudeDir, AgentsDir} {
@@ -125,7 +125,7 @@ func TestSkillRoundTrip(t *testing.T) {
 		}
 	}
 	out.Reset()
-	if code := c.run([]string{"skill", "--check"}, &out, &errb); code != 0 || strings.Count(out.String(), "is up to date") != 3 {
+	if code := c.Run([]string{"skill", "--check"}, &out, &errb); code != 0 || strings.Count(out.String(), "is up to date") != 3 {
 		t.Errorf("check after write: exit %d, stdout %q", code, out.String())
 	}
 	tb := &fakeTB{}
@@ -139,14 +139,14 @@ func TestSkillRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	errb.Reset()
-	if code := c.run([]string{"skill", "--check"}, &out, &errb); code != 1 || !strings.Contains(errb.String(), filepath.Join(ClaudeDir, "tool", SkillFile)+" is stale") {
+	if code := c.Run([]string{"skill", "--check"}, &out, &errb); code != 1 || !strings.Contains(errb.String(), filepath.Join(ClaudeDir, "tool", SkillFile)+" is stale") {
 		t.Errorf("check with a stale copy: exit %d, stderr %q", code, errb.String())
 	}
 	tb = &fakeTB{}
 	if CheckSkill(tb, c); len(tb.errs) != 1 {
 		t.Errorf("CheckSkill with a stale copy: %d errors, want 1", len(tb.errs))
 	}
-	if code := c.run([]string{"skill"}, &out, &errb); code != 0 {
+	if code := c.Run([]string{"skill"}, &out, &errb); code != 0 {
 		t.Fatalf("skill: exit %d", code)
 	}
 	if got, _ := os.ReadFile(local); string(got) != c.render() {

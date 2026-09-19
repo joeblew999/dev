@@ -16,7 +16,7 @@ import (
 // it like any other file.
 func Flatten(md string) string {
 	var b strings.Builder
-	for line := range strings.SplitSeq(strings.TrimRight(md, "\n"), "\n") {
+	for _, line := range Lines(md) {
 		switch {
 		case strings.TrimSpace(line) == "":
 			b.WriteString("\n")
@@ -66,7 +66,7 @@ func Verbs(name string, verbs map[string]Verb, paths []string) string {
 			continue
 		}
 		if len(v.Subs) > 0 {
-			for _, sub := range sortedVerbs(v.Subs) {
+			for _, sub := range SortedKeys(v.Subs) {
 				b.WriteString(one(name, verbs, path+" "+sub))
 			}
 			continue

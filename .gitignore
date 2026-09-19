@@ -8,3 +8,4 @@
 # written per developer by the tool, so it keeps them out of git
 .agents/skills/hk-configure
 .agents/skills/hk-debug
+.reports/

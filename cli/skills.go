@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 )
 
@@ -22,47 +21,59 @@ import (
 // because an agent is told what is available and cannot enumerate it. The
 // directory is the fact.
 func (c Command) skills(call Call) error {
-	if HelpRequested(call.Args) {
-		return ErrHelp
-	}
-	if len(call.Args) > 0 {
-		return call.Usagef("takes no arguments")
-	}
 	root, err := root(".")
 	if err != nil {
 		return err
 	}
+	report := SkillsReport{Directories: map[string][]skillEntry{}}
 	seen := map[string][]string{}
 	for _, dir := range []string{ClaudeDir, AgentsDir} {
 		found := readSkills(filepath.Join(root, dir))
-		fmt.Fprintf(call.Stdout, "%s\n", dir)
-		if len(found) == 0 {
-			fmt.Fprintf(call.Stdout, "  (none)\n")
-		}
+		report.Directories[dir] = found
 		for _, s := range found {
-			fmt.Fprintf(call.Stdout, "  %-22s %s\n", s.name, s.from)
-			seen[s.name] = append(seen[s.name], dir)
+			seen[s.Name] = append(seen[s.Name], dir)
 		}
-		fmt.Fprintln(call.Stdout)
 	}
 	// An agent reads one of these directories and not the other, so a skill in
 	// one alone is a skill that agent cannot see. Worth saying, because mise
 	// syncs a pinned tool's skills into .claude and nowhere else.
-	var only []string
-	for name, dirs := range seen {
-		if len(dirs) == 1 {
-			only = append(only, name+" is in "+dirs[0]+" only")
-		}
+	report.OneDirectoryOnly = Collect(SortedKeys(seen), func(name string) (string, bool) {
+		dirs := seen[name]
+		return name + " is in " + dirs[0] + " only", len(dirs) == 1
+	})
+	if call.WantsJSON() {
+		return call.EmitJSON(report)
 	}
-	slices.Sort(only)
-	for _, line := range only {
+	for _, dir := range []string{ClaudeDir, AgentsDir} {
+		fmt.Fprintf(call.Stdout, "%s\n", dir)
+		if len(report.Directories[dir]) == 0 {
+			fmt.Fprintf(call.Stdout, "  (none)\n")
+		}
+		for _, s := range report.Directories[dir] {
+			fmt.Fprintf(call.Stdout, "  %-22s %s\n", s.Name, s.From)
+		}
+		fmt.Fprintln(call.Stdout)
+	}
+	for _, line := range report.OneDirectoryOnly {
 		fmt.Fprintf(call.Stdout, "%s\n", line)
 	}
 	return nil
 }
 
-// skill is one entry of an agent's skills directory.
-type skillEntry struct{ name, from string }
+// SkillsReport is what `<cmd> skills --json` answers: the same two facts the
+// terminal prints, in the shape an agent can read without parsing columns.
+type SkillsReport struct {
+	Directories      map[string][]skillEntry `json:"directories"`
+	OneDirectoryOnly []string                `json:"oneDirectoryOnly,omitempty"`
+}
+
+// skillEntry is one entry of an agent's skills directory. Its fields are
+// exported because the same value is both the line a person reads and the
+// object --json hands an agent; two shapes of one fact is how they drift.
+type skillEntry struct {
+	Name string `json:"name"`
+	From string `json:"from"`
+}
 
 // readSkills lists a skills directory, saying where each entry came from.
 func readSkills(dir string) []skillEntry {
@@ -75,10 +86,9 @@ func readSkills(dir string) []skillEntry {
 		if strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		out = append(out, skillEntry{e.Name(), source(filepath.Join(dir, e.Name()))})
+		out = append(out, skillEntry{Name: e.Name(), From: source(filepath.Join(dir, e.Name()))})
 	}
-	slices.SortFunc(out, func(a, b skillEntry) int { return strings.Compare(a.name, b.name) })
-	return out
+	return SortedBy(out, func(a, b skillEntry) int { return strings.Compare(a.Name, b.Name) })
 }
 
 // source is where a skill came from: a symlink is a tool this repo pins, and
@@ -123,18 +133,18 @@ func mirror(root string, out io.Writer) error {
 	from, to := filepath.Join(root, ClaudeDir), filepath.Join(root, AgentsDir)
 	want := map[string]string{}
 	for _, e := range readSkills(from) {
-		target, err := os.Readlink(filepath.Join(from, e.name))
+		target, err := os.Readlink(filepath.Join(from, e.Name))
 		if err != nil {
 			continue // a real directory: the repo's own
 		}
-		want[e.name] = target
+		want[e.Name] = target
 	}
 	for _, e := range readSkills(to) {
-		p := filepath.Join(to, e.name)
+		p := filepath.Join(to, e.Name)
 		if _, err := os.Readlink(p); err != nil {
 			continue
 		}
-		if _, ok := want[e.name]; !ok {
+		if _, ok := want[e.Name]; !ok {
 			if err := os.Remove(p); err != nil {
 				return err
 			}
@@ -162,6 +172,5 @@ func mirror(root string, out io.Writer) error {
 	// A mirror is written per developer from the versions that repo pins, the
 	// same as the links it mirrors, so it is ignored for the same reason. The
 	// code that writes it is the code that ignores it.
-	slices.Sort(made)
-	return Ignore(root, made...)
+	return Ignore(root, Sorted(made)...)
 }

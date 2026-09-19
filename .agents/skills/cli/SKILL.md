@@ -19,6 +19,15 @@ therefore cannot drift from the binary — nothing copies anything.
 Write a command against this rather than `flag` directly, and it gets
 `<cmd> skill`, `<cmd> version` and `--help` at every level for free.
 
+## Generics are how this package stops repeating itself
+
+Go 1.27 types these properly, so a loop that only differs by its element type
+is one func with a type parameter, not one func per caller. The set below is
+what that has already collapsed; reach for it before writing a loop, and add
+to it when the same shape turns up a third time. Two of anything is a
+coincidence, three is a helper — and a helper that exists but is not used is
+worse than none, because the next reader now has two ways to do one thing.
+
 ## The shape
 
 ```go
@@ -38,7 +47,12 @@ func main() { cli.Main(app) }
 
 A verb declares what only it knows and nothing that is written elsewhere:
 
-- `Args` — its positionals, `"DIR"` or `"URL"` or `"DIR [VERSION]"`.
+- `Args` — its positionals, `"DIR"` or `"URL"` or `"DIR [VERSION]"`. It is
+  also the rule: a verb that declares none is given none, and `cli` answers
+  anything extra with `takes no arguments` and exit 2. Declare what you take
+  and the check comes with it — two verbs had written that check by hand, in
+  two wordings, and every verb that should have had one silently ignored what
+  it was handed.
 - `Flags` — a func that registers its flags. `cli` renders the signature from
   it and `Run` calls the same func, so there is one registration.
 - `Desc` — one line saying what this verb is for, printed under its
@@ -86,16 +100,160 @@ FlagSet, pull a directory out of the arguments and check the error.
 - `c.Args` — what is left: positionals, then anything after a bare `--`.
 - `c.Value("addr")`, `c.Given("yes")` — a flag's value, and whether a bool
   flag is set.
+- `c.ValueAs("timeout", time.ParseDuration)` — a flag's value parsed with the
+  func given, for flags that are not strings. A generic method, so the type
+  comes from the parse func with nothing written twice.
 - `c.Stdin`, `c.Stdout`, `c.Stderr` — where to read and write.
 - `c.Usagef("...")` — the arguments were wrong. The command prints the verb's
   section after it and exits 2.
 - `c.Verb` — the verb as it was typed, command and subcommand included, for a
   message that has to name it.
 
+## The generic helpers
+
+Not methods on `Call` — package funcs any code may use, and the reason
+`internal/` holds almost no loops that only build a slice or a set.
+
+Order, each returning the slice so a builder ends in one line:
+`cli.Sorted(s)`, `cli.SortedDesc(s)` for deepest-first removal,
+`cli.SortedBy(s, cmp)` for items that carry no order of their own, and
+`cli.SortedKeys(m)` for walking a table deterministically.
+
+Shape: `cli.Map(items, f)` rewrites each, `cli.Filter(items, keep)` keeps what
+you want, `cli.Collect(items, f)` is both in one pass and drops what fails to
+rewrite, `cli.Unique(items)` keeps the first of each in arrival order,
+`cli.Without(items, skip...)` drops named ones, `cli.ToSet(items)` is the
+membership map, and `cli.Pick(m, keys)` narrows a map to the keys you own —
+a key the map lacks stays absent rather than arriving as a zero value.
+
+Difference, which is what most checks are really asking: `cli.DiffSets(allowed,
+seen)` gives what went and what arrived, each in its own side's order;
+`cli.DiffMaps(have, want, equal, ignore...)` gives sorted `missing:`,
+`changed:` and `unexpected:` lines; and `cli.DiffKeys(keys, have, want, equal)`
+is that same diff narrowed to the keys a package owns, built from `DiffMaps`
+rather than walking again — one vocabulary, one implementation.
+
+## Answering in JSON, and reading what other tools print
+
+A verb that runs other programs and reports what they said has two JSON
+problems, and both are the same in every command, so `cli` owns them.
+
+**Reading.** `cli.DecodeJSON[T](what, text)` gives you a `T` out of whatever a
+tool printed. It starts at the first `[` or `{` rather than at byte zero,
+because a CLI prints what it likes first — wrangler opens with a banner,
+flyctl with a version notice — and `what` names the source in the error, since
+whoever reads it is looking at the output of several tools and does not yet
+know which one broke. Two packages here had worked that out separately and
+written the same three lines; a verb that runs six tools would have written it
+six times.
+
+```go
+type crawl struct{ Pages int `json:"pages"` }
+report, err := cli.DecodeJSON[crawl]("scoutly's report", out)
+```
+
+Each tool decodes into its own type, so a command that runs several of them
+merges typed values into one report struct rather than passing `map[string]any`
+around.
+
+**Writing.** `cli.JSONFlags` registers the two flags: `--json` prints the
+report as JSON instead of text, and `--out PATH` also writes it to a file.
+`c.WantsJSON()` says whether either was given — asking for a file is asking
+for JSON — and `c.EmitJSON(v)` writes it to both. A verb reads:
+
+```go
+if c.WantsJSON() {
+    return c.EmitJSON(report)
+}
+// ... the human version
+```
+
+Stdout carries the data and nothing else; progress and warnings go to Stderr.
+So the same run answers a person at the terminal, a task that pipes it into
+another program, and an agent reading the file afterwards — the same bytes in
+all three, because the file is what stdout printed and both come from one
+value. `<cmd> skills --json` is the working example.
+
 The helpers a verb used to call itself are still there for anything that
 parses its own arguments — `cli.Flags`, `cli.DirAnd`, `cli.ParseInterleaved`,
 `cli.Bool`, `cli.Confirm`, `cli.HelpRequested` — but a verb that declares
 `Args` and `Flags` needs none of them.
+
+## Reporting what a verb found
+
+A verb that checks things — a linter, a crawler, a conformance check — has the
+same problems whatever its subject: which severity fails the build, what a
+machine reads, what changed since last time, and how to say "this did not run"
+without it reading as "this found nothing". `cli` owns all four, so no verb
+solves them again and every repo's reports are the same shape.
+
+`cli.ReportFlags(fs)` registers them: `--json` and `--out` from above, plus
+`--fail-on error|warning|info` (the least serious finding that still fails),
+`--record DIR` (keep this run and say what changed since the last) and
+`--quiet`. Call `c.CheckReportFlags()` before doing any work — a crawl takes
+seconds to minutes, and failing afterwards on a typo in `--fail-on` wastes
+every one of them. A typo is answered with what was meant.
+
+```go
+rep := cli.NewReport("seo", target)
+rep.Ran(cli.Step{Name: "scoutly", Took: "1.2s", Findings: 3, Covered: "3 pages"})
+rep.NotRun(cli.Step{Name: "muffet", Provides: "broken links", Cost: "~3s"},
+    "not installed")
+rep.Add(cli.Finding{Tool: "scoutly", Severity: cli.SevError,
+    ID: "missing-canonical", Message: "...", Fix: "add <link rel=canonical> — <doc url>"})
+rep.Sort()
+rep.Done(started, c.Value("fail-on"))
+```
+
+Three rules the shape enforces:
+
+- **Every step appears, including one that did not run**, with why, what it
+  would have given and what it costs. A report that quietly omits what it
+  skipped reads as complete when it is not.
+- **Every finding carries its fix.** An id and a severity say what is wrong
+  and not what to do about it.
+- **`Fix` names the documentation**, so the reader can check the advice rather
+  than take it.
+
+`c.Record(rep)` writes the run to a timestamped file and refreshes
+`latest.json`; `c.Previous` and `cli.Drift` then say what was fixed and what
+is new since the run before. A history is worth keeping only if it says which
+way things moved.
+
+## Running several things at once
+
+`cli.Parallel(jobs, work, onPanic)` runs each unit and returns the results
+**in the order they were given**, whatever order they finished in — so a
+report is the same bytes on every run and a diff of two runs is about the
+subject, not the schedule. A panic in one unit is recorded against that unit
+rather than taking down the run: one badly-behaved tool must not cost the
+answers from the others.
+
+## Running another program
+
+`cli/tool` is the one way anything on this stack reaches a binary it does not
+contain — a package of its own, beside `cli` rather than in it, because `cli`
+is linked into every command including a Worker's wasm, and a Worker can never
+exec anything.
+
+```go
+res, err := tool.Cmd{Bin: "scoutly", Pin: `"go:…/scoutly" = "v0.5.0"`,
+    Args: []string{url, "--format", "json"}}.Capture()
+report, err := res.JSON[scoutlyReport]("scoutly's report")
+```
+
+`Capture` takes stdout while the tool's own progress still reaches the
+terminal, `Attached` wires it to the terminal, `Stream` sends stdout where the
+caller says, and `Start` runs it in the background. Every one is timed, and a
+missing binary is reported as **the mise.toml line to add** rather than as
+"executable file not found in $PATH" — a pinned tool is on PATH inside the
+repo and nowhere else, so "not found" nearly always means one of two things a
+person should not have to work out.
+
+`Result.JSON[T]` is a generic method: the receiver already holds the output
+and which tool produced it, so the call site says only the shape expected
+back. A checker that exits non-zero because it *found* something is an answer,
+not a failure — what it printed comes back.
 
 ## How a manual reaches another repo
 

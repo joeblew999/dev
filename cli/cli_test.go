@@ -34,7 +34,7 @@ func TestParseInterleavedPassesEverythingAfterDoubleDash(t *testing.T) {
 // name, so flags may follow the directory but never precede it — and saying
 // so is cli's job, since cli is what reads them.
 func TestParseTakesTheDirectoryFirst(t *testing.T) {
-	v := Verb{Args: "DIR", Flags: func(fs *flag.FlagSet) { fs.String("env", "", "an `ENV`") }}
+	v := Verb{Args: "DIR EXTRA", Flags: func(fs *flag.FlagSet) { fs.String("env", "", "an `ENV`") }}
 
 	c, err := v.parse("deploy", []string{"cmd/x", "--env", "prod", "extra"}, io.Discard, io.Discard)
 	if err != nil {
@@ -53,5 +53,38 @@ func TestParseTakesTheDirectoryFirst(t *testing.T) {
 	if _, err := v.parse("deploy", []string{"--env", "prod"}, io.Discard, io.Discard); err == nil ||
 		!strings.Contains(err.Error(), "the directory comes first") {
 		t.Errorf("flags before DIR should say so, got %v", err)
+	}
+}
+
+// What Args declares is what a verb is given: cli holds it to that once, so
+// no verb counts its own positionals and none of them silently ignores one.
+func TestArgsIsTheRule(t *testing.T) {
+	for _, tc := range []struct {
+		args    string
+		given   []string
+		wantErr string
+	}{
+		{"DIR", []string{"cmd/x", "extra"}, "takes DIR"},
+		{"DIR", []string{"cmd/x"}, ""},
+		{"URL", nil, "needs URL"},
+		{"URL", []string{"https://example.com"}, ""},
+		{"URL", []string{"a", "b"}, "takes URL"},
+		{"", []string{"x"}, "takes no arguments"},
+		{"NAME...", nil, "needs NAME..."},
+		{"NAME...", []string{"a", "b", "c"}, ""},
+		{"[SOURCE...]", nil, ""},
+		{"DIR [VERSION]", []string{"cmd/x"}, ""},
+		{"DIR [VERSION]", []string{"cmd/x", "v1.2.3"}, ""},
+		{"DIR [VERSION]", []string{"cmd/x", "v1.2.3", "spare"}, "takes DIR [VERSION]"},
+		{"DIR [-- ARGS]", []string{"cmd/x", "anything", "at", "all"}, ""},
+	} {
+		v := Verb{Args: tc.args}
+		_, err := v.parse("tool verb", tc.given, io.Discard, io.Discard)
+		switch {
+		case tc.wantErr == "" && err != nil:
+			t.Errorf("Args %q given %q: %v; want it accepted", tc.args, tc.given, err)
+		case tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)):
+			t.Errorf("Args %q given %q: err %v; want it to say %q", tc.args, tc.given, err, tc.wantErr)
+		}
 	}
 }
