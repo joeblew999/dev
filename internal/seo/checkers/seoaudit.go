@@ -4,13 +4,12 @@
 // carrying what it failed — and the score it produces is the kind of thing a
 // merged report cannot model, so it stays in the sub-report and the link to
 // it is how a reader gets there.
-package seo
+package checkers
 
 import (
 	"fmt"
 
 	"github.com/joeblew999/dev/cli"
-	"github.com/joeblew999/dev/cli/tool"
 )
 
 var seoAudit = Checker{
@@ -25,7 +24,7 @@ var seoAudit = Checker{
 		}
 		return args
 	},
-	Read: readSEOAudit,
+	Read: JSON("seo-audit's report", fromSEOAudit),
 }
 
 type seoAuditReport struct {
@@ -43,11 +42,7 @@ type seoAuditReport struct {
 	} `json:"summary"`
 }
 
-func readSEOAudit(res tool.Result) (Found, error) {
-	report, err := res.JSON[seoAuditReport]("seo-audit's report")
-	if err != nil {
-		return Found{}, err
-	}
+func fromSEOAudit(report seoAuditReport) Found {
 	// Only the checks that failed something are issues; a check every page
 	// passed is not news.
 	failed := cli.Filter(report.Checks, func(c struct {
@@ -72,10 +67,10 @@ func readSEOAudit(res tool.Result) (Found, error) {
 			ID:       c.ID,
 			Severity: c.Severity,
 			Message:  fmt.Sprintf("%s: %d of %d page(s)", c.Name, c.PagesFailed, c.PagesTotal),
-			Fix:      scoutlyFix(seoAuditCode(c.ID)),
+			Fix:      Fix(seoAuditCode(c.ID)),
 		})
 	}
-	return found, nil
+	return found
 }
 
 // seoAuditCode finds the advice this package already wrote for a fault this

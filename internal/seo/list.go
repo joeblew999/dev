@@ -12,6 +12,7 @@ import (
 	"os/exec"
 
 	"github.com/joeblew999/dev/cli"
+	"github.com/joeblew999/dev/internal/seo/checkers"
 )
 
 // Can is one thing this verb can do.
@@ -31,7 +32,7 @@ func Capabilities() []Can {
 		return Can{Name: w.Name, Kind: "write", Provides: w.Provides,
 			Produces: w.Produces.Name, Cost: "<1ms", Installed: true}
 	})
-	return append(out, cli.Map(checkers, func(ch Checker) Can {
+	return append(out, cli.Map(checkers.All, func(ch checkers.Checker) Can {
 		_, err := exec.LookPath(ch.Name)
 		return Can{Name: ch.Name, Kind: "check", Provides: ch.Provides,
 			Cost: ch.Cost, Needs: ch.Pin, Installed: err == nil}

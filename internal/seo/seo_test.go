@@ -14,6 +14,7 @@ import (
 
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/cli/tool"
+	"github.com/joeblew999/dev/internal/seo/checkers"
 )
 
 // recorded replaces the runner with one that hands back reports the checkers
@@ -55,19 +56,19 @@ func TestCheckReadsWhatEachCheckerFound(t *testing.T) {
 	recorded(t, map[string]string{"scoutly": "scoutly-example.json"})
 	c := call(t, io.Discard, CheckFlags)
 	rep := cli.NewReport("seo", "https://example.com")
-	pick, err := selection(c, names(checkers, func(ch Checker) string { return ch.Name }))
+	pick, err := selection(c, names(checkers.All, func(ch checkers.Checker) string { return ch.Name }))
 	if err != nil {
 		t.Fatal(err)
 	}
 	Audit(c, rep, "https://example.com", 5, pick)
 	rep.Done(time.Now(), cli.SevError)
 
-	if len(rep.Steps) != len(checkers) {
-		t.Fatalf("got %d steps; want one per checker (%d)", len(rep.Steps), len(checkers))
+	if len(rep.Steps) != len(checkers.All) {
+		t.Fatalf("got %d steps; want one per checker (%d)", len(rep.Steps), len(checkers.All))
 	}
 	// Checkers run at once but merge in registry order, so a report is the
 	// same bytes however they were scheduled.
-	want := names(checkers, func(ch Checker) string { return ch.Name })
+	want := names(checkers.All, func(ch checkers.Checker) string { return ch.Name })
 	for i, s := range rep.Steps {
 		if s.Name != want[i] {
 			t.Errorf("step %d is %q; want %q — the merge must keep registry order", i, s.Name, want[i])
@@ -100,11 +101,11 @@ func TestCheckReadsWhatEachCheckerFound(t *testing.T) {
 // running nothing.
 func TestSelectionNamesATypo(t *testing.T) {
 	c := call(t, io.Discard, CheckFlags, "--only", "scoutley")
-	if _, err := selection(c, names(checkers, func(ch Checker) string { return ch.Name })); err == nil || !strings.Contains(err.Error(), `did you mean "scoutly"`) {
+	if _, err := selection(c, names(checkers.All, func(ch checkers.Checker) string { return ch.Name })); err == nil || !strings.Contains(err.Error(), `did you mean "scoutly"`) {
 		t.Errorf("err = %v; want it to suggest scoutly", err)
 	}
 	c = call(t, io.Discard, CheckFlags, "--skip", "muffet")
-	pick, err := selection(c, names(checkers, func(ch Checker) string { return ch.Name }))
+	pick, err := selection(c, names(checkers.All, func(ch checkers.Checker) string { return ch.Name }))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +230,7 @@ func TestCheckAnswersJSONAndGates(t *testing.T) {
 // A code this package has no advice for still reports, with the tool's own
 // message and the documentation index, rather than being dropped.
 func TestAnUnknownCodeStillCarriesSomewhereToLook(t *testing.T) {
-	if fix := scoutlyFix("something-scoutly-added-later"); !strings.Contains(fix, docEssentials) {
+	if fix := checkers.Fix("something-scoutly-added-later"); !strings.Contains(fix, checkers.DocEssentials) {
 		t.Errorf("fix = %q; want it to point at the essentials", fix)
 	}
 }

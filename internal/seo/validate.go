@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/joeblew999/dev/cli"
+	"github.com/joeblew999/dev/internal/seo/checkers"
 )
 
 // validateSitemap holds a sitemap to sitemaps.org: absolute locations on the
@@ -108,19 +109,19 @@ func validateRobots(name, content, origin string) (found []cli.Finding, covered 
 			if !strings.HasPrefix(value, "http://") && !strings.HasPrefix(value, "https://") {
 				out = append(out, finding("robots-relative-sitemap", cli.SevError,
 					"Sitemap: must be an absolute URL, not "+value,
-					"write the full URL, scheme and host included — "+docRobotsIntro))
+					"write the full URL, scheme and host included — "+checkers.DocRobotsIntro))
 			}
 		}
 	}
 	if directives == 0 {
 		out = append(out, finding("robots-empty", cli.SevWarning,
 			"robots.txt holds no directives",
-			"an empty file allows everything, which is fine — but say so, and name the sitemap — "+docRobotsIntro))
+			"an empty file allows everything, which is fine — but say so, and name the sitemap — "+checkers.DocRobotsIntro))
 	}
 	if blocksAll {
 		out = append(out, finding("robots-blocks-all", cli.SevError,
 			"robots.txt disallows everything for Googlebot",
-			"remove the Disallow: / — Google will not index what it cannot fetch — "+docRobotsIntro))
+			"remove the Disallow: / — Google will not index what it cannot fetch — "+checkers.DocRobotsIntro))
 	}
 	if sitemaps == 0 {
 		out = append(out, finding("robots-no-sitemap", cli.SevWarning,
@@ -131,7 +132,7 @@ func validateRobots(name, content, origin string) (found []cli.Finding, covered 
 	if len(content) > 500<<10 {
 		out = append(out, finding("robots-too-large", cli.SevError,
 			"over 500 KiB; Google reads no further",
-			"keep it small — what is past the limit is not applied — "+docRobotsIntro))
+			"keep it small — what is past the limit is not applied — "+checkers.DocRobotsIntro))
 	}
 	covered = fmt.Sprintf("%d directive(s)", directives)
 	if sitemaps > 0 {
@@ -148,15 +149,15 @@ func validateHead(name, content, origin string) (found []cli.Finding, covered st
 	switch {
 	case title == "":
 		out = append(out, finding("missing-title", cli.SevError,
-			"no <title>", scoutlyFix("missing-title")))
+			"no <title>", checkers.Fix("missing-title")))
 	case len(title) > 60:
 		out = append(out, finding("title-too-long", cli.SevWarning,
 			fmt.Sprintf("<title> is %d characters; Search truncates near 60", len(title)),
-			scoutlyFix("title-too-long")))
+			checkers.Fix("title-too-long")))
 	}
 	if strings.Count(content, "<title>") > 1 {
 		out = append(out, finding("duplicate-title", cli.SevError,
-			"more than one <title>", scoutlyFix("duplicate-title")))
+			"more than one <title>", checkers.Fix("duplicate-title")))
 	}
 	present := 0
 	for _, want := range []struct{ marker, code string }{
@@ -172,14 +173,14 @@ func validateHead(name, content, origin string) (found []cli.Finding, covered st
 			continue
 		}
 		out = append(out, finding(want.code, cli.SevWarning,
-			"no "+want.marker, scoutlyFix(want.code)))
+			"no "+want.marker, checkers.Fix(want.code)))
 	}
 	// A canonical that is not absolute is the one that silently does nothing.
 	if href := between(content, `rel="canonical" href="`, `"`); href != "" &&
 		!strings.HasPrefix(href, "http") {
 		out = append(out, finding("canonical-relative", cli.SevError,
 			"canonical is not an absolute URL: "+href,
-			"write the full URL, scheme and host included — "+docCanonical))
+			"write the full URL, scheme and host included — "+checkers.DocCanonical))
 	}
 	if title != "" {
 		present++

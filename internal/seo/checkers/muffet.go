@@ -3,14 +3,13 @@
 // a page carries a list of links, and a link carries the error it produced —
 // which is the point: each checker keeps its own shape, and only what they
 // all have in common reaches the merged report.
-package seo
+package checkers
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/joeblew999/dev/cli"
-	"github.com/joeblew999/dev/cli/tool"
 )
 
 var muffet = Checker{
@@ -35,7 +34,7 @@ var muffet = Checker{
 			"--ignore-fragments",
 		}
 	},
-	Read: readMuffet,
+	Read: JSON("muffet's report", fromMuffet),
 }
 
 // muffetPage is one crawled page and what its links did. Only the fields this
@@ -48,11 +47,7 @@ type muffetPage struct {
 	} `json:"links"`
 }
 
-func readMuffet(res tool.Result) (Found, error) {
-	pages, err := res.JSON[[]muffetPage]("muffet's report")
-	if err != nil {
-		return Found{}, err
-	}
+func fromMuffet(pages []muffetPage) Found {
 	// muffet lists only the pages that have something wrong, so counting them
 	// as pages crawled would report a clean site as an empty one. What it
 	// knows is what is broken; the crawl counts belong to the checkers that
@@ -70,7 +65,7 @@ func readMuffet(res tool.Result) (Found, error) {
 				Severity: "error",
 				Message:  fmt.Sprintf("%s → %s", link.URL, firstLine(link.Error)),
 				Where:    page.URL,
-				Fix:      "fix or remove the link: a crawler follows it, finds nothing, and spends the crawl budget doing it — " + docCrawling,
+				Fix:      "fix or remove the link: a crawler follows it, finds nothing, and spends the crawl budget doing it — " + DocCrawling,
 			})
 		}
 	}
@@ -83,7 +78,7 @@ func readMuffet(res tool.Result) (Found, error) {
 			found.Summary = "1 broken link"
 		}
 	}
-	return found, nil
+	return found
 }
 
 // muffetCode names the kind of failure, since muffet reports a sentence and a

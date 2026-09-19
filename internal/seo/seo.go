@@ -28,79 +28,11 @@ import (
 
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/cli/tool"
+	"github.com/joeblew999/dev/internal/seo/checkers"
 )
 
 //go:embed usage.md
 var Usage string
-
-// Checker is one tool dev runs. Everything that knows a tool exists is one of
-// these and the Read that goes with it, so a fourth checker is a new file and
-// one line in checkers — no dispatch to extend, nothing else to touch.
-type Checker struct {
-	Name     string                               // the binary, and what it is called in the report
-	Pin      string                               // the mise.toml [tools] line that installs it
-	Provides string                               // what running it gets you, said in the report when it does not
-	Cost     string                               // roughly how long it takes
-	Args     func(a Ask) []string                 // how to ask it
-	Read     func(res tool.Result) (Found, error) // what it said, read into what this package shares
-
-	// Fetch is a path under the site to download before running, for a tool
-	// that takes a file rather than a URL — Google's robots matcher wants the
-	// rules on disk. The file lands in Ask.File and is removed afterwards.
-	Fetch string
-}
-
-// Ask is what a checker is being asked to look at.
-type Ask struct {
-	URL   string // the page or site
-	Pages int    // how far to crawl, when the tool crawls
-	File  string // what Fetch downloaded, when the checker asked for one
-}
-
-// Found is the part of a checker's answer every checker has: what it covered,
-// and what it wants fixed. Whatever else it said stays in its sub-report.
-type Found struct {
-	Pages  int
-	Links  int
-	Broken int
-	Issues []cli.Finding
-
-	// Summary is what this checker covered, in its own words, for one whose
-	// counts do not describe it. muffet reports only the pages that have
-	// something wrong, so with a clean site it has no counts at all — and
-	// "nothing to report" beside an empty file reads as a failure when it
-	// means the opposite.
-	Summary string
-}
-
-// covered is what a checker looked at, in the words that apply to it: a
-// crawler counts pages, a link checker counts what it found broken, and one
-// that reports neither says so rather than printing two zeroes.
-func (f Found) covered() string {
-	if f.Summary != "" {
-		return f.Summary
-	}
-	var parts []string
-	for _, p := range []struct {
-		n    int
-		word string
-	}{{f.Pages, "page"}, {f.Links, "link"}, {f.Broken, "broken link"}} {
-		switch {
-		case p.n == 1:
-			parts = append(parts, "1 "+p.word)
-		case p.n > 1:
-			parts = append(parts, fmt.Sprintf("%d %ss", p.n, p.word))
-		}
-	}
-	if len(parts) == 0 {
-		return "nothing to report"
-	}
-	return strings.Join(parts, ", ")
-}
-
-// checkers is the whole registry. Order is the order a report lists them in,
-// whatever order they finished.
-var checkers = []Checker{kitsune, scoutly, scry, muffet, seoAudit, ldlint, robotsRules}
 
 // Subs are the three things this verb does: write the files a site needs,
 // validate them with no network, and check a deployed URL with the checkers.
@@ -156,7 +88,7 @@ func runCheck(c cli.Call) error {
 	if err != nil {
 		return c.Usagef("--max-pages wants a number: %v", err)
 	}
-	pick, err := selection(c, names(checkers, func(ch Checker) string { return ch.Name }))
+	pick, err := selection(c, names(checkers.All, func(ch checkers.Checker) string { return ch.Name }))
 	if err != nil {
 		return err
 	}
@@ -286,8 +218,8 @@ func drift(c cli.Call, prev, cur *cli.Report) {
 // A checker that fails is recorded with the reason and the rest still run:
 // one tool missing is not a reason to learn nothing about the page.
 func Audit(c cli.Call, rep *cli.Report, url string, maxPages int, pick *picked) {
-	var run []Checker
-	for _, ch := range checkers {
+	var run []checkers.Checker
+	for _, ch := range checkers.All {
 		if why := pick.skipped(ch.Name); why != "" {
 			rep.NotRun(cli.Step{Name: ch.Name, Provides: ch.Provides, Cost: ch.Cost,
 				Requires: ch.Pin}, why)
@@ -295,8 +227,8 @@ func Audit(c cli.Call, rep *cli.Report, url string, maxPages int, pick *picked) 
 		}
 		run = append(run, ch)
 	}
-	work := cli.Map(run, func(ch Checker) func() result {
-		return func() result { return ch.run(c, url, maxPages) }
+	work := cli.Map(run, func(ch checkers.Checker) func() result {
+		return func() result { return run1(ch, c, url, maxPages) }
 	})
 	jobs, _ := c.ValueAs("jobs", strconv.Atoi)
 	if jobs <= 0 {
@@ -382,8 +314,8 @@ func (p *picked) skipped(name string) string {
 
 // run is one checker: ask it, keep everything it said, and take from it the
 // part this report shares.
-func (ch Checker) run(c cli.Call, url string, maxPages int) result {
-	ask := Ask{URL: url, Pages: maxPages}
+func run1(ch checkers.Checker, c cli.Call, url string, maxPages int) result {
+	ask := checkers.Ask{URL: url, Pages: maxPages}
 	if ch.Fetch != "" {
 		path, cleanup, err := download(originOf(url) + ch.Fetch)
 		if err != nil {
@@ -410,7 +342,7 @@ func (ch Checker) run(c cli.Call, url string, maxPages int) result {
 		step.Status, step.Note = cli.StatusSkipped, err.Error()
 		return result{step: step}
 	}
-	step.Findings, step.Covered = len(found.Issues), found.covered()
+	step.Findings, step.Covered = len(found.Issues), found.Covered()
 	return result{step: step, findings: found.Issues}
 }
 

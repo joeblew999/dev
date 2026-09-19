@@ -5,13 +5,12 @@
 //
 // It fetches /robots.txt and /sitemap.xml itself, so it sees a missing
 // sitemap that a page-only checker cannot.
-package seo
+package checkers
 
 import (
 	"strings"
 
 	"github.com/joeblew999/dev/cli"
-	"github.com/joeblew999/dev/cli/tool"
 )
 
 var kitsune = Checker{
@@ -25,7 +24,7 @@ var kitsune = Checker{
 		// quietly does nothing.
 		return []string{"--json", a.URL}
 	},
-	Read: readKitsune,
+	Read: JSON("kitsune's report", fromKitsune),
 }
 
 type kitsuneReport struct {
@@ -57,11 +56,7 @@ var inRemit = map[string]bool{
 	"security": true,
 }
 
-func readKitsune(res tool.Result) (Found, error) {
-	report, err := res.JSON[kitsuneReport]("kitsune's report")
-	if err != nil {
-		return Found{}, err
-	}
+func fromKitsune(report kitsuneReport) Found {
 	found := Found{Pages: 1, Summary: "1 page, every check Google names"}
 	for _, r := range report.Results {
 		// It reports what passed as well as what failed, and the passes are
@@ -74,12 +69,12 @@ func readKitsune(res tool.Result) (Found, error) {
 			Tool:     "kitsune",
 			ID:       r.ID,
 			Severity: r.Severity,
-			Message:  cmpOr(r.Detail, r.Title),
+			Message:  orElse(r.Detail, r.Title),
 			Where:    report.URL,
 			Fix:      kitsuneFix(r.Fix, r.Doc),
 		})
 	}
-	return found, nil
+	return found
 }
 
 // kitsuneFix is what kitsune says to do, and where it says Google explains

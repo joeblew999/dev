@@ -11,13 +11,12 @@
 //     `seo/missing-meta-description`. That is a usable id for a CI rule.
 //   - It is said to need `--output-file` for JSON. `-o json` writes to stdout,
 //     which is what this uses; its own logs go to stderr where they belong.
-package seo
+package checkers
 
 import (
 	"strings"
 
 	"github.com/joeblew999/dev/cli"
-	"github.com/joeblew999/dev/cli/tool"
 )
 
 var scry = Checker{
@@ -28,7 +27,7 @@ var scry = Checker{
 	Args: func(a Ask) []string {
 		return []string{"check", a.URL, "-o", "json"}
 	},
-	Read: readScry,
+	Read: JSON("scry's report", fromScry),
 }
 
 type scryReport struct {
@@ -41,11 +40,7 @@ type scryReport struct {
 	} `json:"issues"`
 }
 
-func readScry(res tool.Result) (Found, error) {
-	report, err := res.JSON[scryReport]("scry's report")
-	if err != nil {
-		return Found{}, err
-	}
+func fromScry(report scryReport) Found {
 	found := Found{Pages: len(report.Pages)}
 	for _, i := range report.Issues {
 		// Its category is the first half of the check name, and the same two
@@ -64,7 +59,7 @@ func readScry(res tool.Result) (Found, error) {
 			Fix:      scryFix(i.Check),
 		})
 	}
-	return found, nil
+	return found
 }
 
 // scryFix maps its names onto the advice this package already writes, and
@@ -72,14 +67,14 @@ func readScry(res tool.Result) (Found, error) {
 // and not what to do, which is the gap this fills.
 func scryFix(check string) string {
 	_, name, _ := strings.Cut(check, "/")
-	if fix := scoutlyFixes[name]; fix != "" {
+	if fix := fixes[name]; fix != "" {
 		return fix
 	}
 	switch name {
 	case "cert-expiring-soon", "cert-expired":
-		return "renew the certificate: Search requires HTTPS, and a browser will refuse the page before Google ranks it — " + docEssentials
+		return "renew the certificate: Search requires HTTPS, and a browser will refuse the page before Google ranks it — " + DocEssentials
 	case "missing-hsts", "missing-csp", "missing-x-content-type-options", "missing-referrer-policy":
-		return "add the header at the edge or in the server config — " + docEssentials
+		return "add the header at the edge or in the server config — " + DocEssentials
 	}
-	return "see scry's report for " + check + ", and " + docEssentials
+	return "see scry's report for " + check + ", and " + DocEssentials
 }
