@@ -16,6 +16,8 @@ import (
 	"github.com/joeblew999/dev/internal/deps"
 	"github.com/joeblew999/dev/internal/release"
 	"github.com/joeblew999/dev/internal/secrets"
+	"github.com/joeblew999/dev/internal/seo"
+	"github.com/joeblew999/dev/internal/session"
 	"github.com/joeblew999/dev/internal/stage"
 )
 
@@ -52,14 +54,15 @@ var dev = cli.Command{
 		"logs":    {Run: app.LogsVerb, Args: "DIR", Flags: app.EnvFlag, Desc: "follow the deployed app's logs as they happen", Usage: app.Usage},
 		"smoke":   {Run: app.SmokeVerb, Args: "DIR", Flags: app.SmokeFlags, Desc: "start the Worker locally and make one request, to know a build is not broken", Usage: app.Usage},
 		"wait":    {Run: app.WaitVerb, Args: "URL", Flags: app.WaitFlags, Desc: "poll a URL until it answers steadily", Usage: app.Usage},
+		"seo":     {Subs: seo.Subs, Usage: seo.Usage},
 		"delete":  {Run: app.DeleteVerb, Args: "DIR", Flags: app.DeleteFlags, Desc: "remove a deployed app, and the storage created with it; asks first", Usage: app.Usage},
 		"secrets": {Subs: secrets.Subs, Usage: secrets.Usage},
-		// "session": {Run: session.Run, Usage: session.Usage},
-		//
-		// Not exposed for now. The manual, the index and --help are all
-		// rendered from this table, so a verb left out of it is gone from every
-		// one of them with nothing else to change. internal/session stays
-		// compiled and tested; put the line back to have the verb back.
+		"session": {Subs: session.Subs, Usage: session.Usage},
+		// session was out of this table while it still answered to the
+		// pre-Call signature: the manual, the index and --help are all
+		// rendered from here, so a verb left out is gone from every one of
+		// them with nothing else to change. It declares its subcommands like
+		// every other package now, so it is back.
 		"release": {Run: release.Run, Args: "DIR [VERSION]", Flags: release.Flags, Desc: "build for every platform, sign it, and publish it to GitHub", Usage: release.Usage},
 		"deps":    {Subs: deps.Subs, Usage: deps.Usage},
 	},

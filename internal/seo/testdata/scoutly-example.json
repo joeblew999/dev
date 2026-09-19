@@ -1,0 +1,92 @@
+{
+  "url": "https://example.com/",
+  "audited_at": "2026-09-19T08:23:04.170607Z",
+  "summary": {
+    "pages": 1,
+    "links": {
+      "total": 1,
+      "checked": 1,
+      "broken": 0,
+      "blocked": 0,
+      "redirected": 1
+    },
+    "images": {
+      "total": 0,
+      "checked": 0,
+      "broken": 0,
+      "blocked": 0,
+      "redirected": 0,
+      "invalid": 0
+    },
+    "issues": {
+      "total": 2,
+      "error": 1,
+      "warning": 0,
+      "info": 1
+    }
+  },
+  "issues": [
+    {
+      "code": "missing-meta-description",
+      "severity": "error",
+      "message": "Page is missing a meta description",
+      "target": {
+        "type": "page",
+        "url": "https://example.com/"
+      }
+    },
+    {
+      "code": "redirect",
+      "severity": "info",
+      "message": "Link redirected: https://iana.org/domains/example -> http://www.iana.org/help/example-domains",
+      "target": {
+        "type": "link",
+        "url": "https://iana.org/domains/example"
+      }
+    }
+  ],
+  "pages": [
+    {
+      "url": "https://example.com/",
+      "depth": 0,
+      "status_code": 200,
+      "content_type": "text/html",
+      "title": "Example Domain",
+      "description": null,
+      "headings": {
+        "h1": [
+          "Example Domain"
+        ]
+      },
+      "images": [],
+      "open_graph": {
+        "title": null,
+        "description": null,
+        "image": null,
+        "url": null,
+        "type": null,
+        "site_name": null,
+        "locale": null
+      }
+    }
+  ],
+  "links": [
+    {
+      "url": "https://iana.org/domains/example",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "http://www.iana.org/help/example-domains"
+      },
+      "found_on": [
+        {
+          "page_url": "https://example.com/",
+          "original_url": "https://iana.org/domains/example",
+          "element": "a",
+          "text": "Learn more"
+        }
+      ]
+    }
+  ],
+  "images": []
+}

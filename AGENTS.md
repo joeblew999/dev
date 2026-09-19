@@ -15,7 +15,11 @@ on first run from a directory outside any repo, so the machine needs a `go`
 there: `mise use -g go@1.27.1` once, a global default that every repo's own
 pin overrides.
 
-This module is `go 1.27`, so write 1.22–1.27 Go and not the workarounds that
+
+https://www.c-sharpcorner.com/article/go-1-27-generic-methods-where-they-simplify-real-go-apis-and-where-they-dont
+
+
+This module is `go 1.27.1`, so write 1.22–1.27 Go and not the workarounds that
 predate it. An agent's training likely predates 1.27, so when a feature seems
 too new to exist, `go doc` it before deciding it does not — the toolchain
 mise pins is the authority, not memory.

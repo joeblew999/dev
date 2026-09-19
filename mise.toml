@@ -4,13 +4,20 @@
 # and get `dev` on PATH plus its skill in .claude/skills/dev.
 
 [tools]
-go = "1.27"
+go = "1.27.1"
 "packslip:github.com/jdx/hk" = "2.0.1"
 goreleaser = "latest"
 packslip = "latest"
 gh = "latest"
 "go:golang.org/x/tools/cmd/deadcode" = "latest"   # what `mise run dead` reports
 "go:honnef.co/go/tools/cmd/staticcheck" = "latest"   # an hk step: every commit, and lint
+"go:github.com/nelsonlaidev/scoutly/cmd/scoutly" = "v0.5.0"   # what `dev seo` runs: crawl and on-page
+"go:github.com/raviqqe/muffet/v2" = "v2.11.5"   # dev seo: the link layer
+"go:github.com/Erose112/seo-audit" = "latest"   # dev seo: the scored gate
+"go:github.com/berkaycubuk/kitsune/cmd/kitsune" = "latest"   # dev seo: stable dotted ids  (note the /cmd path)
+"go:github.com/jimsmart/grobotstxt/cmd/icanhasrobot" = "latest"   # dev seo: Google own robots matcher, ported
+"go:github.com/meysam81/scry" = "latest"   # dev seo: the broad one, TLS and headers included
+"go:github.com/kevhq/ldlint/cmd/ldlint" = "latest"   # dev seo: schema.org vocabulary
 
 [hooks]
 postinstall = { task = "bootstrap" }
@@ -41,7 +48,7 @@ depends = ["build"]
 run = "hk install"
 
 [tasks.build]
-description = ".bin/dev, and the skill from its verbs"
+description = "go fix, then .bin/dev, and the skill from its verbs"
 # Every input go:embed compiles in, not just the Go. A file missing here
 # leaves .bin/dev stale while mise reports it fresh, and `dev skill` then
 # rewrites the manual from the old bytes and says it succeeded.
@@ -51,6 +58,11 @@ sources = [
 ]
 outputs = [".bin/dev", "./dev", "skills/dev/SKILL.md", ".claude/skills/dev/SKILL.md", ".agents/skills/dev/SKILL.md"]
 run = [
+  # go fix first, before the compile: it rewrites old Go into modern Go, so
+  # the binary and the skill below build from the fixed sources. check and
+  # test both reach this through the build dependency, while lint stays a
+  # read-only gate (hk check) and dead stays a report, never a gate.
+  "go fix ./...",
   # dev is the one repo whose command is the tool itself, so the build lands at
   # the root as well: ./dev is how you try a change the way a person meets it,
   # without .bin/ in front of every line. .gitignore has carried /dev for this
