@@ -10,8 +10,14 @@ for the code, gsx and gsxui for a UI.
 
 ```toml
 [tools]
-"packslip:github.com/joeblew999/dev" = "<version>"   # the Releases page has the latest
+"packslip:github.com/joeblew999/dev" = { version = "<version>", pubkey = "RWQnLlj1BaHu39oBhUFxM3zEscQHqhxihLeTGyDAlavNFAOSTxQEHfoq" }
 ```
+
+The Releases page has the latest version. The key is this repo's
+[packslip.pub](packslip.pub), and it is not optional: a release is signed, so
+a pin without it is refused with *"bundle carries a public key hint but an
+identity was pinned"*. Pinning the key is what makes the download verified
+rather than merely downloaded.
 
 `mise install` puts `dev` on PATH and its skill into `.claude/skills/dev`, so a
 Claude Code session in that repo has the manual.
