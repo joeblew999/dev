@@ -79,16 +79,14 @@ func syncSettings(out io.Writer, c claudePins) error {
 
 // checkSettings fails when settings.json has drifted from session.toml, which
 // is what happens when someone edits the settings file by hand.
-func checkSettings(c claudePins) error {
+func settingsFindings(c claudePins) ([]cli.Finding, string, error) {
 	have, err := readSettings()
 	if err != nil {
-		return err
+		return nil, "", err
 	}
-	if diff := diffSettings(have, wantSettings(c)); len(diff) > 0 {
-		return fmt.Errorf("%s does not match [claude] in %s:\n%sfix with: "+syncCmd,
-			settingsFile, pinsFile, cli.Indent(strings.Join(diff, "\n")))
-	}
-	return nil
+	want := wantSettings(c)
+	return findings("settings-drift", diffSettings(have, want),
+		settingsFile+" does not match [claude] in "+pinsFile), cli.Plural(len(want), "key"), nil
 }
 
 // diffSettings compares only the generated keys; the rest of the file is none
@@ -123,7 +121,7 @@ var committedClaudeFiles = []string{settingsFile, ".mcp.json"}
 
 // checkPortablePaths fails when one of those files names a command by absolute
 // path. A bare name is found on PATH wherever the repo is cloned.
-func checkPortablePaths() error {
+func portableFindings() ([]cli.Finding, string, error) {
 	var bad []string
 	for _, name := range committedClaudeFiles {
 		data, err := os.ReadFile(name)
@@ -131,7 +129,7 @@ func checkPortablePaths() error {
 			continue
 		}
 		if err != nil {
-			return err
+			return nil, "", err
 		}
 		var parsed any
 		if err := json.Unmarshal(data, &parsed); err != nil {
@@ -144,11 +142,12 @@ func checkPortablePaths() error {
 			}
 		}
 	}
-	if len(bad) > 0 {
-		return fmt.Errorf("a command is named by absolute path, so it only works on the machine that wrote it:\n%sname it bare (\"mise\", not \"/opt/homebrew/bin/mise\") so PATH finds it in every clone",
-			cli.Indent(strings.Join(cli.Sorted(bad), "\n")))
-	}
-	return nil
+	found := cli.Map(cli.Sorted(bad), func(line string) cli.Finding {
+		return cli.Finding{Severity: cli.SevError, ID: "absolute-path", Message: line,
+			Fix: `name it bare ("mise", not "/opt/homebrew/bin/mise") so PATH finds ` +
+				"it in every clone: an absolute path only works on the machine that wrote it"}
+	})
+	return found, cli.Plural(len(committedClaudeFiles), "file"), nil
 }
 
 // commandValues collects every "command" string anywhere in the document,

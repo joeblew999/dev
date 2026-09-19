@@ -68,30 +68,114 @@ func Sync(out io.Writer) error {
 // disagrees with the mise pin that is the source of truth for its version. It
 // needs no network: file contents are compared against the hashes sync recorded
 // in the lock.
-func Check(out io.Writer) error {
-	have, err := readDir(skillsDir)
+func Check(c cli.Call) error {
+	if err := c.CheckReportFlags(); err != nil {
+		return err
+	}
+	// The pins are read once, before anything is checked against them: a
+	// file that cannot be read is not three findings, it is one reason
+	// nothing could be checked.
+	pins, err := loadPins()
 	if err != nil {
 		return err
+	}
+	started := time.Now()
+	rep := cli.NewReport("session", skillsDir)
+	for _, part := range []struct {
+		name, provides string
+		look           func() ([]cli.Finding, string, error)
+	}{
+		{"skills", "the vendored skills are the ones session.toml pins", lockedSkills},
+		{"settings", ".claude/settings.json holds what [claude] implies",
+			func() ([]cli.Finding, string, error) { return settingsFindings(pins.Claude) }},
+		{"paths", "nothing committed names this machine's home directory", portableFindings},
+	} {
+		at := time.Now()
+		found, covered, err := part.look()
+		took := time.Since(at)
+		step := cli.Step{Name: part.name, Provides: part.provides, Covered: covered,
+			Took: cli.Took(took), TookMs: took.Milliseconds(), Findings: len(found)}
+		if err != nil {
+			rep.NotRun(step, err.Error())
+			continue
+		}
+		for _, f := range found {
+			f.Tool = part.name
+			rep.Add(f)
+		}
+		rep.Ran(step)
+	}
+	warnStaleSessions(c.Stderr, time.Now())
+	rep.Sort()
+	rep.Done(started, c.Value("fail-on"))
+	if c.WantsJSON() {
+		if err := c.EmitJSON(rep); err != nil {
+			return err
+		}
+	} else {
+		writeReport(c, rep)
+	}
+	if path, err := c.Record(rep); err == nil && path != "" && !c.Given("quiet") {
+		fmt.Fprintf(c.Stderr, "recorded: %s\n", path)
+		if prev, ok := c.Previous(rep, path); ok {
+			drift(c, prev, rep)
+		}
+	}
+	if rep.Outcome != "pass" {
+		return fmt.Errorf("%s does not match session.toml; fix with: "+syncCmd, skillsDir)
+	}
+	return nil
+}
+
+// lockedSkills is the vendored skills against what the lock records.
+func lockedSkills() ([]cli.Finding, string, error) {
+	have, err := readDir(skillsDir)
+	if err != nil {
+		return nil, "", err
 	}
 	want, err := lockedFiles()
 	if err != nil {
-		return err
+		return nil, "", err
 	}
-	if diff := diffLocked(have, want); len(diff) > 0 {
-		return fmt.Errorf("%s does not match its pins:\n%sfix with: "+syncCmd, skillsDir, cli.Indent(strings.Join(diff, "\n")+"\n"))
+	return findings("skill-drift", diffLocked(have, want),
+		skillsDir+" does not match its pins"), cli.Plural(len(want), "file"), nil
+}
+
+// findings turns a diff — the missing/changed/unexpected lines every check
+// here produces — into what a report carries. Three checks had their own
+// sentence around the same list.
+func findings(id string, diff []string, what string) []cli.Finding {
+	return cli.Map(diff, func(line string) cli.Finding {
+		return cli.Finding{Severity: cli.SevError, ID: id, Message: line,
+			Fix: what + "; fix with: " + syncCmd}
+	})
+}
+
+// writeReport is the human answer: what was checked, then what is wrong.
+func writeReport(c cli.Call, r *cli.Report) {
+	for _, s := range r.Steps {
+		fmt.Fprintf(c.Stdout, "  %-10s %7s  %-34s %s\n", s.Name, s.Took,
+			cli.Or(s.Covered, s.Note), cli.Plural(s.Findings, "problem"))
 	}
-	p, err := loadPins()
-	if err != nil {
-		return err
+	if len(r.Findings) > 0 {
+		fmt.Fprintln(c.Stdout)
 	}
-	if err := checkSettings(p.Claude); err != nil {
-		return err
+	for _, f := range r.Findings {
+		fmt.Fprintf(c.Stdout, "%-8s %s (%s)\n  %s\n  fix: %s\n\n", f.Severity, f.ID, f.Tool, f.Message, f.Fix)
 	}
-	if err := checkPortablePaths(); err != nil {
-		return err
+	fmt.Fprintf(c.Stdout, "%s in %s: %s\n", r.Outcome, r.Took,
+		cli.Plural(r.BySeverity[cli.SevError], "problem"))
+}
+
+// drift says what moved since the last recorded run.
+func drift(c cli.Call, prev, cur *cli.Report) {
+	fixed, arrived := cli.Drift(prev, cur)
+	for _, f := range fixed {
+		fmt.Fprintf(c.Stderr, "    FIXED  %s\n", f.Message)
 	}
-	warnStaleSessions(out, time.Now())
-	return nil
+	for _, f := range arrived {
+		fmt.Fprintf(c.Stderr, "    NEW    %s\n", f.Message)
+	}
 }
 
 // pinnedSkills collects every skill at its pinned version. The lock records

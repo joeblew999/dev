@@ -207,7 +207,7 @@ rather than as a binary you may never call directly.
 
 - `dev session bump [SOURCE...]`
   move a pin in session.toml to upstream HEAD
-- `dev session check`
+- `dev session check [--fail-on error|warning|info] [--json] [--out PATH] [--quiet] [--record DIR]`
   fail when either has drifted from session.toml
 - `dev session mcp`
   every MCP server .mcp.json declares connects

@@ -47,7 +47,7 @@ var Usage string
 // it is why session sat out of the verb table while every other package moved.
 var Subs = map[string]cli.Verb{
 	"sync":   {Run: withPins(func(c cli.Call) error { return Sync(c.Stdout) }), Desc: "write .claude/skills and the .claude/settings.json keys session.toml implies"},
-	"check":  {Run: withPins(func(c cli.Call) error { return Check(c.Stdout) }), Desc: "fail when either has drifted from session.toml"},
+	"check":  {Run: withPins(Check), Flags: cli.ReportFlags, Desc: "fail when either has drifted from session.toml"},
 	"verify": {Run: withPins(runVerify), Flags: VerifyFlags, Desc: "hold a fresh Claude Code session against SESSION.lock"},
 	"bump":   {Run: withPins(runBump), Args: "[SOURCE...]", Desc: "move a pin in session.toml to upstream HEAD"},
 	"mcp":    {Run: withPins(func(c cli.Call) error { return MCP(c.Stdout, c.Stderr) }), Desc: "every MCP server .mcp.json declares connects"},

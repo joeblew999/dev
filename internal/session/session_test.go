@@ -152,8 +152,10 @@ func TestSyncSettingsKeepsWhatItDoesNotOwn(t *testing.T) {
 	if _, ok := have["hooks"]; !ok {
 		t.Error("sync dropped hooks, which it does not own")
 	}
-	if err := checkSettings(c); err != nil {
-		t.Errorf("check failed right after sync: %v", err)
+	// What sync just wrote is what check accepts; a finding here would mean
+	// the two disagree about what [claude] implies.
+	if found, _, err := settingsFindings(c); err != nil || len(found) > 0 {
+		t.Errorf("check found %v (%v) right after sync", found, err)
 	}
 	blocked, _ := have["enabledPlugins"].(map[string]any)
 	if blocked["a@b"] != false || len(blocked) != 1 {
@@ -169,9 +171,20 @@ func TestCheckSettingsCatchesHandEdits(t *testing.T) {
 	if err := writeFile(settingsFile, `{"enabledPlugins":{"a@b":true}}`); err != nil {
 		t.Fatal(err)
 	}
-	err := checkSettings(claudePins{BlockedPlugins: []string{"a@b"}})
-	if err == nil || !strings.Contains(err.Error(), syncCmd) {
-		t.Errorf("checkSettings = %v; want an error naming %q as the fix", err, syncCmd)
+	// The pins the finding is checked against come from session.toml, which
+	// this test wrote above.
+	found, _, err := settingsFindings(claudePins{BlockedPlugins: []string{"a@b"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(found) == 0 {
+		t.Fatal("settings that do not match the pins passed the check")
+	}
+	// Every finding names the fix, which is what makes a report actionable.
+	for _, f := range found {
+		if !strings.Contains(f.Fix, syncCmd) {
+			t.Errorf("%s does not name %q as the fix: %q", f.ID, syncCmd, f.Fix)
+		}
 	}
 }
 
@@ -215,9 +228,13 @@ func TestCheckPortablePathsCatchesAbsoluteCommands(t *testing.T) {
 	if err := writeFile(".mcp.json", `{"mcpServers":{"hk":{"command":"/opt/homebrew/bin/mise"}}}`); err != nil {
 		t.Fatal(err)
 	}
-	err := checkPortablePaths()
-	if err == nil || !strings.Contains(err.Error(), "/opt/homebrew/bin/mise") {
-		t.Errorf("checkPortablePaths = %v; want it to name the offending command", err)
+	found, _, err := portableFindings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	said := strings.Join(cli.Map(found, func(f cli.Finding) string { return f.Message }), " ")
+	if !strings.Contains(said, "/opt/homebrew/bin/mise") {
+		t.Errorf("the offending command was not named: %q", said)
 	}
 	// Nested inside a hooks array, which is where the other one hid.
 	if err := writeFile(settingsFile, `{"hooks":{"Stop":[{"hooks":[{"command":"/usr/local/bin/x"}]}]}}`); err != nil {
@@ -226,14 +243,18 @@ func TestCheckPortablePathsCatchesAbsoluteCommands(t *testing.T) {
 	if err := writeFile(".mcp.json", `{"mcpServers":{"hk":{"command":"mise"}}}`); err != nil {
 		t.Fatal(err)
 	}
-	if err := checkPortablePaths(); err == nil || !strings.Contains(err.Error(), "/usr/local/bin/x") {
-		t.Errorf("checkPortablePaths missed a command nested in hooks: %v", err)
+	nested, _, err := portableFindings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(cli.Map(nested, func(f cli.Finding) string { return f.Message }), " "), "/usr/local/bin/x") {
+		t.Errorf("a command nested in hooks was missed: %v", nested)
 	}
 	if err := writeFile(settingsFile, `{"hooks":{"Stop":[{"hooks":[{"command":"mise exec -- hk"}]}]}}`); err != nil {
 		t.Fatal(err)
 	}
-	if err := checkPortablePaths(); err != nil {
-		t.Errorf("checkPortablePaths = %v; want bare commands to pass", err)
+	if found, _, err := portableFindings(); err != nil || len(found) > 0 {
+		t.Errorf("bare commands should pass: %v (%v)", found, err)
 	}
 }
 
