@@ -36,6 +36,13 @@ var notSource = map[string]bool{
 	ShippedDir: true, ".claude": true, ".agents": true, ".plans": true,
 }
 
+// notSourceFile is a file this command writes rather than reads. A manual's
+// three copies are excluded by their directories above; README.md is not in
+// one, and `<cmd> skill` writes its install block — so without this, writing
+// the block makes the binary stale against its own output and the next run
+// refuses. A file a command generates cannot be a file it is behind.
+var notSourceFile = map[string]bool{"README.md": true}
+
 // staleBuild names a file this command was built from that has changed since,
 // or "" when the binary is current — or when the question does not apply.
 //
@@ -76,7 +83,7 @@ func newestAfter(root string, built time.Time) string {
 			}
 			return nil
 		}
-		if !sourceExts[filepath.Ext(p)] {
+		if !sourceExts[filepath.Ext(p)] || notSourceFile[d.Name()] {
 			return nil
 		}
 		if info, err := d.Info(); err == nil && info.ModTime().After(built) {

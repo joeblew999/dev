@@ -55,7 +55,7 @@ description = "go fix, then .bin/dev, and the skill from its verbs"
 # rewrites the manual from the old bytes and says it succeeded.
 sources = [
   "**/*.go", "go.mod", "go.sum",
-  "skill.md", "cli/*.md", "internal/*/usage.md",
+  "skill.md", "cli/*.md", "internal/*/usage.md", "packslip.pub",
 ]
 outputs = [".bin/dev", "./dev", "skills/dev/SKILL.md", ".claude/skills/dev/SKILL.md", ".agents/skills/dev/SKILL.md"]
 run = [

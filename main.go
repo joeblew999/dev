@@ -38,6 +38,14 @@ var skillDoc string
 //go:embed cli/skill.md
 var cliSkill string
 
+// packslip.pub is the public half of the key every release is signed with.
+// Compiled in so `dev version --pin` can print the whole line a consumer
+// pastes: the version it was built with and the key that signed it, which
+// makes the instruction impossible to get wrong and impossible to go stale.
+
+//go:embed packslip.pub
+var pubKey string
+
 // dev is the whole tool: what each verb runs, and its usage. cli.Main runs it
 // and renders the manual from this table, so the manual is the code's; any
 // command built the same way gets the same.
@@ -66,6 +74,9 @@ var dev = cli.Command{
 		"release": {Run: release.Run, Args: "DIR [VERSION]", Flags: release.Flags, Desc: "build for every platform, sign it, and publish it to GitHub", Usage: release.Usage},
 		"deps":    {Subs: deps.Subs, Usage: deps.Usage},
 	},
+	Pin:    "github.com/joeblew999/dev",
+	PubKey: lastLine(pubKey),
+
 	Skill: skillDoc,
 
 	Skills: map[string]string{"cli": cliSkill},
@@ -78,6 +89,16 @@ var dev = cli.Command{
 
 // version is set by the release build (-X main.version).
 var version = "dev"
+
+// lastLine is the key itself out of packslip.pub, which opens with a comment
+// line minisign writes.
+func lastLine(s string) string {
+	lines := cli.Lines(s)
+	if len(lines) == 0 {
+		return ""
+	}
+	return lines[len(lines)-1]
+}
 
 func main() {
 	dev.Version = version

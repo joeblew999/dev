@@ -264,8 +264,22 @@ func snapshotVersion(describe string) (version, tag string) {
 // comes from fnox or, in CI, from the Actions secret; never a throwaway one,
 // since consumers pin its public half. Nothing runs on a tag push, so a
 // release is published exactly once.
-func (r *release) publish(version string) error {
+// publish is the one place a version becomes public, and it is written so
+// that a failure before that moment leaves nothing behind. A half-made
+// release is worse than none: the tag exists, the next attempt refuses it as
+// already there, and nobody can tell from the outside whether the version
+// shipped. So every step that changes something outside this process
+// registers how to put it back, and they are put back in reverse on the way
+// out — until the release is actually published, after which there is
+// nothing to undo and the error says what is there.
+func (r *release) publish(version string) (err error) {
 	defer r.cleanup()
+	var undo rollback
+	defer func() {
+		if err != nil {
+			undo.run(os.Stderr)
+		}
+	}()
 	if version == "" {
 		return fmt.Errorf("give the version to release, vX.Y.Z")
 	}
@@ -281,14 +295,34 @@ func (r *release) publish(version string) error {
 	} else if status != "" {
 		return fmt.Errorf("working tree is dirty; commit first")
 	}
+	// Everything that can be known before anything is public is checked here.
+	// A release publishes binaries and then signs them, so a signing key that
+	// cannot be read after the tag is pushed leaves a public release nobody
+	// can install: mise refuses a packslip with no bundle, and that is the
+	// right refusal. v1.4.0 went out that way — goreleaser succeeded, fnox
+	// was not on PATH, and the release had to be deleted.
+	key, cleanupKey, err := signingKey()
+	if err != nil {
+		return err
+	}
+	defer cleanupKey()
+	if key == "" {
+		return fmt.Errorf("no signing key, and a release is signed: make one with "+
+			"`dev release %s --keygen` (into fnox as %s, its public half into %s), "+
+			"or run where fnox is on PATH — nothing has been published", r.dir, SigningKeyEnv, pubFile)
+	}
 	if err := run("git", "tag", tag); err != nil {
 		return err
 	}
+	undo.add("delete the local tag "+tag, func() error { return run("git", "tag", "-d", tag) })
 	// Push only the tag: pushing main too can advance the remote past the tag
 	// when local main is ahead, and gh then targets the wrong repo state.
 	if err := run("git", "push", "origin", "refs/tags/"+tag); err != nil {
 		return err
 	}
+	undo.add("delete the pushed tag "+tag, func() error {
+		return run("git", "push", "--delete", "origin", tag)
+	})
 	commit, err := head()
 	if err != nil {
 		return err
@@ -310,18 +344,15 @@ func (r *release) publish(version string) error {
 	if err := run(GoreleaserBin, "release", "--clean", "--config", r.config, "--release-notes", notes.Name()); err != nil {
 		return err
 	}
+	// Public from here. Nothing is unwound after this: the release exists,
+	// and deleting it under a consumer who already pinned it would be worse
+	// than leaving it with a message about what is missing.
+	undo.done()
+	// The key was read before anything was published; this is where it signs.
 	// A local release signs with the long-lived key from fnox, logged: mise
 	// refuses a bundle with no log entry, and a throwaway key would need a
 	// new pin on every release. (A snapshot is never installed, so only it
 	// signs with a throwaway key, unlogged.)
-	key, cleanup, err := signingKey()
-	if err != nil {
-		return err
-	}
-	defer cleanup()
-	if key == "" {
-		return fmt.Errorf("no signing key: make one with: dev release %s --keygen (into fnox as %s, its public half into %s)", r.dir, SigningKeyEnv, pubFile)
-	}
 	if err := r.create(strings.TrimPrefix(tag, "v"), commit, tag, key, false); err != nil {
 		return err
 	}

@@ -37,6 +37,14 @@ type Command struct {
 	Verbs   map[string]Verb // the table; skill and version are added to it
 	Default string          // the verb run with no verb given; "" prints the index
 	Version string          // what `<Name> version` prints
+
+	// Pin is the packslip path a consumer pins, and PubKey the key its
+	// releases are signed with. `<Name> version --pin` prints the line to
+	// paste, so the one place that knows how to install this command is the
+	// command: a README that writes the key out by hand goes stale the day
+	// the key rotates, and nothing tells it.
+	Pin    string
+	PubKey string
 	// Skill is the manual a person writes: frontmatter, prose, and a
 	// VerbMarker line where the rendered verbs belong. One document, because
 	// it is one document — a Head and a Tail made every sentence a question
@@ -192,7 +200,7 @@ func (c Command) all() map[string]Verb {
 	own := c.ownUsage()
 	m["skill"] = Verb{Run: c.skill, Flags: checkFlag, Desc: "rewrite the manual from the verbs, in all three places it is read", Usage: own}
 	m["skills"] = Verb{Run: c.skills, Flags: JSONFlags, Desc: "list what every agent in this repo can read, and where each came from", Usage: own}
-	m["version"] = Verb{Run: c.version, Desc: "print the version, to tell a release from a local build", Usage: own}
+	m["version"] = Verb{Run: c.version, Flags: pinFlag, Desc: "print the version, or with --pin the line that installs this build", Usage: own}
 	return m
 }
 

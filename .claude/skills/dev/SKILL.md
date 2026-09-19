@@ -129,8 +129,8 @@ Every command built on this verb system gets these two without writing them.
   rewrite the manual from the verbs, in all three places it is read
 - `dev skills [--json] [--out PATH]`
   list what every agent in this repo can read, and where each came from
-- `dev version`
-  print the version, to tell a release from a local build
+- `dev version [--pin]`
+  print the version, or with --pin the line that installs this build
 
 ### What Google asks of a page
 
