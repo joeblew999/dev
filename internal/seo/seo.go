@@ -117,6 +117,20 @@ func runCheck(c cli.Call) error {
 	return c.Finish(rep, started, func(r *cli.Report) { write(c, r) })
 }
 
+// onDir is what write and validate both are: resolve which writers run,
+// begin a report, do the one thing that differs, and finish. Written out
+// twice, the two drifted the moment either gained a flag.
+func onDir(c cli.Call, do func(*cli.Report, *picked) error) error {
+	rep, pick, started, err := start(c, c.Dir, writerNames())
+	if err != nil {
+		return err
+	}
+	if err := do(rep, pick); err != nil {
+		return err
+	}
+	return c.Finish(rep, started, func(r *cli.Report) { write(c, r) })
+}
+
 // runWrite is `dev seo write DIR`.
 func runWrite(c cli.Call) error {
 	url := c.Value("url")
@@ -127,30 +141,19 @@ func runWrite(c cli.Call) error {
 	if err != nil {
 		return err
 	}
-	rep, pick, started, err := start(c, c.Dir, writerNames())
-	if err != nil {
-		return err
-	}
-	site := Site{
-		Origin: originOf(url), URL: url, Now: started.UTC(), URLs: urls,
-		Title: c.Value("title"), Desc: c.Value("desc"), Image: c.Value("image"),
-	}
-	if err := Write(c, c.Dir, site, rep, pick); err != nil {
-		return err
-	}
-	return c.Finish(rep, started, func(r *cli.Report) { write(c, r) })
+	return onDir(c, func(rep *cli.Report, pick *picked) error {
+		return Write(c, c.Dir, Site{
+			Origin: originOf(url), URL: url, Now: time.Now().UTC(), URLs: urls,
+			Title: c.Value("title"), Desc: c.Value("desc"), Image: c.Value("image"),
+		}, rep, pick)
+	})
 }
 
 // runValidate is `dev seo validate DIR`.
 func runValidate(c cli.Call) error {
-	rep, pick, started, err := start(c, c.Dir, writerNames())
-	if err != nil {
-		return err
-	}
-	if err := Validate(c.Dir, originOf(c.Value("url")), rep, pick); err != nil {
-		return err
-	}
-	return c.Finish(rep, started, func(r *cli.Report) { write(c, r) })
+	return onDir(c, func(rep *cli.Report, pick *picked) error {
+		return Validate(c.Dir, originOf(c.Value("url")), rep, pick)
+	})
 }
 
 // sitemapURLs is what the sitemap should list: an explicit file when given —

@@ -65,6 +65,15 @@ func generate(out io.Writer, d Dir) error {
 	return run(out, d.Path, nil, GoBin, "tool", "gsx", "generate", "-q")
 }
 
+// worker refuses a directory that is not one, in the words both verbs that
+// ask were using.
+func (d Dir) worker() error {
+	if !d.Wrangler {
+		return fmt.Errorf("%s has no wrangler.toml; it is not a Worker", d.Path)
+	}
+	return nil
+}
+
 // Build builds the directory's binary: npm and gsx first where they apply,
 // then go build to .bin/<dir>. With asWorker it builds the Worker's wasm for
 // env instead: the environment's main names the output directory, and one
@@ -110,8 +119,8 @@ func Build(out io.Writer, path string, asWorker bool, env string) error {
 }
 
 func buildWorker(out io.Writer, d Dir, env string) error {
-	if !d.Wrangler {
-		return fmt.Errorf("%s has no wrangler.toml; it is not a Worker", d.Path)
+	if err := d.worker(); err != nil {
+		return err
 	}
 	if err := generate(out, d); err != nil {
 		return err
