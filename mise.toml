@@ -9,6 +9,7 @@ go = "1.27.1"
 goreleaser = "latest"
 packslip = "latest"
 gh = "latest"
+fnox = "latest"   # the one way to a secret; dev release reads the signing key from it
 "go:golang.org/x/tools/cmd/deadcode" = "latest"   # what `mise run dead` reports
 "go:honnef.co/go/tools/cmd/staticcheck" = "latest"   # an hk step: every commit, and lint
 "go:github.com/nelsonlaidev/scoutly/cmd/scoutly" = "v0.5.0"   # what `dev seo` runs: crawl and on-page
