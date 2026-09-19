@@ -30,23 +30,25 @@ func CheckSkill(t TB, c Command) {
 		t.Errorf("%v", err)
 		return
 	}
-	for _, p := range []string{shipped, claude, agents} {
-		have, err := os.ReadFile(p)
-		if err != nil || string(have) != want {
-			t.Errorf("%s is stale; regenerate it with: %s skill", rel(p), c.Name)
-		}
-	}
+	c.holdTo(t, want, shipped, claude, agents)
 	dir, err := root(".")
 	if err != nil {
 		return
 	}
 	for name, body := range c.Skills {
-		want := withProvenance(body, c.Name)
-		for _, p := range skillPaths(dir, name) {
-			have, err := os.ReadFile(p)
-			if err != nil || string(have) != want {
-				t.Errorf("%s is stale; regenerate it with: %s skill", rel(p), c.Name)
-			}
+		c.holdTo(t, withProvenance(body, c.Name), skillPaths(dir, name)...)
+	}
+}
+
+// holdTo fails the test for every named file that is not what it should be.
+// A manual's three copies and a shipped skill's three are the same question
+// asked twice, and asking it twice is how two wordings of one message appear.
+func (c Command) holdTo(t TB, want string, paths ...string) {
+	t.Helper()
+	for _, p := range paths {
+		have, err := os.ReadFile(p)
+		if err != nil || string(have) != want {
+			t.Errorf("%s is stale; regenerate it with: %s skill", rel(p), c.Name)
 		}
 	}
 }

@@ -173,6 +173,18 @@ func (c Cmd) build() (*exec.Cmd, context.CancelFunc, error) {
 	return cmd, cancel, nil
 }
 
+// Stop ends a program started with Start and waits for it to go. Whether
+// that is a signal to a process group or a kill is the platform's business
+// and lives beside it; "is there anything to stop, and wait for it" is not,
+// and was written out on both sides.
+func Stop(cmd *exec.Cmd) {
+	if cmd == nil || cmd.Process == nil {
+		return
+	}
+	end(cmd)
+	_, _ = cmd.Process.Wait()
+}
+
 // Timing is where every run says how long it took: stderr, like every other
 // progress line, because stdout belongs to whatever the caller is building. A
 // variable so a test can silence it, and one place so no caller has to

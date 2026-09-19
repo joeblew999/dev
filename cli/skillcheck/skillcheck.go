@@ -22,7 +22,9 @@ import (
 )
 
 // TB is the part of testing.TB this needs, so a caller's binary never links
-// the testing package.
+// the testing package. Declared here as well as in cli rather than imported
+// from it: a small interface belongs where it is used, and an edge from this
+// package to that one would exist for four lines.
 type TB interface {
 	Helper()
 	Errorf(format string, args ...any)

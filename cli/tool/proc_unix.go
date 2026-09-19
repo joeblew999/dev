@@ -14,12 +14,6 @@ func OwnGroup(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 }
 
-// Stop ends a program started with Start, and waits for it to go. Signalling
-// the group rather than the process is what makes OwnGroup worth setting.
-func Stop(cmd *exec.Cmd) {
-	if cmd == nil || cmd.Process == nil {
-		return
-	}
-	_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
-	_, _ = cmd.Process.Wait()
-}
+// end signals one running program. Signalling the group rather than the
+// process is what makes OwnGroup worth setting.
+func end(cmd *exec.Cmd) { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) }
