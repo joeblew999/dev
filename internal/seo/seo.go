@@ -79,30 +79,46 @@ func ValidateFlags(fs *flag.FlagSet) {
 	cli.ReportFlags(fs)
 }
 
+// start is what every subcommand opens with: the flags checked before any
+// work, the selection resolved against a registry, and a report begun. Three
+// of them had written it out.
+func start(c cli.Call, target string, of []string) (*cli.Report, *picked, time.Time, error) {
+	if err := c.CheckReportFlags(); err != nil {
+		return nil, nil, time.Time{}, err
+	}
+	pick, err := selection(c, of)
+	if err != nil {
+		return nil, nil, time.Time{}, err
+	}
+	return cli.NewReport("seo", target), pick, time.Now(), nil
+}
+
+// writerNames and checkerNames are what --only and --skip are resolved
+// against, per subcommand.
+func writerNames() []string {
+	return names(writers, func(w Writer) string { return w.Name })
+}
+
+func checkerNames() []string {
+	return names(checkers.All, func(ch checkers.Checker) string { return ch.Name })
+}
+
 // runCheck is `dev seo check URL`.
 func runCheck(c cli.Call) error {
-	if err := c.CheckReportFlags(); err != nil {
-		return err
-	}
 	maxPages, err := c.ValueAs("max-pages", strconv.Atoi)
 	if err != nil {
 		return c.Usagef("--max-pages wants a number: %v", err)
 	}
-	pick, err := selection(c, names(checkers.All, func(ch checkers.Checker) string { return ch.Name }))
+	rep, pick, started, err := start(c, c.Args[0], checkerNames())
 	if err != nil {
 		return err
 	}
-	started := time.Now()
-	rep := cli.NewReport("seo", c.Args[0])
 	Audit(c, rep, c.Args[0], maxPages, pick)
 	return finish(c, rep, started)
 }
 
 // runWrite is `dev seo write DIR`.
 func runWrite(c cli.Call) error {
-	if err := c.CheckReportFlags(); err != nil {
-		return err
-	}
 	url := c.Value("url")
 	if url == "" {
 		return c.Usagef("--url says which site these files are for")
@@ -111,15 +127,13 @@ func runWrite(c cli.Call) error {
 	if err != nil {
 		return err
 	}
-	started := time.Now()
-	rep := cli.NewReport("seo", c.Dir)
+	rep, pick, started, err := start(c, c.Dir, writerNames())
+	if err != nil {
+		return err
+	}
 	site := Site{
 		Origin: originOf(url), URL: url, Now: started.UTC(), URLs: urls,
 		Title: c.Value("title"), Desc: c.Value("desc"), Image: c.Value("image"),
-	}
-	pick, err := selection(c, names(writers, func(w Writer) string { return w.Name }))
-	if err != nil {
-		return err
 	}
 	if err := Write(c, c.Dir, site, rep, pick); err != nil {
 		return err
@@ -129,15 +143,10 @@ func runWrite(c cli.Call) error {
 
 // runValidate is `dev seo validate DIR`.
 func runValidate(c cli.Call) error {
-	if err := c.CheckReportFlags(); err != nil {
-		return err
-	}
-	pick, err := selection(c, names(writers, func(w Writer) string { return w.Name }))
+	rep, pick, started, err := start(c, c.Dir, writerNames())
 	if err != nil {
 		return err
 	}
-	started := time.Now()
-	rep := cli.NewReport("seo", c.Dir)
 	if err := Validate(c.Dir, originOf(c.Value("url")), rep, pick); err != nil {
 		return err
 	}
@@ -328,9 +337,14 @@ func run1(ch checkers.Checker, c cli.Call, url string, maxPages int) result {
 	res, err := tool.Run(ch.Name, ch.Pin, ch.Args(ask)...)
 	step := cli.Step{Name: ch.Name, Provides: ch.Provides, Cost: ch.Cost,
 		Requires: ch.Pin, Took: cli.Took(res.Took), TookMs: res.Took.Milliseconds()}
-	if err != nil {
+	// A checker that could not run, and one whose output could not be read,
+	// are the same to a reader: it did not answer, and here is why.
+	gaveUp := func(err error) result {
 		step.Status, step.Note = cli.StatusSkipped, err.Error()
 		return result{step: step}
+	}
+	if err != nil {
+		return gaveUp(err)
 	}
 	// Written before it is read, so a checker this package cannot parse still
 	// leaves everything it said where a person can look.
@@ -339,8 +353,7 @@ func run1(ch checkers.Checker, c cli.Call, url string, maxPages int) result {
 	}
 	found, err := ch.Read(res)
 	if err != nil {
-		step.Status, step.Note = cli.StatusSkipped, err.Error()
-		return result{step: step}
+		return gaveUp(err)
 	}
 	step.Findings, step.Covered = len(found.Issues), found.Covered()
 	return result{step: step, findings: found.Issues}

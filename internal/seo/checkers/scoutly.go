@@ -7,8 +7,6 @@
 package checkers
 
 import (
-	"fmt"
-
 	"github.com/joeblew999/dev/cli"
 )
 
@@ -53,11 +51,7 @@ var scoutly = Checker{
 	Provides: "what Google reads on each page: title, meta description, H1, canonical, Open Graph, images",
 	Cost:     "~1s for a few pages",
 	Args: func(a Ask) []string {
-		args := []string{a.URL, "--format", "json"}
-		if a.Pages > 0 {
-			args = append(args, "--max-pages", fmt.Sprint(a.Pages))
-		}
-		return args
+		return Paged([]string{a.URL, "--format", "json"}, a.Pages)
 	},
 	Read: JSON("scoutly's report", fromScoutly),
 }

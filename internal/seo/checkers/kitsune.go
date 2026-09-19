@@ -69,7 +69,7 @@ func fromKitsune(report kitsuneReport) Found {
 			Tool:     "kitsune",
 			ID:       r.ID,
 			Severity: r.Severity,
-			Message:  orElse(r.Detail, r.Title),
+			Message:  cli.Or(r.Detail, r.Title),
 			Where:    report.URL,
 			Fix:      kitsuneFix(r.Fix, r.Doc),
 		})

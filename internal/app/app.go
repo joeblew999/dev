@@ -16,6 +16,7 @@ import (
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/cloudflare"
 	"github.com/joeblew999/dev/internal/fly"
+	"github.com/joeblew999/dev/internal/stage"
 )
 
 // Usage is what dev prints for these verbs. It is markdown in a file beside
@@ -40,9 +41,10 @@ var Usage string
 // cloud's flags.
 
 // EnvFlag is the wrangler environment, taken by every deploy verb.
-func EnvFlag(fs *flag.FlagSet) {
-	fs.String("env", "", "wrangler environment `NAME`")
-}
+// EnvFlag is stage's, because the environment is a property of the build and
+// not of the deploy. Written out here as well, the two wordings drifted the
+// moment either was edited.
+func EnvFlag(fs *flag.FlagSet) { stage.EnvFlag(fs) }
 
 // URLFlags are what `url` takes.
 func URLFlags(fs *flag.FlagSet) {

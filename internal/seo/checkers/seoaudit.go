@@ -18,11 +18,7 @@ var seoAudit = Checker{
 	Provides: "a fixed list of checks scored across the site, and duplicate titles between pages",
 	Cost:     "~600ms",
 	Args: func(a Ask) []string {
-		args := []string{"crawl", "--url", a.URL, "--output", "json"}
-		if a.Pages > 0 {
-			args = append(args, "--max-pages", fmt.Sprint(a.Pages))
-		}
-		return args
+		return Paged([]string{"crawl", "--url", a.URL, "--output", "json"}, a.Pages)
 	},
 	Read: JSON("seo-audit's report", fromSEOAudit),
 }

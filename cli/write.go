@@ -98,19 +98,12 @@ func (c Command) skill(call Call) error {
 		return err
 	}
 	for _, p := range []string{shipped, claude, agents} {
-		if check {
-			have, err := os.ReadFile(p)
-			if err != nil || string(have) != want {
-				return fmt.Errorf("%s is stale; regenerate it with: %s skill", rel(p), c.Name)
-			}
-			fmt.Fprintf(call.Stdout, "%s is up to date\n", rel(p))
+		written, err := put(call.Stdout, c.Name, p, want, check)
+		if err != nil {
+			return err
+		}
+		if !written {
 			continue
-		}
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			return err
-		}
-		if err := os.WriteFile(p, []byte(want), 0o644); err != nil {
-			return err
 		}
 		fmt.Fprintf(call.Stdout, "wrote %s from the verbs' own usage\n", rel(p))
 	}
@@ -120,25 +113,43 @@ func (c Command) skill(call Call) error {
 // writeSkill writes or checks one of c.Skills, in the three places a manual
 // goes. It is the same work c.skill does for the command's own manual, on a
 // body that was written rather than rendered.
-func writeSkillTo(out io.Writer, paths []string, body string, check bool) error {
+func writeSkillTo(out io.Writer, name string, paths []string, body string, check bool) error {
 	for _, p := range paths {
-		if check {
-			have, err := os.ReadFile(p)
-			if err != nil || string(have) != body {
-				return fmt.Errorf("%s is stale; regenerate it with: dev skill", rel(p))
-			}
-			fmt.Fprintf(out, "%s is up to date\n", rel(p))
-			continue
-		}
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		written, err := put(out, name, p, body, check)
+		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
-			return err
+		if written {
+			fmt.Fprintf(out, "wrote %s\n", rel(p))
 		}
-		fmt.Fprintf(out, "wrote %s\n", rel(p))
 	}
 	return nil
+}
+
+// put writes one file, or with check says whether it is current. Every
+// generated file this command owns goes through here: the three copies of a
+// manual, a skill it ships, and the README's install block all had the same
+// read-compare-or-write, and the wordings had already drifted — one named
+// `dev skill` where another named the command.
+//
+// It reports whether anything was written, so a caller can say what it did
+// in its own words without repeating the decision.
+func put(out io.Writer, name, path, want string, check bool) (written bool, err error) {
+	if check {
+		have, err := os.ReadFile(path)
+		if err != nil || string(have) != want {
+			return false, fmt.Errorf("%s is stale; regenerate it with: %s skill", rel(path), name)
+		}
+		fmt.Fprintf(out, "%s is up to date\n", rel(path))
+		return false, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return false, err
+	}
+	if err := os.WriteFile(path, []byte(want), 0o644); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // writeSkill resolves where a named skill goes, then writes or checks it.
@@ -147,7 +158,7 @@ func (c Command) writeSkill(stdout io.Writer, name, body string, check bool) err
 	if err != nil {
 		return err
 	}
-	return writeSkillTo(stdout, skillPaths(root, name), body, check)
+	return writeSkillTo(stdout, c.Name, skillPaths(root, name), body, check)
 }
 
 // skillPaths are the three copies of a manual for name: the one the release
@@ -221,19 +232,13 @@ func (c Command) readme(out io.Writer, dir string, check bool) error {
 		return fmt.Errorf("%s has one %s and needs two, around the block to write", rel(path), PinMarker)
 	}
 	want := before + PinMarker + "\n" + c.pinBlock() + PinMarker + after
-	if string(data) == want {
-		if check {
-			fmt.Fprintf(out, "%s is up to date\n", rel(path))
-		}
-		return nil
-	}
-	if check {
-		return fmt.Errorf("%s is stale; regenerate it with: %s skill", rel(path), c.Name)
-	}
-	if err := os.WriteFile(path, []byte(want), 0o644); err != nil {
+	written, err := put(out, c.Name, path, want, check)
+	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "wrote the install block in %s\n", rel(path))
+	if written {
+		fmt.Fprintf(out, "wrote the install block in %s\n", rel(path))
+	}
 	return nil
 }
 

@@ -48,6 +48,12 @@ func (c wranglerConfig) kvBindings(env string) []kvBinding {
 	return c.Env[env].KV
 }
 
+// config is the wrangler.toml a directory holds. Its callers all have the
+// directory and none of them has the path.
+func config(dir string) (wranglerConfig, error) {
+	return readWrangler(filepath.Join(dir, ConfigFile))
+}
+
 func readWrangler(path string) (wranglerConfig, error) {
 	cfg, err := conf.Load[wranglerConfig](path)
 	if err != nil {
@@ -74,7 +80,7 @@ func workerName(cfg wranglerConfig, env string) string {
 
 // Name is the Worker that dir's config deploys env to, suffix included.
 func Name(dir, env string) (string, error) {
-	cfg, err := readWrangler(filepath.Join(dir, ConfigFile))
+	cfg, err := config(dir)
 	if err != nil {
 		return "", err
 	}
@@ -87,7 +93,7 @@ func URL(dir, env string, worker bool, local string, refresh bool) (string, erro
 	if !worker {
 		return local, nil
 	}
-	cfg, err := readWrangler(filepath.Join(dir, ConfigFile))
+	cfg, err := config(dir)
 	if err != nil {
 		return "", err
 	}

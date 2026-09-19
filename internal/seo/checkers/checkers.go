@@ -84,6 +84,15 @@ func (f Found) Covered() string {
 	return strings.Join(parts, ", ")
 }
 
+// Paged appends a page limit in the spelling both crawlers use, for a
+// checker that takes one and skips it at zero.
+func Paged(args []string, pages int) []string {
+	if pages <= 0 {
+		return args
+	}
+	return append(args, "--max-pages", itoa(pages))
+}
+
 // All is the registry, in the order a report lists them — whatever order they
 // finished in.
 var All = []Checker{kitsune, scoutly, scry, muffet, seoAudit, ldlint, robotsRules}
@@ -152,15 +161,6 @@ func Issue(toolName, id, severity, message, where, fix string) cli.Finding {
 		Tool: toolName, ID: id, Severity: severity,
 		Message: message, Where: where, Fix: fix,
 	}
-}
-
-// orElse is the first non-empty of the two, for a checker whose detail is
-// sometimes blank and whose title always is not.
-func orElse(s, fallback string) string {
-	if s == "" {
-		return fallback
-	}
-	return s
 }
 
 func plural(n int, word string) string {

@@ -80,6 +80,16 @@ var writers = []Writer{
 		Write:    writeRobots,
 	},
 	{
+		Name:     "headers",
+		Provides: "_headers — the response headers two checkers report missing and nothing could fix",
+		Produces: Artifact{Name: "_headers", Validate: validateHeaders},
+		Fixes: []string{
+			"security.", "security/", "missing-header-", "headers-",
+			"health/missing-charset",
+		},
+		Write: writeHeaders,
+	},
+	{
 		Name:     "head",
 		Provides: "head.html — title, description, canonical, Open Graph and JSON-LD",
 		Produces: Artifact{Name: "head.html", Validate: validateHead},
@@ -181,82 +191,83 @@ func writeHead(s Site) (content, covered string, err error) {
 	return b.String(), tags, nil
 }
 
+// each walks the writers, honouring --only and --skip, and hands every one
+// that runs to do. Write and Validate differed only in what do was: produce
+// the content, or read it back. Everything around that — the selection, the
+// timing, the step, attributing findings to the writer — was written twice.
+func each(rep *cli.Report, pick *picked, do func(Writer) (found []cli.Finding, covered, path string, err error)) int {
+	ran := 0
+	for _, w := range writers {
+		if why := pick.skipped(w.Name); why != "" {
+			rep.NotRun(cli.Step{Name: w.Name, Provides: w.Provides}, why)
+			continue
+		}
+		started := time.Now()
+		found, covered, path, err := do(w)
+		took := time.Since(started)
+		step := cli.Step{Name: w.Name, Provides: w.Provides, Covered: covered,
+			Took: cli.Took(took), TookMs: took.Milliseconds(), Report: path,
+			Findings: len(found)}
+		if err != nil {
+			rep.NotRun(step, err.Error())
+			continue
+		}
+		ran++
+		for _, f := range found {
+			f.Tool = w.Name
+			rep.Add(f)
+		}
+		rep.Ran(step)
+	}
+	return ran
+}
+
 // Write writes every artifact into dir and validates what it wrote, with the
 // same checks `validate` runs — so nothing can pass here and fail there.
 func Write(c cli.Call, dir string, s Site, rep *cli.Report, pick *picked) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	for _, w := range writers {
-		if why := pick.skipped(w.Name); why != "" {
-			rep.NotRun(cli.Step{Name: w.Name, Provides: w.Provides}, why)
-			continue
-		}
-		started := time.Now()
+	each(rep, pick, func(w Writer) ([]cli.Finding, string, string, error) {
 		content, covered, err := w.Write(s)
-		step := cli.Step{Name: w.Name, Provides: w.Provides, Covered: covered,
-			Took: cli.Took(time.Since(started)), TookMs: time.Since(started).Milliseconds()}
 		if err != nil {
-			rep.NotRun(step, err.Error())
-			continue
+			return nil, "", "", err
 		}
 		path := filepath.Join(dir, w.Produces.Name)
 		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			rep.NotRun(step, err.Error())
-			continue
+			return nil, "", "", err
 		}
-		found, _ := w.Produces.Validate(w.Produces.Name, content, s.Origin)
-		for _, f := range found {
-			f.Tool = w.Name
-			rep.Add(f)
-		}
-		step.Findings = len(found)
-		step.Report = path
-		rep.Ran(step)
 		if !c.Given("quiet") {
 			fmt.Fprintf(c.Stderr, "  wrote %-14s %s\n", w.Produces.Name, w.Provides)
 		}
-	}
+		found, _ := w.Produces.Validate(w.Produces.Name, content, s.Origin)
+		return found, covered, path, nil
+	})
 	return nil
 }
 
 // Validate checks artifacts already on disk, with no network at all: the same
 // checks Write runs on what it just wrote. Good as a pre-commit hook.
 func Validate(dir string, origin string, rep *cli.Report, pick *picked) error {
-	found := 0
-	for _, w := range writers {
-		if why := pick.skipped(w.Name); why != "" {
-			rep.NotRun(cli.Step{Name: w.Name, Provides: w.Provides}, why)
-			continue
-		}
-		started := time.Now()
+	ran := each(rep, pick, func(w Writer) ([]cli.Finding, string, string, error) {
 		path := filepath.Join(dir, w.Produces.Name)
 		data, err := os.ReadFile(path)
-		step := cli.Step{Name: w.Name, Provides: w.Provides,
-			Took: cli.Took(time.Since(started)), TookMs: time.Since(started).Milliseconds()}
 		if err != nil {
-			rep.NotRun(step, w.Produces.Name+" is not in "+dir)
 			rep.Add(cli.Finding{Tool: w.Name, Severity: cli.SevWarning,
 				ID: "missing-" + w.Name, Message: w.Produces.Name + " is not in " + dir,
-				Fix: "write it with: dev seo write " + dir})
-			continue
+				Fix: "write it with: dev seo write " + dir, FixedBy: w.Name})
+			return nil, "", "", fmt.Errorf("%s is not in %s", w.Produces.Name, dir)
 		}
-		found++
 		// The origin a strict check compares against is read from the files
 		// when nobody named one: guessing a host fails every URL on a
 		// spurious host check.
 		if origin == "" {
 			origin = originFrom(string(data))
 		}
-		issues, covered := w.Produces.Validate(w.Produces.Name, string(data), origin)
-		for _, f := range issues {
-			f.Tool = w.Name
-			rep.Add(f)
-		}
-		step.Findings, step.Report, step.Covered = len(issues), path, covered
-		rep.Ran(step)
-	}
-	if found == 0 {
+		found, covered := w.Produces.Validate(w.Produces.Name, string(data), origin)
+		return found, covered, path, nil
+	})
+	if ran == 0 {
 		return fmt.Errorf("%s holds none of the files dev seo writes; make them with: dev seo write %s", dir, dir)
 	}
 	return nil

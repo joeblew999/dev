@@ -126,7 +126,7 @@ func validateRobots(name, content, origin string) (found []cli.Finding, covered 
 	if sitemaps == 0 {
 		out = append(out, finding("robots-no-sitemap", cli.SevWarning,
 			"robots.txt names no Sitemap:",
-			"add Sitemap: "+cmpOr(origin, "https://example.com")+"/sitemap.xml — it is how Google finds the list — "+docSitemaps))
+			"add Sitemap: "+cli.Or(origin, "https://example.com")+"/sitemap.xml — it is how Google finds the list — "+docSitemaps))
 	}
 	// Google reads the first 500 KiB and ignores the rest.
 	if len(content) > 500<<10 {
@@ -212,13 +212,6 @@ func findingAt(code, sev, where, msg, fix string) cli.Finding {
 
 func one(code, sev, msg, fix string) []cli.Finding {
 	return []cli.Finding{finding(code, sev, msg, fix)}
-}
-
-func cmpOr(s, fallback string) string {
-	if s == "" {
-		return fallback
-	}
-	return s
 }
 
 const docSitemaps = "https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview"

@@ -119,7 +119,7 @@ func (r *Report) Add(f Finding) {
 
 // Ran records a step that ran.
 func (r *Report) Ran(s Step) {
-	s.Status = cmpOr(s.Status, StatusOK)
+	s.Status = Or(s.Status, StatusOK)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.Steps = append(r.Steps, s)
@@ -151,7 +151,7 @@ func (r *Report) Done(started time.Time, failOn string) {
 // Failed reports whether anything was found at or above failOn. An empty
 // failOn means errors fail and nothing else does.
 func (r *Report) Failed(failOn string) bool {
-	want := SevRank(cmpOr(failOn, SevError))
+	want := SevRank(Or(failOn, SevError))
 	for _, f := range r.Findings {
 		if SevRank(f.Severity) <= want {
 			return true
@@ -302,8 +302,12 @@ func Parallel[T any](jobs int, work []func() T, onPanic func(i int, v any) T) []
 	return out
 }
 
-// cmpOr is the first non-empty of the two.
-func cmpOr(s, fallback string) string {
+// Or is the first non-empty of the two: the default a caller falls back to
+// when a field, a flag or a tool's answer is blank. Three packages had
+// written it, and cmp.Or in the standard library wants comparable ordered
+// values rather than this one narrow case, which is the one that keeps
+// coming up.
+func Or(s, fallback string) string {
 	if s == "" {
 		return fallback
 	}

@@ -121,7 +121,7 @@ func (c Cmd) Stream(out io.Writer) error {
 	runErr := cmd.Run()
 	report(Result{Bin: c.Bin, Took: time.Since(started)}, c.Quiet)
 	if runErr != nil {
-		return fmt.Errorf("%s %v (in %s): %w", c.Bin, c.Args, cmp(c.Dir, "."), runErr)
+		return fmt.Errorf("%s %v (in %s): %w", c.Bin, c.Args, cli.Or(c.Dir, "."), runErr)
 	}
 	return nil
 }
@@ -171,13 +171,6 @@ func (c Cmd) build() (*exec.Cmd, context.CancelFunc, error) {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
 	return cmd, cancel, nil
-}
-
-func cmp(s, fallback string) string {
-	if s == "" {
-		return fallback
-	}
-	return s
 }
 
 // Timing is where every run says how long it took: stderr, like every other
