@@ -15,6 +15,7 @@ package tool
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -171,10 +172,19 @@ func (c Cmd) Started(stdout, stderr io.Writer, before ...func(*exec.Cmd)) (*exec
 func (c Cmd) build() (*exec.Cmd, context.CancelFunc, error) {
 	nothing := context.CancelFunc(func() {})
 	if _, err := exec.LookPath(c.Bin); err != nil {
-		if c.Pin == "" {
+		// The caller's own wording wins, then what the tool registry knows.
+		// Every caller used to have to remember a pin, and thirteen of the
+		// fourteen did not, so a missing binary said only that it was
+		// missing — which is useless to the one person it matters to, the
+		// one who has just adopted dev and does not know what it wants.
+		switch pin := cmp.Or(c.Pin, cli.PinFor(c.Bin)); {
+		case pin == "":
 			return nil, nothing, fmt.Errorf("%s is not on PATH", c.Bin)
+		case !cli.Installable(c.Bin) && c.Pin == "":
+			return nil, nothing, fmt.Errorf("%s is not on PATH: %s", c.Bin, pin)
+		default:
+			return nil, nothing, fmt.Errorf("%s is not on PATH; add it to mise.toml [tools] and run mise install:\n  %s", c.Bin, pin)
 		}
-		return nil, nothing, fmt.Errorf("%s is not on PATH; add it to mise.toml [tools] and run mise install:\n  %s", c.Bin, c.Pin)
 	}
 	ctx, cancel := context.Background(), nothing
 	if c.Timeout > 0 {

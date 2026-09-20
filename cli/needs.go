@@ -1,0 +1,82 @@
+// What a command on this stack needs installed, and the mise line that
+// installs it.
+//
+// dev shells out to fourteen programs and, until this existed, named the pin
+// for exactly one of them. The rest failed with "not on PATH" and left the
+// reader to work out what to add — which is fine once, on your own machine,
+// and is the whole adoption cost for a repo that has just pinned dev and does
+// not yet know what dev wants.
+//
+// One declaration serves both halves: the error a missing binary gives, and
+// the list a repo needs before it hits that error. They cannot drift, because
+// there is nothing to keep in step.
+package cli
+
+import "sort"
+
+// Need is one program, and how a repo gets it.
+type Need struct {
+	Bin string // what it is called on PATH
+	Pin string // the mise.toml [tools] line, "" when mise cannot install it
+	For string // which of dev's verbs want it, so a repo can skip what it will never run
+	// Why is what to say when mise cannot install it — Claude Code has its
+	// own installer, and git is expected to be there already.
+	Why string
+}
+
+// Line is the [tools] entry, or Why when there is no line to give.
+func (n Need) Line() string {
+	if n.Pin == "" {
+		return n.Why
+	}
+	return n.Pin
+}
+
+// needs is every program, by the name it has on PATH.
+//
+// Kept here rather than beside each caller because the point of it is to be
+// answerable as a set: "what does this repo need before it can use dev" is
+// one question, and fourteen constants in nine packages cannot answer it.
+var needs = map[string]Need{
+	"go":         {Bin: "go", Pin: `go = "1.27.1"`, For: "build, check, run, test"},
+	"tinygo":     {Bin: "tinygo", Pin: `tinygo = "latest"`, For: "wasm, for a Worker built from Go"},
+	"node":       {Bin: "node", Pin: `node = "latest"`, For: "wasm and deploy, because wrangler runs on it"},
+	"npm":        {Bin: "npm", Pin: `node = "latest"`, For: "a command directory holding a package.json"},
+	"wrangler":   {Bin: "wrangler", Pin: `wrangler = "latest"`, For: "deploy, delete, logs, smoke on Cloudflare"},
+	"workerd":    {Bin: "workerd", Pin: `workerd = "latest"`, For: "running a Worker locally"},
+	"flyctl":     {Bin: "flyctl", Pin: `flyctl = "latest"`, For: "deploy, delete, logs, list on Fly"},
+	"fnox":       {Bin: "fnox", Pin: `fnox = "latest"`, For: "every secret, and every cloud CLI runs under it"},
+	"goreleaser": {Bin: "goreleaser", Pin: `goreleaser = "latest"`, For: "release"},
+	"packslip":   {Bin: "packslip", Pin: `packslip = "latest"`, For: "release: the signed manifest mise installs from"},
+	"gh":         {Bin: "gh", Pin: `gh = "latest"`, For: "release: publishing it"},
+	"cloudflared": {Bin: "cloudflared", Pin: `cloudflared = "latest"`,
+		For: "fronting an app through a tunnel"},
+
+	// The three mise does not install.
+	"git": {Bin: "git", For: "which repository a directory is in",
+		Why: "git is expected to be on the machine already"},
+	"claude": {Bin: "claude", For: "session verify: holding a real session against the lock",
+		Why: "install Claude Code: https://claude.com/product/claude-code"},
+	"ps":   {Bin: "ps", For: "finding sessions that predate a sync", Why: "part of the operating system"},
+	"lsof": {Bin: "lsof", For: "finding sessions that predate a sync", Why: "part of the operating system"},
+}
+
+// PinFor is the mise line that installs bin, so a missing binary names what
+// to add rather than only what is absent. Empty for a program mise cannot
+// install, which Cmd reports differently.
+func PinFor(bin string) string { return needs[bin].Line() }
+
+// Needs is every program a command on this stack may run, in name order.
+func Needs() []Need {
+	out := make([]Need, 0, len(needs))
+	for _, n := range needs {
+		out = append(out, n)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Bin < out[j].Bin })
+	return out
+}
+
+// Installable reports whether mise can fetch this one. git, ps and lsof are
+// needed and cannot be installed, and an error that offers a mise line for
+// them sends the reader somewhere that will not help.
+func Installable(bin string) bool { return needs[bin].Pin != "" }

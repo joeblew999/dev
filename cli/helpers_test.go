@@ -290,3 +290,60 @@ func TestEitherOr(t *testing.T) {
 		t.Errorf("English = %q", got)
 	}
 }
+
+// A repo adopts this command by pinning one line, and then finds out what
+// else it needs one failure at a time — wrangler when it first deploys a
+// Worker, node because wrangler runs on it, flyctl at the first Fly deploy,
+// fnox the moment anything touches a secret. Each is a stop, a search and a
+// guess at a version.
+//
+// One declaration answers both: the list up front, and the line a missing
+// binary names. They cannot disagree because there is only one of them.
+func TestEveryToolSaysWhatItIsForAndHowToGetIt(t *testing.T) {
+	all := Needs()
+	if len(all) == 0 {
+		t.Fatal("no tools declared, so `tools` answers nothing")
+	}
+	for _, n := range all {
+		if n.For == "" {
+			t.Errorf("%s does not say what it is for, so nobody can tell whether they need it", n.Bin)
+		}
+		// Either mise can install it and there is a line, or it cannot and
+		// there is a sentence. Neither is optional: a tool with no line and
+		// no reason is one a reader can do nothing about.
+		if n.Pin == "" && n.Why == "" {
+			t.Errorf("%s has no pin and no explanation", n.Bin)
+		}
+		if n.Line() == "" {
+			t.Errorf("%s offers nothing when it is missing", n.Bin)
+		}
+	}
+	// The three mise cannot install are named as such, so an error does not
+	// offer a mise line for git.
+	for _, bin := range []string{"git", "ps", "lsof", "claude"} {
+		if Installable(bin) {
+			t.Errorf("%s is offered as a mise install and is not one", bin)
+		}
+		if PinFor(bin) == "" {
+			t.Errorf("%s says nothing when it is missing", bin)
+		}
+	}
+	// And the ones it can.
+	for _, bin := range []string{"wrangler", "flyctl", "fnox", "cloudflared", "go"} {
+		if !Installable(bin) {
+			t.Errorf("%s has no mise line, and mise installs it", bin)
+		}
+		if !strings.Contains(PinFor(bin), "=") {
+			t.Errorf("%s's line is not a [tools] entry: %q", bin, PinFor(bin))
+		}
+	}
+	// Every binary the tree actually runs is declared. This is the half that
+	// rots: a new tool gets a Cmd and nobody remembers the registry, and the
+	// first person to hear about it is whoever adopts the command next.
+	for _, bin := range []string{"go", "npm", "node", "packslip", "fnox", "gh",
+		"goreleaser", "tinygo", "claude", "flyctl", "git", "lsof", "ps", "wrangler"} {
+		if PinFor(bin) == "" {
+			t.Errorf("%s is run by this tree and is not declared in needs", bin)
+		}
+	}
+}

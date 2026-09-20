@@ -211,6 +211,7 @@ func (c Command) all() map[string]Verb {
 	m["skill"] = Verb{Run: c.skill, Flags: checkFlag, Desc: "rewrite the manual from the verbs, in all three places it is read", Usage: own}
 	m["skills"] = Verb{Run: c.skills, Flags: JSONFlags, Desc: "list what every agent in this repo can read, and where each came from", Usage: own}
 	m["version"] = Verb{Run: c.version, Flags: pinFlag, Desc: "print the version, or with --pin the line that installs this build", Usage: own}
+	m["tools"] = Verb{Run: c.tools, Flags: ToolsFlags, Desc: "every program this command may run, the mise line that installs it, and whether it is here", Usage: own}
 	return m
 }
 

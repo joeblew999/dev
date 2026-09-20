@@ -189,6 +189,8 @@ Every command built on this verb system gets these two without writing them.
   rewrite the manual from the verbs, in all three places it is read
 - `dev skills [--json] [--out PATH]`
   list what every agent in this repo can read, and where each came from
+- `dev tools [--json] [--missing] [--out PATH]`
+  every program this command may run, the mise line that installs it, and whether it is here
 - `dev version [--pin]`
   print the version, or with --pin the line that installs this build
 
