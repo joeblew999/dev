@@ -12,6 +12,11 @@ first, so it tells you what your directory really takes.
 A developer's own copy of every app comes from DEPLOY_SUFFIX in gitignored
 mise.local.toml, so two people deploying the same repo never fight over one.
 
+`list DIR` says what that directory's cloud has deployed, marking the one the
+directory is — because "what did I leave running" is the question a deploy
+raises and nothing here could answer. It is the other half of being able to
+remove something: a suffixed copy is easy to make and easy to forget.
+
 A directory deploys to the cloud its config names, and one with no config
 deploys nowhere. `deploy DIR --to fly` or `--to cloudflare` writes that
 cloud's conventional config and carries on, the way a release writes

@@ -100,3 +100,21 @@ func namespaces(dir string) ([]namespace, error) {
 	// wrangler prints its banner before the JSON; DecodeJSON starts at it.
 	return cli.DecodeJSON[[]namespace]("wrangler's namespace list", buf.String())
 }
+
+// List is every Worker on this account.
+//
+// Through the API rather than wrangler, because wrangler has no command that
+// prints them: `wrangler deployments` wants a Worker already named.
+func List() ([]string, error) {
+	scripts, err := ask[[]struct {
+		ID string `json:"id"`
+	}]("the Workers on this account", scriptsEndpoint)
+	if err != nil {
+		return nil, err
+	}
+	return cli.Sorted(cli.Map(scripts, func(w struct {
+		ID string `json:"id"`
+	}) string {
+		return w.ID
+	})), nil
+}

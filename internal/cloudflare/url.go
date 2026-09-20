@@ -1,10 +1,8 @@
 package cloudflare
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,7 +10,6 @@ import (
 
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/conf"
-	"github.com/joeblew999/dev/internal/fnox"
 	"github.com/joeblew999/dev/internal/suffix"
 )
 
@@ -117,15 +114,7 @@ func subdomain(refresh bool) (string, error) {
 			return env[subdomainKey], nil
 		}
 	}
-	token, err := credential("CLOUDFLARE_API_TOKEN")
-	if err != nil {
-		return "", err
-	}
-	account, err := credential("CLOUDFLARE_ACCOUNT_ID")
-	if err != nil {
-		return "", err
-	}
-	sub, err := fetchSubdomain(token, account)
+	sub, err := fetchSubdomain()
 	if err != nil {
 		return "", err
 	}
@@ -135,47 +124,17 @@ func subdomain(refresh bool) (string, error) {
 	return sub, nil
 }
 
-func credential(name string) (string, error) {
-	v, err := fnox.Get(name)
-	if err != nil || v == "" {
-		return "", fmt.Errorf("%s is not in fnox; store it with: fnox set -g %s", name, name)
-	}
-	return v, nil
-}
-
-func fetchSubdomain(token, account string) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf(subdomainEndpoint, account), nil)
+func fetchSubdomain() (string, error) {
+	result, err := ask[struct {
+		Subdomain string `json:"subdomain"`
+	}]("the account's workers.dev subdomain", subdomainEndpoint)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("asking Cloudflare for the workers.dev subdomain: %w", err)
+	if result.Subdomain == "" {
+		return "", fmt.Errorf("this account has no workers.dev subdomain; Cloudflare asks for one on the Workers dashboard before a Worker has a URL")
 	}
-	defer resp.Body.Close()
-	var body struct {
-		Success bool `json:"success"`
-		Result  struct {
-			Subdomain string `json:"subdomain"`
-		} `json:"result"`
-		Errors []struct {
-			Message string `json:"message"`
-		} `json:"errors"`
-	}
-	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if resp.StatusCode != http.StatusOK || !body.Success || body.Result.Subdomain == "" {
-		var msgs []string
-		for _, e := range body.Errors {
-			msgs = append(msgs, e.Message)
-		}
-		detail := ""
-		if len(msgs) > 0 {
-			detail = ": " + strings.Join(msgs, "; ")
-		}
-		return "", fmt.Errorf("could not read the account's workers.dev subdomain (HTTP %d%s); check that CLOUDFLARE_API_TOKEN in fnox can read Workers and CLOUDFLARE_ACCOUNT_ID is the account that owns them", resp.StatusCode, detail)
-	}
-	return body.Result.Subdomain, nil
+	return result.Subdomain, nil
 }
 
 // mise.local.toml is this clone's, gitignored, and mise reads its [env] like

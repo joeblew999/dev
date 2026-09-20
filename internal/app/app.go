@@ -122,6 +122,7 @@ func DeployVerb(c cli.Call) error { return to(c, "deploy") }
 func LogsVerb(c cli.Call) error   { return to(c, "logs") }
 func SmokeVerb(c cli.Call) error  { return to(c, "smoke") }
 func DeleteVerb(c cli.Call) error { return to(c, "delete") }
+func ListVerb(c cli.Call) error   { return to(c, "list") }
 
 // WaitVerb is the one verb here that talks to no cloud: it polls a URL.
 func WaitVerb(c cli.Call) error {
@@ -171,6 +172,14 @@ type cloud struct {
 	Smoke    func(c cli.Call) error // nil when the target has no local runtime
 	NoSmoke  string                 // and why, in words a person can act on
 
+	// List is what this account has deployed on this target. It is the half
+	// of a lifecycle that was missing: dev could put an app in a cloud and
+	// take it away again, and never say what was there — so "what did I
+	// leave running" was a question only the cloud's own CLI could answer,
+	// which is the moment somebody reaches past dev and stops getting the
+	// suffix, the env and the account dev would have used.
+	List func() ([]string, error)
+
 	// Name and PutSecret take plain arguments rather than a Call, because
 	// secrets reaches for them with no verb running. They are here all the
 	// same: they were the last two places that dispatched with `if target ==
@@ -201,6 +210,7 @@ var clouds = map[string]cloud{
 		},
 		Name:      cloudflare.Name,
 		PutSecret: cloudflare.PutSecret,
+		List:      cloudflare.List,
 	},
 	"fly": {
 		ConfigFile: fly.ConfigFile,
@@ -231,6 +241,7 @@ var clouds = map[string]cloud{
 		NoSmoke: "smoke runs a Worker on local workerd; a Fly app has no local runtime here. dev check DIR tests it, and dev deploy DIR --wait PATH proves it online",
 		// A Fly app's name is in its fly.toml and has no environments, so both
 		// take the dir alone and ignore the env a Worker needs.
+		List:      fly.List,
 		Name:      func(dir, _ string) (string, error) { return fly.App(dir) },
 		PutSecret: func(dir, _, name, value string) error { return fly.PutSecret(dir, name, value) },
 	},
@@ -296,6 +307,26 @@ func to(c cli.Call, verb string) error {
 			return fmt.Errorf("%s", t.NoSmoke)
 		}
 		return t.Smoke(c)
+	case "list":
+		names, err := t.List()
+		if err != nil {
+			return err
+		}
+		if len(names) == 0 {
+			fmt.Fprintf(c.Stdout, "nothing deployed here\n")
+			return nil
+		}
+		// The one this directory is, marked, because the question behind
+		// this is usually "is mine up, and what else did I leave running".
+		mine, _ := t.Name(c.Dir, c.Value("env"))
+		for _, name := range names {
+			if name == mine {
+				fmt.Fprintf(c.Stdout, "* %s\n", name)
+				continue
+			}
+			fmt.Fprintf(c.Stdout, "  %s\n", name)
+		}
+		return nil
 	}
 	// Unreachable: to() is only ever called with one of the verbs above, from
 	// this file. It is here so that adding a verb without adding its case is a

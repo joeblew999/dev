@@ -68,6 +68,11 @@ first, so it tells you what your directory really takes.
 A developer's own copy of every app comes from DEPLOY_SUFFIX in gitignored
 mise.local.toml, so two people deploying the same repo never fight over one.
 
+`list DIR` says what that directory's cloud has deployed, marking the one the
+directory is — because "what did I leave running" is the question a deploy
+raises and nothing here could answer. It is the other half of being able to
+remove something: a suffixed copy is easy to make and easy to forget.
+
 A directory deploys to the cloud its config names, and one with no config
 deploys nowhere. `deploy DIR --to fly` or `--to cloudflare` writes that
 cloud's conventional config and carries on, the way a release writes
@@ -79,6 +84,8 @@ next time anybody looked. Read it — it is the convention, not a ceiling.
   put the command in the cloud its directory names
 - `dev delete DIR [--env NAME] [--name APP] [--yes]`
   remove a deployed app, and the storage created with it; asks first
+- `dev list DIR [--env NAME]`
+  what is deployed on this directory's cloud, with this one marked
 - `dev logs DIR [--env NAME]`
   follow the deployed app's logs as they happen
 - `dev smoke DIR [--env NAME] [--expect TEXT] [--path P] [--timeout LONG]`

@@ -344,3 +344,29 @@ func orgsSeen() []string {
 	}
 	return cli.SortedKeys(orgs)
 }
+
+// List is every app these credentials can see, which is every app in the
+// organisations the token reaches and no more. An empty list is not proof
+// that an account has no apps — it is what a token scoped elsewhere returns —
+// and this is why nothing here decides whether one app exists by looking for
+// it in this list.
+func List() ([]string, error) {
+	if err := installed(); err != nil {
+		return nil, err
+	}
+	said, err := fnox.Ask(".", FlyctlBin, "apps", "list", "--json")
+	if err != nil {
+		return nil, fmt.Errorf("flyctl apps list failed: %w — %s", err, credentials("an app"))
+	}
+	apps, err := cli.DecodeJSON[[]struct {
+		Name string `json:"Name"`
+	}]("flyctl's app list", said)
+	if err != nil {
+		return nil, err
+	}
+	return cli.Sorted(cli.Map(apps, func(a struct {
+		Name string `json:"Name"`
+	}) string {
+		return a.Name
+	})), nil
+}

@@ -76,6 +76,7 @@ func TestEveryCloudIsWholeSoAddingOneIsOneEdit(t *testing.T) {
 			"Delete":    c.Delete == nil,
 			"Name":      c.Name == nil,
 			"PutSecret": c.PutSecret == nil,
+			"List":      c.List == nil,
 		} {
 			if missing {
 				t.Errorf("cloud %q has no %s, so whatever calls it panics", name, what)
