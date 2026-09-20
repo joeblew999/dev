@@ -84,7 +84,7 @@ func Deploy(out io.Writer, dir string, extra []string) error {
 	args = append(args, extra...)
 	args = append(args, ".")
 	if err := fnox.Exec(".", nil, out, args...); err != nil {
-		return fmt.Errorf("flyctl deploy of %s failed: %w. It needs FLY_API_TOKEN in fnox (a deploy token from: flyctl tokens create deploy), or a login from: flyctl auth login; and the app must exist: flyctl apps create %s", app, err, app)
+		return fmt.Errorf("flyctl deploy of %s failed: %w — %s", app, err, credentials(app))
 	}
 	return nil
 }
@@ -154,7 +154,7 @@ func ensureApp(out io.Writer, app string) error {
 	fmt.Fprint(out, said)
 	if err != nil {
 		if strings.Contains(said, "already been taken") {
-			return fmt.Errorf("the Fly app %s exists and these credentials cannot see it, so it can be neither deployed to nor created: check FLY_API_TOKEN in fnox is for the account that owns it (flyctl auth whoami), or give this copy its own name with DEPLOY_SUFFIX", app)
+			return fmt.Errorf("the Fly app %s exists and cannot be seen from here, so it can be neither deployed to nor created — %s; or give this copy its own name with DEPLOY_SUFFIX", app, credentials(app))
 		}
 		return fmt.Errorf("flyctl apps create %s failed: %w (a name is global across Fly; DEPLOY_SUFFIX gives this copy its own, FLY_ORG the org)", app, err)
 	}
@@ -189,7 +189,7 @@ func appStatus(app string) error {
 	if strings.Contains(said, "Could not find App") {
 		return errNoSuchApp
 	}
-	return fmt.Errorf("flyctl status --app %s failed: %w. It needs FLY_API_TOKEN in fnox (a token from: flyctl tokens create org), or a login from: flyctl auth login", app, err)
+	return fmt.Errorf("flyctl could not say whether the app %s is there: %w — %s", app, err, credentials(app))
 }
 
 // Logs streams the deployed app's logs in the foreground until interrupted.
@@ -284,4 +284,63 @@ func Scaffold(dir, name string) string {
 		"# One machine at a time, so a bad release never takes them all.\n" +
 		"[deploy]\n" +
 		"  strategy = \"rolling\"\n"
+}
+
+// tokenIdentity is how Fly names a scoped token rather than a person: `fly
+// auth whoami` answers with a uuid at this domain.
+const tokenIdentity = "@tokens.fly.io"
+
+// whoami is who these credentials are, "" when Fly will not say.
+func whoami() string {
+	said, err := fnox.Ask(".", FlyctlBin, "auth", "whoami")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(said)
+}
+
+// credentials says who is being refused, and what kind of credential it is.
+//
+// Every way this package can be refused looks the same from outside —
+// "unauthorized", an empty list, an app that cannot be found — and all of
+// them have the same cause more often than not: FLY_API_TOKEN is a scoped
+// token for some other app. A scoped token is not a smaller login, it is a
+// key to one app, so it resolves an org, validates a name and refuses
+// everything about any app but its own. Nothing in Fly's own errors says so.
+//
+// This turns that into a sentence. It costs one flyctl call, and only on the
+// path where something has already gone wrong.
+func credentials(app string) string {
+	who := whoami()
+	switch {
+	case who == "":
+		return "and Fly will not say who these credentials are, which usually means there is no FLY_API_TOKEN in fnox and no login either (flyctl auth login, or fnox set -g FLY_API_TOKEN)"
+	case strings.Contains(who, tokenIdentity):
+		// A token, not a person. Which is not the same as app-scoped: an org
+		// token wears the same identity, and saying "a key to one app" was
+		// wrong for exactly the token this was written against. What it can
+		// reach is a question with an answer, so ask it rather than guess.
+		where := "no organisation at all"
+		if orgs := orgsSeen(); len(orgs) > 0 {
+			where = "the " + cli.English(orgs) + " " + cli.Plural(len(orgs), "organisation")[2:]
+		}
+		return fmt.Sprintf("and these credentials are a Fly token (%s) that can reach %s, which %s is not in — use a token for the organisation that owns it (`flyctl tokens create org` from an account that can see it), or `flyctl auth login`", who, where, app)
+	}
+	return fmt.Sprintf("and these credentials are %s, which does not have it; check the account that owns %s", who, app)
+}
+
+// orgsSeen is the organisations these credentials can reach, which is the
+// fact that decides whether an app is reachable at all. Empty when Fly will
+// not say.
+func orgsSeen() []string {
+	said, err := fnox.Ask(".", FlyctlBin, "orgs", "list", "--json")
+	if err != nil {
+		return nil
+	}
+	// A map of slug to display name.
+	orgs, err := cli.DecodeJSON[map[string]string]("flyctl orgs list", said)
+	if err != nil {
+		return nil
+	}
+	return cli.SortedKeys(orgs)
 }

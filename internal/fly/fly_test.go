@@ -182,8 +182,11 @@ func TestDeployAsksAboutTheAppAndHandlesEachAnswer(t *testing.T) {
 			want: []string{
 				"flyctl status --app acme-site-probe --json",
 				"flyctl apps create acme-site-probe --org acme",
+				// Asked only once something has already gone wrong, so the
+				// happy path never pays for it.
+				"flyctl auth whoami",
 			},
-			wantErr: "cannot see it",
+			wantErr: "cannot be seen from here",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
