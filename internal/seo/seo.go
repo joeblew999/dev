@@ -194,33 +194,27 @@ func Audit(c cli.Call, rep *cli.Report, url string, maxPages int, pick *picked) 
 		}
 		run = append(run, ch)
 	}
-	work := cli.Map(run, func(ch checkers.Checker) func() result {
-		return func() result { return run1(ch, c, url, maxPages) }
-	})
 	jobs, _ := c.ValueAs("jobs", strconv.Atoi)
 	if jobs <= 0 {
-		jobs = len(work)
+		jobs = len(run)
 	}
-	results := cli.Parallel(jobs, work, func(i int, v any) result {
-		// A panic in one checker's reader is that checker's problem, not the
-		// run's: record it against the tool and keep the other answers.
-		return result{step: cli.Step{Name: run[i].Name, Status: cli.StatusSkipped,
-			Note: fmt.Sprintf("panicked: %v", v)}}
-	})
-	for _, res := range results {
-		if res.step.Status == cli.StatusSkipped {
-			rep.NotRun(res.step, res.step.Note)
-		} else {
-			rep.Ran(res.step)
-		}
-		for _, f := range res.findings {
-			// Which of this command's writers closes the gap, so the report
-			// is a route to a fix and not only a list of faults. Empty when
-			// no file fixes it: a broken link is content, not a tag.
-			f.FixedBy = fixedBy(f.ID)
-			rep.Add(f)
-		}
-	}
+	// They run at once and merge in registry order, so the report is the same
+	// bytes however they were scheduled — which is what makes two runs
+	// comparable. A checker that panics is recorded against its own name and
+	// the rest still answer: one tool's bad afternoon is not a reason to
+	// learn nothing about the page.
+	cli.Gather(rep, jobs, run,
+		func(ch checkers.Checker) string { return ch.Name },
+		func(ch checkers.Checker) cli.Measured {
+			res := run1(ch, c, url, maxPages)
+			for i := range res.findings {
+				// Which of this command's writers closes the gap, so the report
+				// is a route to a fix and not only a list of faults. Empty when
+				// no file fixes it: a broken link is content, not a tag.
+				res.findings[i].FixedBy = fixedBy(res.findings[i].ID)
+			}
+			return cli.Measured{Step: res.step, Findings: res.findings}
+		})
 }
 
 // result is one checker's run: how it went, and what it found.

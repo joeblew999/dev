@@ -366,3 +366,101 @@ func Or(s, fallback string) string {
 	}
 	return s
 }
+
+// Measured is one named part of a report: the step that describes the run,
+// and whatever it found.
+//
+// Four reports in this tree built this by hand and each wrote the same five
+// lines around it — start a clock, call the thing, stop the clock, fill a
+// Step, then either NotRun with the error or Ran and attribute the findings.
+// The fifth line was the one that varied, and only by being forgotten:
+// findings attributed to the part in one place and not in another.
+type Measured struct {
+	Step     Step
+	Findings []Finding
+}
+
+// Measure runs one part of a report and times it.
+//
+// look returns what it found, one line saying what it looked at, and whether
+// it could look at all. A part that could not run is not a failure of the
+// report: it is a step with a reason, and the rest still run.
+func Measure(name, provides string, look func() ([]Finding, string, error)) Measured {
+	at := time.Now()
+	found, covered, err := look()
+	took := time.Since(at)
+	step := Step{
+		Name: name, Provides: provides, Covered: covered,
+		Took: Took(took), TookMs: took.Milliseconds(), Findings: len(found),
+	}
+	if err != nil {
+		step.Status, step.Note = StatusSkipped, err.Error()
+		return Measured{Step: step}
+	}
+	// Every finding says which part found it. Left to each caller this was
+	// done in some and not others, so a report could name a problem without
+	// naming what noticed it.
+	for i := range found {
+		if found[i].Tool == "" {
+			found[i].Tool = name
+		}
+	}
+	return Measured{Step: step, Findings: found}
+}
+
+// Record files what Measure produced.
+func (r *Report) Record(m Measured) {
+	for _, f := range m.Findings {
+		r.Add(f)
+	}
+	if m.Step.Status == StatusSkipped {
+		r.NotRun(m.Step, m.Step.Note)
+		return
+	}
+	r.Ran(m.Step)
+}
+
+// Part is one named piece of a report, for the common case where the parts
+// are known and each is just a function. Declaring them reads as a list of
+// what is checked, which is what a reader of the report will see.
+type Part struct {
+	Name     string
+	Provides string
+	Look     func() ([]Finding, string, error)
+}
+
+// Parts runs a declared set and records each.
+func Parts(r *Report, jobs int, parts []Part) {
+	Gather(r, jobs, parts,
+		func(p Part) string { return p.Name },
+		func(p Part) Measured { return Measure(p.Name, p.Provides, p.Look) })
+}
+
+// Gather runs every part and records them in the order given, however they
+// were scheduled — so a report reads the same whether it was run one at a
+// time or all at once, which is what makes two runs comparable.
+//
+// jobs is how many at once: one for parts that must not overlap, len(parts)
+// for independent questions to an API.
+//
+// name says what to call a part that panics, because the thing that would
+// have named it is the thing that did not finish. Without it the report says
+// the whole struct, which is how a checker's bad afternoon became forty lines
+// of Go in a step's name.
+func Gather[T any](r *Report, jobs int, parts []T, name func(T) string, run func(T) Measured) {
+	if jobs < 1 {
+		jobs = 1
+	}
+	work := Map(parts, func(p T) func() Measured {
+		return func() Measured { return run(p) }
+	})
+	// A part that panics is recorded as not run rather than taking the report
+	// down with it: one tool's bad afternoon is not a reason to learn nothing
+	// about the rest.
+	for _, m := range Parallel(jobs, work, func(i int, v any) Measured {
+		return Measured{Step: Step{Name: name(parts[i]), Status: StatusSkipped,
+			Note: fmt.Sprintf("panicked: %v", v)}}
+	}) {
+		r.Record(m)
+	}
+}

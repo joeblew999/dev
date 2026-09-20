@@ -74,46 +74,57 @@ func Fronting(c cli.Call, host string) error {
 	}
 	started := time.Now()
 	rep := cli.NewReport("fronting", host)
+	done := func() error { return c.Finish(rep, started, func(r *cli.Report) { writeFronting(c, r) }) }
 
+	// The zone decides whether there is anything else to ask, so it is asked
+	// first and alone. Everything after it is a question about that zone.
 	zone, err := cloudflare.ZoneFor(host)
+	rep.Record(cli.Measure("zone", "which Cloudflare zone answers for this host",
+		func() ([]cli.Finding, string, error) {
+			if err != nil {
+				return []cli.Finding{{Severity: cli.SevInfo, ID: "no-zone", Message: err.Error(),
+					Fix: "nothing on this account fronts it; a Worker that fetches the origin needs no zone, or add the domain to this account"}}, "", err
+			}
+			return nil, zone.Name, nil
+		}))
 	if err != nil {
-		rep.NotRun(cli.Step{Name: "zone", Provides: "which Cloudflare zone answers for this host"}, err.Error())
-		rep.Add(cli.Finding{Tool: "zone", Severity: cli.SevInfo, ID: "no-zone",
-			Message: err.Error(),
-			Fix:     "nothing on this account fronts it; a Worker that fetches the origin needs no zone, or add the domain to this account"})
-		return c.Finish(rep, started, func(r *cli.Report) { writeFronting(c, r) })
+		return done()
 	}
-	rep.Ran(cli.Step{Name: "zone", Covered: zone.Name, Provides: "which Cloudflare zone answers for this host"})
 
-	records, err := cloudflare.Records(zone.ID)
-	if err != nil {
-		return err
-	}
-	found := cli.Filter(records, func(r cloudflare.Record) bool { return r.Name == host })
-	switch {
-	case len(found) == 0:
-		rep.Add(cli.Finding{Tool: "dns", Severity: cli.SevError, ID: "no-record",
-			Message: "no DNS record in " + zone.Name + " for " + host,
-			Fix:     "add a CNAME to the origin and proxy it, or a CNAME to the tunnel"})
-	default:
-		for _, f := range front(zone, found) {
-			rep.Add(f)
-		}
-	}
-	rep.Ran(cli.Step{Name: "dns", Covered: cli.Plural(len(found), "record"),
-		Provides: "what points at this host, and whether Cloudflare stands in front"})
+	// Both of these are about the same zone and neither depends on the
+	// other, so they are asked together.
+	var records []cloudflare.Record
+	var mode string
+	cli.Parts(rep, 2, []cli.Part{
+		{Name: "dns", Provides: "what points at this host, and whether Cloudflare stands in front",
+			Look: func() ([]cli.Finding, string, error) {
+				all, err := cloudflare.Records(zone.ID)
+				if err != nil {
+					return nil, "", err
+				}
+				records = cli.Filter(all, func(r cloudflare.Record) bool { return r.Name == host })
+				if len(records) == 0 {
+					return []cli.Finding{{Severity: cli.SevError, ID: "no-record",
+						Message: "no DNS record in " + zone.Name + " for " + host,
+						Fix:     "add a CNAME to the origin and proxy it, or a CNAME to the tunnel"}}, "none", nil
+				}
+				return front(zone, records), cli.Plural(len(records), "record"), nil
+			}},
+		{Name: "ssl", Provides: "how Cloudflare speaks to the origin",
+			Look: func() ([]cli.Finding, string, error) {
+				got, err := cloudflare.SSLMode(zone.ID)
+				mode = got
+				return nil, got, err
+			}},
+	})
 
-	mode, err := cloudflare.SSLMode(zone.ID)
-	if err != nil {
-		return err
-	}
-	for _, f := range sslFindings(mode, found) {
-		rep.Add(f)
-	}
-	rep.Ran(cli.Step{Name: "ssl", Covered: mode, Provides: "how Cloudflare speaks to the origin"})
+	// Said after both, because it is the two together that are wrong: a
+	// flexible zone matters only when something in it is proxied.
+	rep.Record(cli.Measure("arrangement", "whether what is there can work",
+		func() ([]cli.Finding, string, error) { return sslFindings(mode, records), mode, nil }))
 
 	rep.Fail = host + " is not fronted in a way that will work"
-	return c.Finish(rep, started, func(r *cli.Report) { writeFronting(c, r) })
+	return done()
 }
 
 // front says what arrangement the records describe.
@@ -170,7 +181,7 @@ func sslFindings(mode string, records []cloudflare.Record) []cli.Finding {
 // writeFronting is the human answer.
 func writeFronting(c cli.Call, r *cli.Report) {
 	for _, s := range r.Steps {
-		fmt.Fprintf(c.Stdout, "  %-6s %-28s %s\n", s.Name, cli.Or(s.Covered, s.Note), cli.Plural(s.Findings, "note"))
+		fmt.Fprintf(c.Stdout, "  %-12s %-28s %s\n", s.Name, cli.Or(s.Covered, s.Note), cli.Plural(s.Findings, "note"))
 	}
 	for _, f := range r.Findings {
 		fmt.Fprintf(c.Stdout, "\n%-8s %s\n  %s\n  %s\n", f.Severity, f.ID, f.Message, f.Fix)

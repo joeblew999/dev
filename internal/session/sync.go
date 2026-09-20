@@ -76,30 +76,12 @@ func Check(c cli.Call) error {
 	}
 	started := time.Now()
 	rep := cli.NewReport("session", cli.Or(cli.English(vendored.Dirs()), "nowhere"))
-	for _, part := range []struct {
-		name, provides string
-		look           func() ([]cli.Finding, string, error)
-	}{
-		{"skills", "every agent's directory holds what session.toml pins", lockedSkills},
-		{"settings", ".claude/settings.json holds what [claude] implies",
-			func() ([]cli.Finding, string, error) { return settingsFindings(p.Claude) }},
-		{"paths", "nothing committed names this machine's home directory", portableFindings},
-	} {
-		at := time.Now()
-		found, covered, err := part.look()
-		took := time.Since(at)
-		step := cli.Step{Name: part.name, Provides: part.provides, Covered: covered,
-			Took: cli.Took(took), TookMs: took.Milliseconds(), Findings: len(found)}
-		if err != nil {
-			rep.NotRun(step, err.Error())
-			continue
-		}
-		for _, f := range found {
-			f.Tool = part.name
-			rep.Add(f)
-		}
-		rep.Ran(step)
-	}
+	cli.Parts(rep, 1, []cli.Part{
+		{Name: "skills", Provides: "every agent's directory holds what session.toml pins", Look: lockedSkills},
+		{Name: "settings", Provides: ".claude/settings.json holds what [claude] implies",
+			Look: func() ([]cli.Finding, string, error) { return settingsFindings(p.Claude) }},
+		{Name: "paths", Provides: "nothing committed names this machine's home directory", Look: portableFindings},
+	})
 	warnStaleSessions(c.Stderr, time.Now())
 	rep.Fail = "what agents read does not match " + pins.File + "; fix with: " + pins.SyncCommand()
 	return c.Finish(rep, started, func(r *cli.Report) { writeReport(c, r) })

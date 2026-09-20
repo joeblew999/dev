@@ -5,6 +5,7 @@
 package cli
 
 import (
+	"errors"
 	"flag"
 	"os"
 	"path/filepath"
@@ -449,5 +450,102 @@ func TestOnePinIsAskedForOnce(t *testing.T) {
 	specs := Unique(Collect(shared, func(n Need) (string, bool) { return n.Spec(), n.Pin != "" }))
 	if len(specs) != 1 {
 		t.Errorf("two tools sharing one pin produced %v; mise must be asked once", specs)
+	}
+}
+
+// Four reports in this tree built a step by hand: start a clock, call the
+// thing, stop the clock, fill a Step, record it. The fifth line varied only
+// by being forgotten — findings attributed to the part in one place and not
+// in another, so a report could name a problem without naming what noticed
+// it.
+func TestMeasureTimesAndAttributes(t *testing.T) {
+	got := Measure("probe", "what it is for", func() ([]Finding, string, error) {
+		return []Finding{{ID: "a"}, {ID: "b", Tool: "its own"}}, "two things", nil
+	})
+	if got.Step.Name != "probe" || got.Step.Provides != "what it is for" {
+		t.Errorf("step = %+v", got.Step)
+	}
+	if got.Step.Covered != "two things" || got.Step.Findings != 2 {
+		t.Errorf("step did not carry what the part said: %+v", got.Step)
+	}
+	if got.Step.Took == "" {
+		t.Error("the step was not timed")
+	}
+	// Attribution is filled in, and what a part named itself is kept: a
+	// checker that knows better than the step it belongs to should say so.
+	if got.Findings[0].Tool != "probe" {
+		t.Errorf("a finding was not attributed: %+v", got.Findings[0])
+	}
+	if got.Findings[1].Tool != "its own" {
+		t.Errorf("an attribution the part made was overwritten: %+v", got.Findings[1])
+	}
+}
+
+// A part that could not run is a step with a reason, not a failed report —
+// and it carries what it would have provided, so a reader can decide whether
+// to care.
+func TestMeasureRecordsWhatDidNotRun(t *testing.T) {
+	got := Measure("probe", "what it is for", func() ([]Finding, string, error) {
+		return nil, "", errors.New("no credentials")
+	})
+	if got.Step.Status != StatusSkipped {
+		t.Errorf("status = %q; a part that could not run did not run", got.Step.Status)
+	}
+	if got.Step.Note != "no credentials" {
+		t.Errorf("note = %q; the reason is the point", got.Step.Note)
+	}
+	if got.Step.Provides == "" {
+		t.Error("a skipped step dropped what it would have given")
+	}
+	if len(got.Findings) != 0 {
+		t.Error("a part that could not run reported findings")
+	}
+}
+
+// Recorded in the order given however they were scheduled, so a report reads
+// the same whether it ran one at a time or all at once.
+func TestGatherKeepsTheOrderItWasGiven(t *testing.T) {
+	r := NewReport("t", "x")
+	parts := []string{"first", "second", "third", "fourth"}
+	Gather(r, len(parts), parts,
+		func(s string) string { return s },
+		func(s string) Measured {
+			return Measure(s, "p", func() ([]Finding, string, error) { return nil, s, nil })
+		})
+	for i, s := range r.Steps {
+		if s.Name != parts[i] {
+			t.Fatalf("step %d is %q; want %q — order must not depend on scheduling", i, s.Name, parts[i])
+		}
+	}
+}
+
+// A part that panics keeps its name, because the thing that would have named
+// it is the thing that did not finish. Without a namer the report said the
+// whole value, which for a struct is unreadable.
+func TestAPanickingPartIsNamedAndTheRestSurvive(t *testing.T) {
+	r := NewReport("t", "x")
+	type checker struct{ Name, Long string }
+	parts := []checker{{"good", "aaa"}, {"bad", "bbb"}, {"also good", "ccc"}}
+	Gather(r, len(parts), parts,
+		func(c checker) string { return c.Name },
+		func(c checker) Measured {
+			if c.Name == "bad" {
+				panic("upstream changed its mind")
+			}
+			return Measure(c.Name, "p", func() ([]Finding, string, error) { return nil, "ok", nil })
+		})
+	if len(r.Steps) != 3 {
+		t.Fatalf("recorded %d steps; one panicking part must not lose the others", len(r.Steps))
+	}
+	if r.Steps[1].Name != "bad" {
+		t.Errorf("the panicking step is named %q", r.Steps[1].Name)
+	}
+	if r.Steps[1].Status != StatusSkipped || !strings.Contains(r.Steps[1].Note, "upstream changed its mind") {
+		t.Errorf("the panic was not recorded against it: %+v", r.Steps[1])
+	}
+	for _, i := range []int{0, 2} {
+		if r.Steps[i].Status == StatusSkipped {
+			t.Errorf("step %d did not survive its neighbour's panic", i)
+		}
 	}
 }
