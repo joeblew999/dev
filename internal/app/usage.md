@@ -12,6 +12,20 @@ first, so it tells you what your directory really takes.
 A developer's own copy of every app comes from DEPLOY_SUFFIX in gitignored
 mise.local.toml, so two people deploying the same repo never fight over one.
 
+`domains` is every domain on the Cloudflare account and what each points at.
+A domain that answers nothing is easy to end up with and hard to notice: it
+was registered for a project that did not happen, or moved, or was bought
+defensively beside one in use — and the bill and the dashboard look the same
+either way. It also answers the question that comes before any experiment
+with fronting: which of these can be used without touching anything that
+matters.
+
+`fronting HOST` says what stands in front of a host and whether that
+arrangement can work. Both read and change nothing, deliberately: a token
+that can read a zone's settings can usually write them, and one that reaches
+every zone would change how every site on a domain is served from a command
+somebody ran about one app.
+
 `list DIR` says what that directory's cloud has deployed, marking the one the
 directory is — because "what did I leave running" is the question a deploy
 raises and nothing here could answer. It is the other half of being able to

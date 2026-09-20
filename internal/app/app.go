@@ -141,6 +141,10 @@ func ListVerb(c cli.Call) error   { return to(c, "list") }
 // may be reachable at several.
 func FrontingVerb(c cli.Call) error { return Fronting(c, c.Args[0]) }
 
+// DomainsVerb takes nothing: it is about the account, not about a directory
+// or a name.
+func DomainsVerb(c cli.Call) error { return Domains(c) }
+
 // FrontingFlags are what fronting takes.
 func FrontingFlags(fs *flag.FlagSet) { cli.ReportFlags(fs) }
 

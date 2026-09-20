@@ -99,3 +99,27 @@ func askZone[T any](what, endpoint, zone string) (T, error) {
 	}
 	return request[T](what, fmt.Sprintf(endpoint, zone), token)
 }
+
+// Serves reports whether a record actually puts something on the internet.
+//
+// Only A, AAAA and CNAME point a name at a thing. MX is mail, TXT is proof
+// and policy, and neither makes a domain reachable — a zone holding nothing
+// but those is a domain somebody is paying for that answers nothing.
+//
+// Names beginning with an underscore are excluded even when they are CNAMEs.
+// They are protocol records — _domainconnect, _acme-challenge, _dmarc — put
+// there by a setup flow or a certificate check, and counting one as a site is
+// how a domain serving nothing looks like a domain serving something.
+func (r Record) Serves() bool {
+	switch r.Type {
+	case "A", "AAAA", "CNAME":
+		return !strings.HasPrefix(r.Name, "_") && !strings.Contains(r.Name, "._")
+	}
+	return false
+}
+
+// Apex reports whether this record is the bare domain rather than a name
+// under it. A zone whose subdomains work and whose apex does not is the
+// common half-finished state: someone set up www and never the domain
+// itself.
+func (r Record) Apex(zone string) bool { return r.Name == zone }
