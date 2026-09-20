@@ -22,6 +22,20 @@ asks the bounded question instead — the last `--limit` events over the last
 `--since` — so a script, a report or an agent can read it, since a stream has
 no end any of those can wait for.
 
+Every event says who wrote it: your application, or the platform running it.
+Most of what comes back is never the application — Fly's image pulls and
+firecracker lines, Cloudflare's own record of each invocation — and without
+that distinction "my app logged nothing" and "my app's lines are buried in
+machinery" look identical.
+
+What both clouds really record about a request — the method, the URL, the
+status and the id — is unified; the id is what lets you find every line about
+the same request. The rest is not, because it is not the same on both:
+Cloudflare keeps request headers, CPU time and wall time, and Fly's log schema
+has no headers at all. `--raw` carries each cloud's own record alongside, so
+what only one of them has is still reachable rather than lost to a shape that
+had nowhere to put it.
+
 How far back that reaches is not the same on both, and the note on stderr says
 which. Cloudflare stores Workers Logs for seven days and answers a query over
 them, for a Worker whose config enables observability — which the config

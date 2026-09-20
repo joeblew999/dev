@@ -295,3 +295,30 @@ func TestTelemetryDefaultsAreBounded(t *testing.T) {
 		t.Errorf("Defaults() overrode what was asked for: %+v", asked)
 	}
 }
+
+// The request is the one richer thing both clouds really keep, which is why
+// it is the one that unifies. Everything else they record is one-sided —
+// Cloudflare's CPU and wall time, Fly's region and machine — and a field that
+// is always empty for one of them reads as missing data rather than as a
+// difference between clouds.
+func TestOnlyWhatBothCloudsKeepIsUnified(t *testing.T) {
+	// Nothing recorded is nil, not a request to nowhere. Fly writes the HTTP
+	// block on every line and fills it only when there was one, so without
+	// this every deploy message would carry an empty request.
+	if got := request("", "", "", 0); got != nil {
+		t.Errorf("an empty request became %+v; want nil", got)
+	}
+	// Any one of the three is enough to be a request: a line may record the
+	// status without the URL, or the method before anything came back.
+	for name, r := range map[string]*Request{
+		"method only": request("GET", "", "", 0),
+		"url only":    request("", "https://x/", "", 0),
+		"status only": request("", "", "", 500),
+		"all three":   request("GET", "https://x/", "", 200),
+		"id only":     request("", "", "req-1", 0),
+	} {
+		if r == nil {
+			t.Errorf("%s was dropped as empty", name)
+		}
+	}
+}

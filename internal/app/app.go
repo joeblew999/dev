@@ -95,6 +95,7 @@ func LogsFlags(fs *flag.FlagSet) {
 	cli.JSONFlags(fs)
 	fs.String("since", "1h", "how far back to read, with --json")
 	fs.String("limit", "100", "at most this many events, with --json")
+	fs.Var(new(cli.Bool), "raw", "carry each cloud's own record too: the headers, timings and everything the shared shape has nowhere to put")
 }
 
 func DeployFlags(fs *flag.FlagSet) {
@@ -243,12 +244,15 @@ var clouds = map[string]cloud{
 			if err != nil {
 				return nil, err
 			}
-			said, err := cloudflare.Events(name, t.Since, t.Limit)
+			said, err := cloudflare.Events(name, t.Since, t.Limit, t.Raw)
 			if err != nil {
 				return nil, err
 			}
 			return cli.Map(said, func(e cloudflare.Event) Event {
-				return Event{At: e.At, Level: e.Level, Message: e.Message}
+				return Event{At: e.At, Level: e.Level, Message: e.Message,
+					From:    from(e.Type == cloudflare.WorkerLine),
+					Request: request(e.Method, e.URL, e.ID, e.Status),
+					Raw:     e.Raw}
 			}), nil
 		},
 	},
@@ -284,12 +288,15 @@ var clouds = map[string]cloud{
 		List:  fly.List,
 		Keeps: "only what flyctl still holds in its buffer, which is recent and not a window",
 		Events: func(c cli.Call, t Telemetry) ([]Event, error) {
-			said, err := fly.Events(c.Dir, t.Since, t.Limit)
+			said, err := fly.Events(c.Dir, t.Since, t.Limit, t.Raw)
 			if err != nil {
 				return nil, err
 			}
 			return cli.Map(said, func(e fly.Event) Event {
-				return Event{At: e.At, Level: e.Level, Message: e.Message, Source: e.Source}
+				return Event{At: e.At, Level: e.Level, Message: e.Message, Source: e.Source,
+					From:    from(e.Provider == fly.AppLine),
+					Request: request(e.Method, e.URL, e.ID, e.Status),
+					Raw:     e.Raw}
 			}), nil
 		},
 		Name:      func(dir, _ string) (string, error) { return fly.App(dir) },
@@ -363,7 +370,7 @@ func to(c cli.Call, verb string) error {
 		if c.Set("since") && t.Keeps != "" {
 			fmt.Fprintf(c.Stderr, "note: this target keeps %s\n", t.Keeps)
 		}
-		events, err := t.Events(c, Telemetry{Since: since, Limit: limit}.Defaults())
+		events, err := t.Events(c, Telemetry{Since: since, Limit: limit, Raw: c.Given("raw")}.Defaults())
 		if err != nil {
 			return err
 		}
