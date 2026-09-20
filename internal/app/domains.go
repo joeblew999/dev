@@ -8,7 +8,6 @@ package app
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/cloudflare"
@@ -20,34 +19,31 @@ import (
 // zone's records can usually delete them, and this one reaches every zone on
 // the account.
 func Domains(c cli.Call) error {
-	if err := c.CheckReportFlags(); err != nil {
-		return err
-	}
-	started := time.Now()
-	rep := cli.NewReport("domains", "this Cloudflare account")
-	zones, err := cloudflare.Zones()
-	if err != nil {
-		return err
-	}
-	// Asked at once rather than one after another: each zone is its own
-	// request and none depends on another, so a loop made an account's worth
-	// of domains take as long as the sum of them.
-	cli.Gather(rep, len(zones), zones,
-		func(z cloudflare.Zone) string { return z.Name },
-		func(z cloudflare.Zone) cli.Measured {
-			return cli.Measure(z.Name, "what this domain points at", func() ([]cli.Finding, string, error) {
-				records, err := cloudflare.Records(z.ID)
-				if err != nil {
-					return nil, "", err
-				}
-				serving := cli.Filter(records, cloudflare.Record.Serves)
-				apex := cli.Filter(serving, func(r cloudflare.Record) bool { return r.Apex(z.Name) })
-				return unmapped(z, serving, apex), fmt.Sprintf("%s, %s at the apex",
-					cli.Plural(len(serving), "name"), cli.Plural(len(apex), "record")), nil
+	return c.Reported("domains", "this Cloudflare account", func(rep *cli.Report) error {
+		zones, err := cloudflare.Zones()
+		if err != nil {
+			return err
+		}
+		// Asked at once rather than one after another: each zone is its own
+		// request and none depends on another, so a loop made an account's worth
+		// of domains take as long as the sum of them.
+		cli.Gather(rep, len(zones), zones,
+			func(z cloudflare.Zone) string { return z.Name },
+			func(z cloudflare.Zone) cli.Measured {
+				return cli.Measure(z.Name, "what this domain points at", func() ([]cli.Finding, string, error) {
+					records, err := cloudflare.Records(z.ID)
+					if err != nil {
+						return nil, "", err
+					}
+					serving := cli.Filter(records, cloudflare.Record.Serves)
+					apex := cli.Filter(serving, func(r cloudflare.Record) bool { return r.Apex(z.Name) })
+					return unmapped(z, serving, apex), fmt.Sprintf("%s, %s at the apex",
+						cli.Plural(len(serving), "name"), cli.Plural(len(apex), "record")), nil
+				})
 			})
-		})
-	rep.Fail = "some domains on this account point at nothing"
-	return c.Finish(rep, started, c.Write)
+		rep.Fail = "some domains on this account point at nothing"
+		return nil
+	})
 }
 
 // unmapped is what is worth saying about one zone.

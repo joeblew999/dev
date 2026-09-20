@@ -64,9 +64,6 @@ func Sync(out io.Writer) error {
 // Check fails when what is on disk differs from what the pins imply. It needs
 // no network: file contents are compared against the hashes sync recorded.
 func Check(c cli.Call) error {
-	if err := c.CheckReportFlags(); err != nil {
-		return err
-	}
 	// The pins are read once, before anything is checked against them: a file
 	// that cannot be read is not three findings, it is one reason nothing
 	// could be checked.
@@ -74,17 +71,17 @@ func Check(c cli.Call) error {
 	if err != nil {
 		return err
 	}
-	started := time.Now()
-	rep := cli.NewReport("session", cli.Or(cli.English(vendored.Dirs()), "nowhere"))
-	cli.Parts(rep, 1, []cli.Part{
-		{Name: "skills", Provides: "every agent's directory holds what session.toml pins", Look: lockedSkills},
-		{Name: "settings", Provides: ".claude/settings.json holds what [claude] implies",
-			Look: func() ([]cli.Finding, string, error) { return settingsFindings(p.Claude) }},
-		{Name: "paths", Provides: "nothing committed names this machine's home directory", Look: portableFindings},
+	return c.Reported("session", cli.Or(cli.English(vendored.Dirs()), "nowhere"), func(rep *cli.Report) error {
+		cli.Parts(rep, 1, []cli.Part{
+			{Name: "skills", Provides: "every agent's directory holds what session.toml pins", Look: lockedSkills},
+			{Name: "settings", Provides: ".claude/settings.json holds what [claude] implies",
+				Look: func() ([]cli.Finding, string, error) { return settingsFindings(p.Claude) }},
+			{Name: "paths", Provides: "nothing committed names this machine's home directory", Look: portableFindings},
+		})
+		warnStaleSessions(c.Stderr, time.Now())
+		rep.Fail = "what agents read does not match " + pins.File + "; fix with: " + pins.SyncCommand()
+		return nil
 	})
-	warnStaleSessions(c.Stderr, time.Now())
-	rep.Fail = "what agents read does not match " + pins.File + "; fix with: " + pins.SyncCommand()
-	return c.Finish(rep, started, c.Write)
 }
 
 // lockedSkills is every agent's directory against what the lock records.

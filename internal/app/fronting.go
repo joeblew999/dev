@@ -46,7 +46,6 @@ package app
 
 import (
 	"strings"
-	"time"
 
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/cloudflare"
@@ -68,13 +67,15 @@ const tunnelTarget = ".cfargotunnel.com"
 // fine from every angle and does not work: a record that is proxied, a zone
 // set to flexible, and an origin that insists on HTTPS.
 func Fronting(c cli.Call, host string) error {
-	if err := c.CheckReportFlags(); err != nil {
-		return err
-	}
-	started := time.Now()
-	rep := cli.NewReport("fronting", host)
-	done := func() error { return c.Finish(rep, started, c.Write) }
+	return c.Reported("fronting", host, func(rep *cli.Report) error {
+		return fronting(c, rep, host)
+	})
+}
 
+// fronting is the questions themselves, against a report somebody else opened
+// and will finish. Returning nil is a finished report, which is what a host
+// no zone answers for is: an answer, not a failure.
+func fronting(c cli.Call, rep *cli.Report, host string) error {
 	// The zone decides whether there is anything else to ask, so it is asked
 	// first and alone. Everything after it is a question about that zone.
 	zone, err := cloudflare.ZoneFor(host)
@@ -87,7 +88,7 @@ func Fronting(c cli.Call, host string) error {
 			return nil, zone.Name, nil
 		}))
 	if err != nil {
-		return done()
+		return nil
 	}
 
 	// Both of these are about the same zone and neither depends on the
@@ -123,7 +124,7 @@ func Fronting(c cli.Call, host string) error {
 		func() ([]cli.Finding, string, error) { return sslFindings(mode, records), mode, nil }))
 
 	rep.Fail = host + " is not fronted in a way that will work"
-	return done()
+	return nil
 }
 
 // front says what arrangement the records describe.
