@@ -25,6 +25,7 @@ import (
 func ToolsFlags(fs *flag.FlagSet) {
 	fs.Var(new(Bool), "missing", "only what this machine does not have")
 	fs.Var(new(Bool), "add", "write the missing [tools] lines into this repo's mise.toml")
+	fs.Var(new(Bool), "fresh", "replace the [tools] table with exactly what this command needs, making mise.toml when there is none")
 	JSONFlags(fs)
 }
 
@@ -73,6 +74,9 @@ func (c Command) tools(call Call) error {
 	if len(lines) == 0 {
 		return nil
 	}
+	if call.Given("fresh") {
+		return c.freshTools(call, lines)
+	}
 	if !call.Given("add") {
 		fmt.Fprintf(call.Stdout, "\nfor mise.toml [tools], the ones you will run:\n")
 		for _, l := range lines {
@@ -102,9 +106,18 @@ func addTools(call Call, lines []string) error {
 	}
 	text := string(data)
 	var added []string
+	// Two tools can share one line — node ships npm, so both ask for node —
+	// and a [tools] table with the same key twice is not valid TOML. Deduped
+	// within the batch as well as against the file, because the file has not
+	// been written yet when the second one is considered.
+	seen := map[string]bool{}
 	for _, l := range lines {
 		pin := strings.TrimSpace(l)
 		name, _, _ := strings.Cut(pin, " =")
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
 		// Already pinned, whatever version it names: a repo that chose 1.24
 		// should not be given "latest" underneath it.
 		if strings.Contains(text, "\n"+name+" =") || strings.Contains(text, "\n"+name+"=") {
@@ -183,4 +196,59 @@ func miseActive() map[string]bool {
 		}
 	}
 	return active
+}
+
+// freshTools replaces the [tools] table with exactly what this command needs,
+// and makes a mise.toml when there is none.
+//
+// The other half of a pattern this stack keeps arriving at: a thing that adds
+// what is missing, and a thing that makes the state known. `session sync` and
+// `session remove` are the same pair, and `dev front` and `dev unfront`. Add
+// is right for a repo somebody owns; fresh is right for a scratch directory,
+// where the question is not "what is missing" but "give me one that works".
+//
+// It says what it replaced rather than doing it quietly, because a mise.toml
+// holds versions somebody chose and comments explaining why, and this throws
+// both away.
+func (c Command) freshTools(call Call, lines []string) error {
+	dir, err := root(".")
+	if err != nil {
+		// No mise.toml above means no repo on this stack yet, which for a
+		// scratch directory is the normal state rather than an error: make
+		// one here.
+		dir, err = os.Getwd()
+		if err != nil {
+			return err
+		}
+	}
+	path := filepath.Join(dir, "mise.toml")
+	had, readErr := os.ReadFile(path)
+	seen := map[string]bool{}
+	var pins []string
+	for _, l := range lines {
+		pin := strings.TrimSpace(l)
+		name, _, _ := strings.Cut(pin, " =")
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		pins = append(pins, pin)
+	}
+	body := "# Written by `" + c.Name + " tools --fresh`: every tool this command may run.\n" +
+		"# Trim it to what this repo actually does — a repo that never deploys to\n" +
+		"# Fly does not need flyctl, and mise installs what is listed.\n[tools]\n" +
+		strings.Join(pins, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		return err
+	}
+	switch {
+	case readErr != nil:
+		fmt.Fprintf(call.Stdout, "wrote %s with %s\n", rel(path), Plural(len(pins), "tool"))
+	default:
+		kept := strings.Count(strings.TrimSpace(string(had)), "\n") + 1
+		fmt.Fprintf(call.Stdout, "replaced %s (%s) with %s\n",
+			rel(path), Plural(kept, "line"), Plural(len(pins), "tool"))
+	}
+	fmt.Fprintln(call.Stdout, "then: mise install")
+	return nil
 }
