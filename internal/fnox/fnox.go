@@ -1,7 +1,20 @@
 // Package fnox is the one way dev reaches a secret. fnox holds every
-// credential, and wrangler only ever runs under `fnox exec`, which is how it
-// gets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID without either touching
-// a file in the repo. The functions are variables so tests can replace them.
+// credential, and wrangler and flyctl only ever run under `fnox exec`, which
+// is how they get CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID and
+// FLY_API_TOKEN without either touching a file in the repo.
+//
+// There are two ways through, and the difference is worth stating because it
+// has been overstated: Run puts a credential in a child process's environment
+// and dev never sees it, while Get hands the value to dev itself. Both are
+// real and both are used. dev reads a Cloudflare token with Get and calls the
+// API with it directly to find the workers.dev subdomain; it reads the
+// signing key to sign a release, and secrets' own values to push them.
+//
+// So "dev never holds a secret" is not true and never was. What is true is
+// narrower and still worth keeping: a secret is never written into the repo,
+// never passed as an argument where a process list would show it, and read
+// into dev only where dev itself has to act on it. Exec when something else
+// does the work, Get when dev does.
 package fnox
 
 import (
