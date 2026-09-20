@@ -138,7 +138,7 @@ func (c Command) Run(args []string, stdout, stderr io.Writer) int {
 		// Say which of the two it was. "takes a subcommand" is true when none
 		// was given and a lie when one was, and the second is the case where
 		// someone is already looking at the wrong word.
-		what := fmt.Sprintf("%s takes a subcommand", path)
+		what := path + " takes a subcommand"
 		if named != "" {
 			what = fmt.Sprintf("%s has no subcommand %q", path, named)
 		}

@@ -18,6 +18,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -75,7 +76,7 @@ func Front(c cli.Call, host, origin string) error {
 		case 1:
 			org = orgs[0]
 		case 0:
-			return fmt.Errorf("flyctl reports no organisation, so the Fly provider cannot be told one; check FLY_API_TOKEN in fnox")
+			return errors.New("flyctl reports no organisation, so the Fly provider cannot be told one; check FLY_API_TOKEN in fnox")
 		default:
 			return cli.Usagef("these credentials reach %s; name the one this app is in with --org", cli.English(orgs))
 		}

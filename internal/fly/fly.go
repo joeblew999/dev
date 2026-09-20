@@ -107,7 +107,7 @@ func Destroy(stdin io.Reader, out io.Writer, dir, name string, yes bool) error {
 	}
 	fmt.Fprintf(out, "will destroy the Fly app %s, its machines and volumes\n", name)
 	if !yes && !cli.Confirm(stdin, out, "destroy? [y/N] ") {
-		return fmt.Errorf("not destroyed (pass --yes to skip the question)")
+		return errors.New("not destroyed (pass --yes to skip the question)")
 	}
 	said, err := fnox.Ask(".", FlyctlBin, "apps", "destroy", name, "--yes")
 	fmt.Fprint(out, said)
@@ -219,7 +219,7 @@ func ready(dir string) (string, error) {
 
 func installed() error {
 	if _, err := lookPath(FlyctlBin); err != nil {
-		return fmt.Errorf("flyctl is not installed; add to mise.toml under [tools]: flyctl = \"latest\", then: mise install")
+		return errors.New(`flyctl is not installed; add to mise.toml under [tools]: flyctl = "latest", then: mise install`)
 	}
 	return nil
 }

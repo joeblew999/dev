@@ -95,7 +95,7 @@ var writers = []Writer{
 	{
 		Name:     "sitemap",
 		Provides: "sitemap.xml — the list of pages Google should fetch",
-		Produces: Artifact{Name: "sitemap.xml", Validate: validateSitemap},
+		Produces: Artifact{Name: SitemapFile, Validate: validateSitemap},
 		Pages:    true,
 		Fixes:    []string{"sitemap-", "seo.sitemap.", "seo/sitemap", "SITEMAP"},
 		Write:    writeSitemap,
@@ -104,7 +104,7 @@ var writers = []Writer{
 		Name:     "llms",
 		Provides: "llms.txt — the site in the shape a language model reads it",
 		Produces: Artifact{Name: "llms.txt", Validate: validateLlms},
-		Needs:    []string{"sitemap.xml"},
+		Needs:    []string{SitemapFile},
 		Pages:    true,
 		Fixes:    []string{"llms-", "seo.llms."},
 		Write:    writeLlms,
@@ -113,7 +113,7 @@ var writers = []Writer{
 		Name:     "robots",
 		Provides: "robots.txt — what a crawler may fetch, and where the sitemap is",
 		Produces: Artifact{Name: "robots.txt", Validate: validateRobots},
-		Needs:    []string{"sitemap.xml"},
+		Needs:    []string{SitemapFile},
 		Fixes:    []string{"robots-", "seo.robots_txt.", "seo/robots", "blocked-by-robots"},
 		Write:    writeRobots,
 	},
@@ -447,7 +447,7 @@ func writeLlms(s Site) (content, covered string, err error) {
 			// The sitemap is named rather than listed among the pages: a
 			// model that wants the whole list should be told where it is, not
 			// handed it twice.
-			{Name: "Optional", Links: []cli.LLMsLink{{Text: "sitemap.xml",
+			{Name: "Optional", Links: []cli.LLMsLink{{Text: SitemapFile,
 				URL: s.Origin + "/sitemap.xml", Note: "every page, machine-readable"}}},
 		},
 	}
@@ -471,6 +471,13 @@ func hostOf(origin string) string {
 	}
 	return origin
 }
+
+// SitemapFile is the one artifact other writers depend on: robots.txt names
+// it and llms.txt points at it, so it appears in the registry entry that
+// produces it and in the Needs of the two that do not. Spelling it four times
+// is four chances for one of them to name a file nobody writes, which is the
+// broken chain Needs exists to make impossible.
+const SitemapFile = "sitemap.xml"
 
 // producer is which writer makes an artifact, by the artifact's file name.
 // One map, because both the ordering and the selection ask the same question.

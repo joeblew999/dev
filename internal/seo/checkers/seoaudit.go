@@ -18,7 +18,7 @@ var seoAudit = Checker{
 	Provides: "a fixed list of checks scored across the site, and duplicate titles between pages",
 	Cost:     "~600ms",
 	Args: func(a Ask) []string {
-		return Paged([]string{"crawl", "--url", a.URL, "--output", "json"}, a.Pages)
+		return Paged([]string{"crawl", "--url", a.URL, "--output", FormatJSON}, a.Pages)
 	},
 	Read: JSON("seo-audit's report", fromSEOAudit),
 }
@@ -89,5 +89,5 @@ var seoAuditCodes = map[string]string{
 	"CANONICAL":        "missing-canonical",
 	"VIEWPORT":         "missing-viewport",
 	"DUPLICATE_TITLE":  "duplicate-title",
-	"BROKEN_LINK":      "broken-link",
+	"BROKEN_LINK":      BrokenLink,
 }

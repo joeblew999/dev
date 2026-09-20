@@ -3,7 +3,6 @@ package fly
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -196,9 +195,9 @@ func TestDeployAsksAboutTheAppAndHandlesEachAnswer(t *testing.T) {
 				ran = append(ran, line)
 				switch {
 				case strings.Contains(line, "status") && tc.status != "":
-					return tc.status, fmt.Errorf("exit status 1")
+					return tc.status, errors.New("exit status 1")
 				case strings.Contains(line, "apps create") && tc.create != "":
-					return tc.create, fmt.Errorf("exit status 1")
+					return tc.create, errors.New("exit status 1")
 				}
 				return "", nil
 			}
@@ -271,7 +270,7 @@ func TestExistenceIsDecidedByTheJSONNotTheProse(t *testing.T) {
 				if tc.exitedOK {
 					return tc.said, nil
 				}
-				return tc.said, fmt.Errorf("exit status 1")
+				return tc.said, errors.New("exit status 1")
 			}
 			t.Cleanup(func() { fnox.Run = old })
 

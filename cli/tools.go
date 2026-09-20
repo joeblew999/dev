@@ -13,6 +13,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -135,7 +136,7 @@ func record(call Call, needs []Need, fresh bool) error {
 	default:
 		fmt.Fprintf(call.Stdout, "%s already exists here.\nIts tools will be replaced with %s.\n\n", existing, Plural(len(needs), "tool"))
 		if !call.Given("yes") && !Confirm(call.Stdin, call.Stdout, "replace? [y/N] ") {
-			return fmt.Errorf("not replaced (pass --yes to skip the question)")
+			return errors.New("not replaced (pass --yes to skip the question)")
 		}
 		// Emptied rather than deleted, and only ever this directory's own
 		// file: what is replaced is the set of tools, and a config may hold
@@ -164,7 +165,7 @@ func record(call Call, needs []Need, fresh bool) error {
 // get it is the whole of what is appropriate here.
 func haveMise() error {
 	if _, err := exec.LookPath("mise"); err != nil {
-		return fmt.Errorf("mise is not installed, and this will not install it: it is a tool that manages your machine's tools, so that is your call. https://mise.jdx.dev/getting-started.html")
+		return errors.New("mise is not installed, and this will not install it: it is a tool that manages your machine's tools, so that is your call. https://mise.jdx.dev/getting-started.html")
 	}
 	return nil
 }

@@ -33,7 +33,7 @@ import (
 // Code upgrade adds a built-in.
 func Verify(out io.Writer, update bool) error {
 	if _, err := exec.LookPath(ClaudeBin); err != nil {
-		return fmt.Errorf("claude CLI not found; install Claude Code to run this check")
+		return errors.New("claude CLI not found; install Claude Code to run this check")
 	}
 	seen, answer, err := sessionSkills()
 	if err != nil {
@@ -148,7 +148,7 @@ func sessionSkills() ([]string, string, error) {
 		Timeout: 2 * time.Minute,
 	}.Capture()
 	if errors.Is(err, context.DeadlineExceeded) {
-		return nil, "", fmt.Errorf("claude did not answer within 2 minutes")
+		return nil, "", errors.New("claude did not answer within 2 minutes")
 	}
 	if err != nil {
 		return nil, "", fmt.Errorf("claude -p: %w", err)

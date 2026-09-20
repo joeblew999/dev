@@ -20,7 +20,7 @@ var muffet = Checker{
 	Args: func(a Ask) []string {
 		return []string{
 			a.URL,
-			"--format", "json",
+			"--format", FormatJSON,
 			// Not --follow-robots-txt: muffet treats a 404 robots.txt as a
 			// failure and stops, while Google treats it as allow-all. A site
 			// without one is normal, not a reason to learn nothing.
@@ -86,7 +86,7 @@ func fromMuffet(pages []muffetPage) Found {
 func muffetCode(err string) string {
 	switch {
 	case strings.Contains(err, "404"):
-		return "broken-link"
+		return BrokenLink
 	case strings.Contains(err, "timeout") || strings.Contains(err, "deadline"):
 		return "slow-link"
 	case strings.Contains(err, "certificate") || strings.Contains(err, "tls"):

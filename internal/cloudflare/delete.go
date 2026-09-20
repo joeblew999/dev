@@ -3,6 +3,7 @@ package cloudflare
 import (
 	"bytes"
 	"cmp"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -44,7 +45,7 @@ func Delete(stdin io.Reader, out io.Writer, dir, env, name string, yes bool) err
 		fmt.Fprintln(out, "no KV namespace wrangler provisioned for it; one made by hand stays")
 	}
 	if !yes && !cli.Confirm(stdin, out, "delete? [y/N] ") {
-		return fmt.Errorf("not deleted (pass --yes to skip the question)")
+		return errors.New("not deleted (pass --yes to skip the question)")
 	}
 	// Asked with both streams so wrangler's own words reach the reader, and
 	// so an absent Worker can be told from a real failure. Without that, a

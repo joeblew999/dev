@@ -39,8 +39,8 @@ var Usage string
 // Writing and validating share one declaration, so an artifact cannot pass
 // when it is written and fail when it is checked.
 var Subs = map[string]cli.Verb{
-	"write":    {Run: runWrite, Args: "DIR", Flags: WriteFlags, Desc: "write sitemap.xml, robots.txt and head.html, then validate them"},
-	"validate": {Run: runValidate, Args: "DIR", Flags: ValidateFlags, Desc: "check those files on disk, with no network at all"},
+	"write":    {Run: runWrite, Args: cli.DIR, Flags: WriteFlags, Desc: "write sitemap.xml, robots.txt and head.html, then validate them"},
+	"validate": {Run: runValidate, Args: cli.DIR, Flags: ValidateFlags, Desc: "check those files on disk, with no network at all"},
 	"check":    {Run: runCheck, Args: "URL", Flags: CheckFlags, Desc: "run every checker against a deployed URL and merge what they say"},
 	"can":      {Run: runList, Flags: cli.JSONFlags, Desc: "what this verb can write and check, what each needs, and whether it is installed"},
 }

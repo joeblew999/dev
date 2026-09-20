@@ -50,7 +50,7 @@ var fixes = map[string]string{
 	"multiple-h1":              "leave one <h1>: several tell a reader and a crawler different things about what the page is — " + DocHeadings,
 	"missing-canonical":        `add <link rel="canonical" href="..."> with the absolute URL this page should be indexed as — ` + DocCanonical,
 	"missing-alt":              "give the image an alt: it is what Images indexes and what a screen reader says — " + DocImages,
-	"broken-link":              "fix or remove the link: a crawler follows it, finds nothing, and spends the crawl budget doing it — " + DocCrawling,
+	BrokenLink:                 "fix or remove the link: a crawler follows it, finds nothing, and spends the crawl budget doing it — " + DocCrawling,
 	"broken-image":             "fix or remove the image: it is a request that costs the page and returns nothing — " + DocImages,
 	"redirect":                 "point the link at its final URL: a hop costs a request and dilutes what the link says — " + DocRedirects,
 	"blocked-by-robots":        "check robots.txt is meant to block this: Google will not index what it cannot fetch — " + DocRobotsIntro,

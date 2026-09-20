@@ -21,6 +21,17 @@ import (
 	"github.com/joeblew999/dev/cli/tool"
 )
 
+// The ids and arguments more than one checker names.
+//
+// BrokenLink is a finding id three checkers produce and advice.go answers,
+// spelled in four files. JSON is the format every one of them is asked for,
+// under a different flag each time — AGENTS.md's rule is to prefer it and
+// decide from what parsed, never from a tool's prose.
+const (
+	BrokenLink = "broken-link"
+	FormatJSON = "json"
+)
+
 // Checker is one tool. Everything that knows a tool exists is one of these
 // and the Read that goes with it.
 type Checker struct {

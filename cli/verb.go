@@ -98,7 +98,7 @@ func (v Verb) parse(command, verb string, args []string, stdout, stderr io.Write
 		v.Flags(fs)
 	}
 	c := Call{Verb: verb, Command: command, Flags: fs, Stdin: Stdin, Stdout: stdout, Stderr: stderr}
-	if strings.HasPrefix(v.Args, "DIR") {
+	if strings.HasPrefix(v.Args, DIR) {
 		dir, rest, err := DirAnd(fs, args, -1)
 		if err != nil {
 			return c, err

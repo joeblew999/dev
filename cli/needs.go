@@ -58,11 +58,15 @@ func (n Need) Line() string {
 // Kept here rather than beside each caller because the point of it is to be
 // answerable as a set: "what does this repo need before it can use dev" is
 // one question, and fourteen constants in nine packages cannot answer it.
+// nodeKey is what mise calls node, and npm comes from the same install — so
+// npm's Key has to be node's name, and the two were spelled separately.
+const nodeKey = "node"
+
 var needs = map[string]Need{
 	"go":         {Bin: "go", Pin: "go@1.27.1", For: "build, check, run, test"},
 	"tinygo":     {Bin: "tinygo", Pin: "tinygo@latest", For: "wasm, for a Worker built from Go"},
-	"node":       {Bin: "node", Pin: "node@latest", For: "wasm and deploy, because wrangler runs on it"},
-	"npm":        {Bin: "npm", Key: "node", Pin: "node@latest", For: "a command directory holding a package.json"},
+	nodeKey:      {Bin: nodeKey, Pin: nodeKey + "@latest", For: "wasm and deploy, because wrangler runs on it"},
+	"npm":        {Bin: "npm", Key: nodeKey, Pin: nodeKey + "@latest", For: "a command directory holding a package.json"},
 	"wrangler":   {Bin: "wrangler", Pin: "wrangler@latest", For: "deploy, delete, logs, smoke on Cloudflare"},
 	"workerd":    {Bin: "workerd", Pin: "workerd@latest", For: "running a Worker locally"},
 	"flyctl":     {Bin: "flyctl", Pin: "flyctl@latest", For: "deploy, delete, logs, list on Fly"},

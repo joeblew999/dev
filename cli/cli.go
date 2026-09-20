@@ -152,11 +152,22 @@ func Flags(name string, stderr io.Writer) *flag.FlagSet {
 	return fs
 }
 
+// DIR is the word a verb's Args begins with when its first argument is the
+// command directory to act on.
+//
+// A contract between this package and every command on the stack, and it was
+// a bare literal on both sides of it: twelve declarations spelling "DIR" and
+// one parser asking whether Args starts with it. Nothing connected the two,
+// so a typo in a declaration made the verb silently stop taking a directory
+// — the flags would parse, the first argument would land in Args, and the
+// verb would act on the working directory instead of the one named.
+const DIR = "DIR"
+
 // Bool is a flag.Value for booleans that also takes "" as false, so a task
 // may pass `--flag=$var` with the variable unset.
 type Bool bool
 
-func (b *Bool) String() string { return fmt.Sprint(bool(*b)) }
+func (b *Bool) String() string { return strconv.FormatBool(bool(*b)) }
 
 // IsBoolFlag lets a bare `--flag` mean true.
 func (b *Bool) IsBoolFlag() bool { return true }

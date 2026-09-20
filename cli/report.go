@@ -332,7 +332,7 @@ func (c Call) Record(r *Report) (string, error) {
 		return "", nil
 	}
 	if !filepath.IsAbs(dir) {
-		root, err := root(".")
+		root, err := root()
 		if err == nil {
 			dir = filepath.Join(root, dir)
 		}
@@ -366,7 +366,7 @@ func (c Call) History(exclude string) []*Report {
 		return nil
 	}
 	if !filepath.IsAbs(dir) {
-		if root, err := root("."); err == nil {
+		if root, err := root(); err == nil {
 			dir = filepath.Join(root, dir)
 		}
 	}

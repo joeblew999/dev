@@ -134,20 +134,20 @@ func front(records []cloudflare.Record) []cli.Finding {
 		switch {
 		case strings.HasSuffix(r.Content, tunnelTarget):
 			if !r.Proxied {
-				out = append(out, cli.Finding{Tool: "dns", Severity: cli.SevError, ID: "tunnel-not-proxied",
+				out = append(out, cli.Finding{Severity: cli.SevError, ID: "tunnel-not-proxied",
 					Message: r.Name + " points at a tunnel and is not proxied, so nothing reaches it",
 					Fix:     "a tunnel is only reachable through Cloudflare; turn the record's proxy on"})
 				continue
 			}
-			out = append(out, cli.Finding{Tool: "dns", Severity: cli.SevInfo, ID: "tunnel",
+			out = append(out, cli.Finding{Severity: cli.SevInfo, ID: "tunnel",
 				Message: r.Name + " is served through a tunnel",
 				Fix:     "the origin needs no public address; if the tunnel stops, Cloudflare answers 1016 rather than falling back"})
 		case !r.Proxied:
-			out = append(out, cli.Finding{Tool: "dns", Severity: cli.SevWarning, ID: "not-proxied",
+			out = append(out, cli.Finding{Severity: cli.SevWarning, ID: "not-proxied",
 				Message: r.Name + " resolves straight to the origin, so Cloudflare is only its DNS",
 				Fix:     "turn the record's proxy on for anything Cloudflare is meant to do in front of it"})
 		default:
-			out = append(out, cli.Finding{Tool: "dns", Severity: cli.SevInfo, ID: "proxied",
+			out = append(out, cli.Finding{Severity: cli.SevInfo, ID: "proxied",
 				Message: r.Name + " is proxied to " + r.Content,
 				Fix:     "Cloudflare terminates TLS here and speaks to the origin itself, so the SSL mode decides whether that works"})
 		}
@@ -163,14 +163,14 @@ func sslFindings(mode string, records []cloudflare.Record) []cli.Finding {
 	}
 	if mode == cloudflare.Flexible {
 		return []cli.Finding{{
-			Tool: "ssl", Severity: cli.SevError, ID: "flexible-in-front-of-https",
+			Severity: cli.SevError, ID: "flexible-in-front-of-https",
 			Message: "the zone speaks plain HTTP to the origin, and anything that redirects to HTTPS will loop until a browser gives up",
 			Fix:     "set this zone's SSL to Full (strict); a Fly app redirects by default and the fly.toml dev writes sets force_https",
 		}}
 	}
 	if !cli.ToSet(cloudflare.StrictModes)[mode] {
 		return []cli.Finding{{
-			Tool: "ssl", Severity: cli.SevWarning, ID: "ssl-not-strict",
+			Severity: cli.SevWarning, ID: "ssl-not-strict",
 			Message: "the zone's SSL mode is " + cli.Or(mode, "unset"),
 			Fix:     "Full (strict) is what Fly's own documentation asks for in front of a Fly app",
 		}}

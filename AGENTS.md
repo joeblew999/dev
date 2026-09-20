@@ -266,6 +266,20 @@ and green first.
   whitespace, secrets and large files, and `mise run lint` runs that same list
   from `hk.pkl` — one place, so the two can never disagree. CI runs
   `mise run test`, which is that plus the tests and a signed snapshot release.
+- **`mise run audit` is golangci-lint, and `check` depends on it.** Seventeen
+  linters that nothing else here runs, with `default: none` so staticcheck is
+  not declared in two files that could disagree. It is a gate and it sits at
+  zero: four of them found something and it was fixed, the other thirteen
+  found nothing and are there for the day something appears. Warm it takes
+  under a second, which is why it belongs in the inner loop and not in a task
+  somebody remembers.
+
+  `dupl` is deliberately not among them. golangci-lint runs analyzers per
+  package, so its dupl cannot see across package boundaries: measured on this
+  tree it found no cross-file clones at any threshold, where standalone dupl
+  finds the real one — `internal/cloudflare/deploy.go` against
+  `internal/fly/fly.go`, the same step written twice in the two cloud targets.
+
 - **`mise run lint` says what `go vet` will not** — a function nobody calls, a
   variable a refactor left behind, a deprecated call. Every one of those lived
   in this tree until staticcheck was added to the gate.

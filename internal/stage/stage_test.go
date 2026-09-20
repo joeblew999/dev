@@ -1,8 +1,10 @@
 package stage
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/joeblew999/dev/cli"
@@ -72,13 +74,22 @@ func TestInspectSeesACLICommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Whatever cli itself needs, because a consumer of cli needs it too and
+	// this scratch module is a consumer. Read from dev's own go.mod rather
+	// than listed here: cli gained a dependency once and this test was the
+	// only thing that noticed, which is the right alarm and the wrong place
+	// to have to edit by hand every time.
+	needs, err := devRequires(filepath.Join(dev, "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Chdir(t.TempDir())
 	os.WriteFile("mise.toml", nil, 0o644)
 	os.MkdirAll("cmd/plain", 0o755)
 	os.WriteFile("cmd/plain/go.mod", []byte("module x/cmd/plain\n\ngo 1.27\n"), 0o644)
 	os.WriteFile("cmd/plain/main.go", []byte("package main\n\nfunc main() {}\n"), 0o644)
 	os.MkdirAll("cmd/tool", 0o755)
-	os.WriteFile("cmd/tool/go.mod", []byte("module x/cmd/tool\n\ngo 1.27.1\n\nrequire github.com/joeblew999/dev v0.0.0\n\nreplace github.com/joeblew999/dev => "+dev+"\n"), 0o644)
+	os.WriteFile("cmd/tool/go.mod", []byte("module x/cmd/tool\n\ngo 1.27.1\n\nrequire github.com/joeblew999/dev v0.0.0\n\n"+needs+"\nreplace github.com/joeblew999/dev => "+dev+"\n"), 0o644)
 	os.WriteFile("cmd/tool/go.sum", sum, 0o644)
 	os.WriteFile("cmd/tool/main.go", []byte(`package main
 
@@ -105,4 +116,31 @@ func main() { cli.Main(cli.Command{Name: "tool"}) }
 			t.Errorf("after Build, %s: %v", p, err)
 		}
 	}
+}
+
+// devRequires is dev's own require lines, marked indirect, for a scratch
+// module that imports its cli.
+func devRequires(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	var out strings.Builder
+	in := false
+	for line := range strings.SplitSeq(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "require ("):
+			in = true
+		case in && trimmed == ")":
+			in = false
+		case in && trimmed != "":
+			name, _, _ := strings.Cut(trimmed, " //")
+			fmt.Fprintf(&out, "require %s // indirect\n", strings.TrimSpace(name))
+		case strings.HasPrefix(trimmed, "require "):
+			name, _, _ := strings.Cut(strings.TrimPrefix(trimmed, "require "), " //")
+			fmt.Fprintf(&out, "require %s // indirect\n", strings.TrimSpace(name))
+		}
+	}
+	return out.String(), nil
 }

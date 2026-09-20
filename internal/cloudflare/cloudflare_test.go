@@ -56,6 +56,7 @@ func fakeAccount(t *testing.T, token, subdomain string) (calls *int) {
 }
 
 func stubFnox(t *testing.T, values map[string]string) {
+	t.Helper()
 	// Every stub starts from nothing read. The credential memo is as
 	// invisible to a stub as it is fast, and without this a test that
 	// replaces fnox gets whatever an earlier test caused to be read — which

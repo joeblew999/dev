@@ -2,6 +2,7 @@ package cloudflare
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -95,10 +96,10 @@ func waitReady(log string, timeout time.Duration) error {
 	for {
 		data, _ := os.ReadFile(log)
 		if bytes.Contains(data, []byte(tooNew)) {
-			return fmt.Errorf("this Worker's compatibility_date is newer than the workerd inside the pinned wrangler, so it deploys but will not run locally; move the wrangler pin in mise.toml forward, or set compatibility_date back to a date that wrangler knows. Its log is above")
+			return errors.New("this Worker's compatibility_date is newer than the workerd inside the pinned wrangler, so it deploys but will not run locally; move the wrangler pin in mise.toml forward, or set compatibility_date back to a date that wrangler knows. Its log is above")
 		}
 		if bytes.Contains(data, []byte("ERROR")) {
-			return fmt.Errorf("wrangler dev failed; its log is above")
+			return errors.New("wrangler dev failed; its log is above")
 		}
 		if bytes.Contains(data, []byte("Ready on")) {
 			return nil

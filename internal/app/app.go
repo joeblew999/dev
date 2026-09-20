@@ -138,12 +138,31 @@ func WaitFlags(fs *flag.FlagSet) {
 // directory. cli has already parsed DIR and the flags, so these are the
 // dispatch and nothing else.
 
-func URLVerb(c cli.Call) error    { return to(c, "url") }
-func DeployVerb(c cli.Call) error { return to(c, "deploy") }
-func LogsVerb(c cli.Call) error   { return to(c, "logs") }
-func SmokeVerb(c cli.Call) error  { return to(c, "smoke") }
-func DeleteVerb(c cli.Call) error { return to(c, "delete") }
-func ListVerb(c cli.Call) error   { return to(c, "list") }
+// The verbs to() dispatches, named once. Each appears three times otherwise
+// — the function that sends it, the case that answers it, and the list the
+// unreachable default prints — and the third is the one that goes stale:
+// health was added and the list did not mention it, so the message that
+// exists to say "you added a verb and forgot its case" would itself have
+// been missing a verb.
+const (
+	verbURL    = "url"
+	verbDeploy = "deploy"
+	verbLogs   = "logs"
+	verbSmoke  = "smoke"
+	verbHealth = "health"
+	verbDelete = "delete"
+	verbList   = "list"
+)
+
+// dispatched is every verb to() answers, in the order a person meets them.
+var dispatched = []string{verbURL, verbDeploy, verbLogs, verbSmoke, verbHealth, verbDelete, verbList}
+
+func URLVerb(c cli.Call) error    { return to(c, verbURL) }
+func DeployVerb(c cli.Call) error { return to(c, verbDeploy) }
+func LogsVerb(c cli.Call) error   { return to(c, verbLogs) }
+func SmokeVerb(c cli.Call) error  { return to(c, verbSmoke) }
+func DeleteVerb(c cli.Call) error { return to(c, verbDelete) }
+func ListVerb(c cli.Call) error   { return to(c, verbList) }
 
 // FrontingVerb takes a hostname rather than a directory: what stands in front
 // of an app is a fact about a name, not about where the code is. An app may
@@ -351,7 +370,7 @@ func to(c cli.Call, verb string) error {
 	// A directory with no config and a --to gets one and carries on, which is
 	// the whole of "make it if it is not there": the config is written at the
 	// moment something needs it, not by a separate verb nobody remembers.
-	if want := c.Value("to"); want != "" && verb == "deploy" {
+	if want := c.Value("to"); want != "" && verb == verbDeploy {
 		if err := toward(c, want); err != nil {
 			return err
 		}
@@ -375,14 +394,14 @@ func to(c cli.Call, verb string) error {
 		}
 	}
 	switch verb {
-	case "url":
+	case verbURL:
 		u, err := address(c, t)
 		if err != nil {
 			return err
 		}
 		fmt.Fprintln(c.Stdout, u)
 		return nil
-	case "deploy":
+	case verbDeploy:
 		if err := t.Deploy(c); err != nil {
 			return err
 		}
@@ -396,7 +415,7 @@ func to(c cli.Call, verb string) error {
 			return err
 		}
 		return Wait(c.Stdout, u+c.Value("wait"), 2*time.Minute)
-	case "logs":
+	case verbLogs:
 		// A person watching gets the stream; everything else gets an answer
 		// that ends. The flag that already means "for a reader that is not a
 		// person" decides, as it does everywhere else here.
@@ -416,20 +435,20 @@ func to(c cli.Call, verb string) error {
 			return err
 		}
 		return c.EmitJSON(events)
-	case "delete":
+	case verbDelete:
 		return t.Delete(c)
-	case "health":
+	case verbHealth:
 		// Nothing per-cloud: what a deploy answers is a fact about an HTTP
 		// address, and every cloud in the registry already knows how to name
 		// its own. A third cloud gets this by declaring Deployed and nothing
 		// else, which is the test the registry is supposed to pass.
 		return health(c, t)
-	case "smoke":
+	case verbSmoke:
 		if t.Smoke == nil {
 			return fmt.Errorf("%s", t.NoSmoke)
 		}
 		return t.Smoke(c)
-	case "list":
+	case verbList:
 		names, err := t.List()
 		if err != nil {
 			return err
@@ -454,7 +473,7 @@ func to(c cli.Call, verb string) error {
 	// this file. It is here so that adding a verb without adding its case is a
 	// message and not a silent success.
 	return cli.Usagef("%v", cli.Unknown("deploy verb", verb,
-		[]string{"url", "deploy", "logs", "delete", "smoke"}))
+		dispatched))
 }
 
 // address is what `url` prints and what `deploy --wait` polls: what --local

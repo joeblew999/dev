@@ -51,7 +51,7 @@ var scoutly = Checker{
 	Provides: "what Google reads on each page: title, meta description, H1, canonical, Open Graph, images",
 	Cost:     "~1s for a few pages",
 	Args: func(a Ask) []string {
-		return Paged([]string{a.URL, "--format", "json"}, a.Pages)
+		return Paged([]string{a.URL, "--format", FormatJSON}, a.Pages)
 	},
 	Read: JSON("scoutly's report", fromScoutly),
 }

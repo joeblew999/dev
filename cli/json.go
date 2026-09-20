@@ -69,7 +69,7 @@ func reportPath(out string) (string, error) {
 	if strings.ContainsRune(out, filepath.Separator) || filepath.IsAbs(out) {
 		return out, nil
 	}
-	root, err := root(".")
+	root, err := root()
 	if err != nil {
 		return "", err
 	}
@@ -157,7 +157,7 @@ func (c Call) SubReport(tool, raw string) (string, error) {
 	}
 	// Relative to the repo, because the path is read in a report rather than
 	// followed from wherever the reader's shell happens to be.
-	if root, err := root("."); err == nil {
+	if root, err := root(); err == nil {
 		if rel, err := filepath.Rel(root, path); err == nil {
 			return rel, nil
 		}

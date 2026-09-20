@@ -10,6 +10,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/BurntSushi/toml"
 )
 
 // TB is the part of testing.TB that CheckSkill needs, so that importing this
@@ -31,7 +33,7 @@ func CheckSkill(t TB, c Command) {
 		return
 	}
 	c.holdTo(t, want, shipped, claude, agents)
-	dir, err := root(".")
+	dir, err := root()
 	if err != nil {
 		return
 	}
@@ -164,16 +166,11 @@ func angleProblems(md string) []string {
 // never sees, keeping the lines so that a message's line number still counts
 // from the top of the file a person edits.
 func blankFrontmatter(md string) string {
-	lines := strings.Split(md, "\n")
-	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+	lines, end := frontmatterLines(md)
+	if end < 0 {
 		return md
 	}
-	for i := 1; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) == "---" {
-			clear(lines[:i+1])
-			break
-		}
-	}
+	clear(lines[:end+1])
 	return strings.Join(lines, "\n")
 }
 
@@ -314,60 +311,36 @@ func CheckPinned(t TB, misePath string) {
 }
 
 // miseTools is the [tools] table: the name mise is given, and the version
-// asked for. A small reader rather than a TOML library, because the section
-// is flat and one key per line, and the dependency would be carried by every
-// command on the stack for the sake of it.
+// asked for.
+//
+// Through the TOML parser this module already depends on. It was a hand
+// written line reader — cut at the first =, strip the quotes, skip the
+// comment — which is a TOML parser with the hard parts missing, and it had
+// them missing in the way that costs: a pin carrying settings
+// (`wrangler = { version = "latest", allow_builds = [...] }`) made the whole
+// brace-blob the version, and every repo on this stack using allow_builds
+// was told its pin disagreed with a registry saying the same thing. Fixing
+// that by hand was writing the parser's second hard part.
 func miseTools(config string) map[string]string {
-	tools, inTools := map[string]string{}, false
-	for line := range strings.Lines(config) {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "[") {
-			// A table header, and only the flat [tools] one is pins: a
-			// [tools.something] sub-table is settings for one of them.
-			inTools = trimmed == "[tools]"
-			continue
+	var file struct {
+		Tools map[string]any `toml:"tools"`
+	}
+	if _, err := toml.Decode(config, &file); err != nil {
+		return map[string]string{}
+	}
+	tools := map[string]string{}
+	for name, value := range file.Tools {
+		switch v := value.(type) {
+		case string:
+			tools[name] = v
+		case map[string]any:
+			// A pin may carry how to install it as well as which one:
+			// allow_builds, or a backend's own settings. Only the version
+			// says which.
+			if version, ok := v["version"].(string); ok {
+				tools[name] = version
+			}
 		}
-		key, value, ok := strings.Cut(trimmed, "=")
-		if !inTools || !ok || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		// The comment this repo writes beside a pin is not part of the
-		// version, and a key is quoted because of the : and / in a backend
-		// path, not because mise calls it that.
-		value, _, _ = strings.Cut(value, "#")
-		tools[unquoted(key)] = version(value)
 	}
 	return tools
-}
-
-// unquoted is one TOML string: trimmed, and without the quotes it was
-// written with.
-func unquoted(s string) string { return strings.Trim(strings.TrimSpace(s), `"`) }
-
-// version is what a [tools] value asks for, whether it is written as a string
-// or as a table.
-//
-// mise lets a pin carry settings — wrangler needs
-// allow_builds = ["esbuild", "sharp", "workerd"] before npm will install it —
-// and then the line is an inline table rather than a version. Reading
-// everything after the first = as the version made that whole brace-blob the
-// version, so a repo that legitimately pins wrangler with its build allowance
-// was told its pin disagreed with a registry that says the same thing. Any
-// repo on this stack using allow_builds would have hit it.
-func version(value string) string {
-	value = strings.TrimSpace(value)
-	if !strings.HasPrefix(value, "{") {
-		return unquoted(value)
-	}
-	// One field out of the table, by name: the others are how to install it,
-	// not which one to install.
-	_, rest, ok := strings.Cut(value, "version")
-	if !ok {
-		return ""
-	}
-	if _, rest, ok = strings.Cut(rest, `"`); !ok {
-		return ""
-	}
-	got, _, _ := strings.Cut(rest, `"`)
-	return got
 }

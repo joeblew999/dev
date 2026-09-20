@@ -35,7 +35,11 @@ var sleep = time.Sleep
 // have four different fixes and the message named none of them.
 func Wait(out io.Writer, url string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
-	streak, last := 0, "nothing yet"
+	// last is set by every path through the loop before anything reads it,
+	// so it is declared rather than initialised: a value here would be one
+	// nobody can ever see, which reads as a default and is not one.
+	streak := 0
+	var last string
 	for {
 		resp, err := waitClient.Get(url)
 		switch {

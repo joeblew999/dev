@@ -19,7 +19,7 @@ import (
 // mise.toml — every repo on the stack has one at its root — and never
 // through git: a Worker's main links this package into its wasm.
 func (c Command) paths() (shipped, claude, agents string, err error) {
-	root, err := root(".")
+	root, err := root()
 	if err != nil {
 		return "", "", "", err
 	}
@@ -28,9 +28,11 @@ func (c Command) paths() (shipped, claude, agents string, err error) {
 		filepath.Join(root, AgentsDir, c.Name, SkillFile), nil
 }
 
-// root is the nearest directory at or above dir holding a mise.toml.
-func root(dir string) (string, error) {
-	abs, err := filepath.Abs(dir)
+// root is the nearest directory at or above the working directory holding a
+// mise.toml. It took the directory to start from and every caller passed ".",
+// which is a parameter that looks like a choice and is not one.
+func root() (string, error) {
+	abs, err := filepath.Abs(".")
 	if err != nil {
 		return "", err
 	}
@@ -40,7 +42,7 @@ func root(dir string) (string, error) {
 		}
 		parent := filepath.Dir(abs)
 		if parent == abs {
-			return "", fmt.Errorf("no mise.toml at or above %s; run this inside a repo on the stack", dir)
+			return "", fmt.Errorf("no mise.toml at or above %s; run this inside a repo on the stack", abs)
 		}
 		abs = parent
 	}
@@ -66,7 +68,7 @@ func (c Command) skill(call Call) error {
 	// checking would compare that old render against equally old files and
 	// report "up to date". Refuse instead — the cost is one rebuild, and the
 	// alternative is a wrong answer nobody can see.
-	dir, err := root(".")
+	dir, err := root()
 	if err != nil {
 		return err
 	}
@@ -154,7 +156,7 @@ func put(out io.Writer, name, path, want string, check bool) (written bool, err 
 
 // writeSkill resolves where a named skill goes, then writes or checks it.
 func (c Command) writeSkill(stdout io.Writer, name, body string, check bool) error {
-	root, err := root(".")
+	root, err := root()
 	if err != nil {
 		return err
 	}

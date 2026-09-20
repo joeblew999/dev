@@ -5,6 +5,7 @@
 package gitrepo
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -15,7 +16,7 @@ import (
 func Slug(dir string) (string, error) {
 	res, err := tool.Cmd{Bin: "git", Args: []string{"remote", "get-url", "origin"}, Dir: dir, Quiet: true}.Capture()
 	if err != nil {
-		return "", fmt.Errorf("no origin remote here; add one: git remote add origin https://github.com/<owner>/<repo>")
+		return "", errors.New("no origin remote here; add one: git remote add origin https://github.com/<owner>/<repo>")
 	}
 	remote := strings.TrimSpace(res.Out)
 	slug, ok := Parse(remote)

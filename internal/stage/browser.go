@@ -80,7 +80,7 @@ func probe(out io.Writer, server, probe, path string) error {
 		return err
 	}
 	if _, err := exec.LookPath(NodeBin); err != nil {
-		return fmt.Errorf("node is not on PATH; run this through mise, which pins it")
+		return errors.New("node is not on PATH; run this through mise, which pins it")
 	}
 
 	appPort, err := tool.FreePort()

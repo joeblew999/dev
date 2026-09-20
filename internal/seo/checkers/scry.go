@@ -25,7 +25,7 @@ var scry = Checker{
 	Provides: "90-odd checks a page at a time, including TLS expiry and the security headers",
 	Cost:     "~1s",
 	Args: func(a Ask) []string {
-		return []string{"check", a.URL, "-o", "json"}
+		return []string{"check", a.URL, "-o", FormatJSON}
 	},
 	Read: JSON("scry's report", fromScry),
 }

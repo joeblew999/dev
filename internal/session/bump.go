@@ -2,6 +2,7 @@ package session
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -77,7 +78,7 @@ func Bump(out io.Writer, sources []string) error {
 	}
 
 	if !confirm(out, "rewrite "+pins.File+"? [y/N] ") {
-		return fmt.Errorf("not bumped")
+		return errors.New("not bumped")
 	}
 	if err := rewriteRefs(pins.File, p); err != nil {
 		return err

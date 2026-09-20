@@ -15,6 +15,7 @@ package release
 import (
 	"bytes"
 	_ "embed"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -292,7 +293,7 @@ func (r *release) publish(stdout io.Writer, version string) (err error) {
 		}
 	}()
 	if version == "" {
-		return fmt.Errorf("give the version to release, vX.Y.Z")
+		return errors.New("give the version to release, vX.Y.Z")
 	}
 	tag := version
 	if !strings.HasPrefix(tag, "v") {
@@ -304,7 +305,7 @@ func (r *release) publish(stdout io.Writer, version string) (err error) {
 	if status, err := out("git", "status", "--porcelain"); err != nil {
 		return err
 	} else if status != "" {
-		return fmt.Errorf("working tree is dirty; commit first")
+		return errors.New("working tree is dirty; commit first")
 	}
 	// Everything that can be known before anything is public is checked here.
 	// A release publishes binaries and then signs them, so a signing key that
@@ -442,5 +443,5 @@ func modulePath() (string, error) {
 			return strings.TrimSpace(rest), nil
 		}
 	}
-	return "", fmt.Errorf("go.mod names no module")
+	return "", errors.New("go.mod names no module")
 }

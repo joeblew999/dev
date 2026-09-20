@@ -145,8 +145,8 @@ func buildWorker(d Dir, env string) error {
 		}
 		outDir := filepath.Dir(main)
 		mode, goEnv := "go", []string{GoOSEnv + "=js", GoArchEnv + "=wasm"}
-		if filepath.Base(outDir) == "tinygo" {
-			mode = "tinygo"
+		if filepath.Base(outDir) == TinyGoBin {
+			mode = TinyGoBin
 		}
 		if err := run(d.Path, nil, GoBin, "run", "github.com/syumai/workers-go/cmd/workers-assets-gen", "-mode="+mode, "-o", outDir); err != nil {
 			return err

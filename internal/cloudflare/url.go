@@ -135,7 +135,7 @@ func fetchSubdomain() (string, error) {
 		return "", err
 	}
 	if result.Subdomain == "" {
-		return "", fmt.Errorf("this account has no workers.dev subdomain; Cloudflare asks for one on the Workers dashboard before a Worker has a URL")
+		return "", errors.New("this account has no workers.dev subdomain; Cloudflare asks for one on the Workers dashboard before a Worker has a URL")
 	}
 	return result.Subdomain, nil
 }

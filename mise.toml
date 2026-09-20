@@ -32,6 +32,7 @@ fnox = "latest"   # the one way to a secret; dev release reads the signing key f
 wrangler = { version = "latest", allow_builds = ["esbuild", "sharp", "workerd"] }
 node = "latest"
 flyctl = "latest"
+golangci-lint = "latest"
 
 # The site's own address, named once: three tasks write it into canonical
 # links, a sitemap and an llms.txt, and a fourth checks the deployed thing.
@@ -186,9 +187,23 @@ description = "hk checks: gofmt, vet, tidy, staticcheck, whitespace, secrets"
 # place so the two can never say different things.
 run = "hk check --all"
 
+[tasks.audit]
+description = "golangci-lint: the checks nothing else here runs"
+# A gate, and it sits at zero. That is the whole difference between this and
+# the four reports: dead, dup, unread and repeated are ~50% true positive on
+# any real tree and a gate that cries wolf gets suppressed. This one is
+# configured to four linters that nothing else covers — unparam, goconst,
+# forbidigo, depguard — with default: none, so staticcheck is not run twice
+# in two files that could disagree.
+#
+# check depends on it so it runs in the inner loop rather than when somebody
+# remembers. It was pinned and configured and wired to nothing for an hour,
+# which is exactly how a check becomes decoration.
+run = "golangci-lint run ./..."
+
 [tasks.check]
 description = "tests (which hold the skill to the verbs), and a snapshot release builds and signs"
-depends = ["build"]
+depends = ["build", "audit"]
 # No vet here: hk.pkl runs it, on every commit and in lint. Running it again
 # was the same check declared in two files, and test ran it twice.
 run = [

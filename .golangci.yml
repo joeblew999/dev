@@ -1,0 +1,88 @@
+# Only what nothing else here runs.
+#
+# staticcheck, gofmt, go vet and go mod tidy are hk's, on every commit and in
+# `mise run lint` — enabling them here too would be one check declared in two
+# files, which is the thing hk.pkl exists to prevent. So `default: none`, and
+# the list below is the linters that add something.
+#
+# dupl is deliberately absent. golangci-lint runs analyzers per package, so
+# its dupl cannot see across package boundaries: measured on this tree it
+# found zero cross-file pairs at any threshold, where standalone dupl finds
+# the real one — internal/cloudflare/deploy.go against internal/fly/fly.go,
+# the same step written twice in the two cloud targets. That one stays in
+# `mise run dup`, standalone, as a report.
+version: "2"
+
+linters:
+  default: none
+  enable:
+    # A parameter the body never touches means the signature says something
+    # the code does not do. Nothing else here says that: the compiler, go
+    # vet, staticcheck and deadcode are all silent on a parameter a called
+    # function ignores.
+    - unparam
+    # One string written in three files. Half of what it finds is a verb's
+    # name, where a constant reads worse than the word; the other half is a
+    # fact spelled in three places, and a constant that already exists being
+    # bypassed by a literal.
+    - goconst
+    # Every verb writes to the Call's Stdout so a test can read it and a
+    # caller can redirect it. One fmt.Printf had drifted into non-test code.
+    - forbidigo
+    # cloudflare-go and fly-go are libraries dev would become rather than
+    # binaries dev runs. AGENTS.md has the measurements: warm rebuild 1.1s to
+    # 2.1s, binary 11.3MB to 28MB, four modules to nine.
+    - depguard
+
+    # The rest sit at zero on this tree and each catches a real class, which
+    # is the whole case for making them gates: a linter at zero costs nothing
+    # to keep and fails the day somebody writes the thing it is about. The
+    # four above are here because they found something; these are here
+    # because they will.
+    #
+    # Measured before enabling, and the ones that found things were fixed
+    # first: perfsprint found 11 fmt.Errorf with no verb in them, wastedassign
+    # an initial value nothing could read, thelper a helper that did not name
+    # itself so a failure pointed at the helper rather than the test.
+    - errorlint       # errors compared with == rather than errors.Is
+    - bodyclose       # an HTTP body left open, which leaks the connection
+    - copyloopvar     # the Go 1.22 loop-variable copy, now redundant
+    - intrange        # for i := 0; i < n; i++ where `range n` says it
+    - makezero        # make([]T, n) then append, which hides n zero values
+    - usetesting      # os.Setenv in a test where t.Setenv cleans up
+    - tparallel       # t.Parallel in a test whose parent does not have it
+    - canonicalheader # a header name spelled in a case Go will not match
+    - mirror          # []byte where the string form avoids an allocation
+    - fatcontext      # a context built inside a loop that should be outside
+    - perfsprint      # fmt.Errorf with no verb in it, which is errors.New
+    - wastedassign    # a value assigned and overwritten before it is read
+    - thelper         # a test helper that does not call t.Helper()
+
+  settings:
+    goconst:
+      min-occurrences: 3
+      ignore-tests: true
+    forbidigo:
+      forbid:
+        - pattern: ^fmt\.Print(f|ln)?$
+          msg: writes to the process's stdout, around the Call the verb was handed. Use fmt.Fprintf(c.Stdout, ...) so a test can read it; progress and warnings go to c.Stderr.
+    depguard:
+      rules:
+        cloud-sdks:
+          deny:
+            - pkg: github.com/cloudflare/cloudflare-go
+              desc: a library dev becomes, not a binary dev runs. wrangler is pinned by the registry and costs go.mod nothing; see AGENTS.md for the measurements.
+            - pkg: github.com/superfly/fly-go
+              desc: nine direct requires and twenty-odd indirect, to replace a flyctl that already does everything. See AGENTS.md.
+
+  exclusions:
+    rules:
+      # A test prints to its own stdout when it is showing a person what a
+      # fixture looks like, and go test owns that stream.
+      - path: _test\.go
+        linters: [forbidigo]
+      # A test helper with one caller is a test helper, not a mistake: the
+      # second caller is the next test somebody writes, and narrowing the
+      # signature now only means widening it again.
+      - path: _test\.go
+        linters: [unparam]

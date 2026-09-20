@@ -21,7 +21,7 @@ import (
 // because an agent is told what is available and cannot enumerate it. The
 // directory is the fact.
 func (c Command) skills(call Call) error {
-	root, err := root(".")
+	root, err := root()
 	if err != nil {
 		return err
 	}

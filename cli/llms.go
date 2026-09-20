@@ -162,14 +162,11 @@ func heading(prose string) string {
 // back is what stops a command carrying a second description of itself that
 // somebody has to remember to keep in step.
 func frontmatter(md, key string) string {
-	lines := Lines(md)
-	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+	lines, end := frontmatterLines(md)
+	if end < 0 {
 		return ""
 	}
-	for _, line := range lines[1:] {
-		if strings.TrimSpace(line) == "---" {
-			return ""
-		}
+	for _, line := range lines[1:end] {
 		// Cut at the first colon only: what a description says about the
 		// command has colons of its own, and they belong to the value.
 		if name, value, ok := strings.Cut(line, ":"); ok && strings.TrimSpace(name) == key {
@@ -177,6 +174,29 @@ func frontmatter(md, key string) string {
 		}
 	}
 	return ""
+}
+
+// Fence is the line that opens and closes a markdown file's frontmatter.
+const Fence = "---"
+
+// frontmatterLines splits a markdown file and says which line closes its
+// leading frontmatter block, or -1 when there is none.
+//
+// One reader, because there were two: one emptied the block so a line number
+// still counted from the top of the file, the other read a key out of it, and
+// each asked "where does the --- end" in its own spelling. goconst noticed
+// the string before anybody noticed the duplication under it.
+func frontmatterLines(md string) (lines []string, end int) {
+	lines = strings.Split(md, "\n")
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != Fence {
+		return lines, -1
+	}
+	for i := 1; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) == Fence {
+			return lines, i
+		}
+	}
+	return lines, -1
 }
 
 // llms is `<cmd> llms [DIR]`: the document to stdout, or written as llms.txt
