@@ -317,7 +317,16 @@ depends = ["build"]
 # build has sources and outputs, so when the agent changed nothing this costs
 # a stat of each file and skips. mise is doing the work the Makefile would
 # have; depends_post is how it knows to do it afterwards rather than before.
-depends_post = ["build", "skill:check"]
+#
+# session:check last, and it is the half that is easy to get wrong. Claude
+# Code reads skills when it starts and does not watch them, so regenerating
+# SKILL.md reaches the next `claude -p` — which mise starts fresh every run,
+# so the loop itself is fine — and does not reach a session already open.
+# session:check compares each running session's start time against the
+# skills' newest mtime and names the ones now briefed on a manual that has
+# moved. Without it the loop is correct and every human and agent watching it
+# is quietly reading the previous version.
+depends_post = ["build", "skill:check", "session:check"]
 # The loop above closes what dev already knows how to close. What survives it
 # is, by construction, what no writer claims — and every one of those is a
 # question about dev itself: a writer that should exist, a validator that

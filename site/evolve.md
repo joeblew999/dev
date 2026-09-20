@@ -64,6 +64,23 @@ what your last change actually did.
   is the rule and it is not negotiable.
 - **Do not widen the job.** One finding. The loop runs again.
 
+## The manual you were briefed with
+
+`.claude/skills/dev/SKILL.md` is what Claude Code loaded when mise started
+you, and it is generated from the verbs — so it describes the code as it was
+when the task began. The moment you change a verb's flags, arguments or
+description, the manual in your context is out of date and you are the only
+one who knows it.
+
+You do not need to regenerate it: `depends_post` runs `build` after you exit,
+which rewrites all three copies, and `skill:check` fails if any is behind.
+What you do need is to stop trusting your own briefing about anything you
+have changed. Read the code, not the manual you were given.
+
+Claude Code reads skills at startup and does not watch them. The next run of
+this task is a fresh process and gets the new manual; a session already open
+does not, which is why `session:check` runs afterwards and names them.
+
 ## What good looks like
 
 One finding closed, or one honestly reported as not closable and why —

@@ -218,13 +218,13 @@ func (s source) pages() ([]page, error) {
 	if err != nil {
 		return nil, err
 	}
-	md := s.relink(uncomment(frontmatterless(string(data))))
+	md := headless(s.relink(uncomment(frontmatterless(string(data)))))
 	intro, secs := split(md)
 	index := page{Path: s.Base, Group: s.Base, H1: s.H1, Title: s.Title, Desc: s.Desc, Body: intro}
 	if !s.Split {
 		// One page, so it keeps everything: a README's ## Get it is the whole
 		// reason the page exists.
-		index.Body = headless(md)
+		index.Body = md
 		return []page{index}, nil
 	}
 	out := []page{index}
@@ -298,6 +298,11 @@ func split(md string) (intro string, secs []section) {
 // headless drops the document's own H1. Every page here renders its own, from
 // what the site calls that page rather than from what the file calls itself —
 // and two H1s on one page is a finding.
+//
+// It runs before the split rather than on the one-page branch only, which is
+// where it was and what that cost: the level-1 heading sits above the first
+// level-2, so it landed in the intro, and both manual index pages shipped
+// with two H1s. Three checkers reported it within the minute.
 func headless(md string) string {
 	var out []string
 	fenced := false
