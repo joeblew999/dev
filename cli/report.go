@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -27,19 +28,37 @@ const (
 	SevInfo    = "info"
 )
 
+// Severities are the three, most serious first. The order is the rank, the
+// list is what a summary counts, and --fail-on takes one of them — three
+// facts that were a switch, a second switch and a third list.
+var Severities = []string{SevError, SevWarning, SevInfo}
+
 // SevRank orders severities, with anything unknown last so it never satisfies
 // a gate by accident.
 func SevRank(s string) int {
-	switch s {
-	case SevError:
-		return 0
-	case SevWarning:
-		return 1
-	case SevInfo:
-		return 2
-	default:
-		return 3
+	if i := slices.Index(Severities, s); i >= 0 {
+		return i
 	}
+	return len(Severities)
+}
+
+// Summary is what a run found, in the words the findings above it used.
+//
+// Every severity that occurred, most serious first, because the line used to
+// count errors alone and call them "problems" — so `dev domains` printed four
+// warnings and two notes and then said "0 problems" underneath them. A
+// summary that contradicts what is directly above it is worse than none.
+func (r *Report) Summary() string {
+	var parts []string
+	for _, sev := range Severities {
+		if n := r.BySeverity[sev]; n > 0 {
+			parts = append(parts, Plural(n, sev))
+		}
+	}
+	if len(parts) == 0 {
+		return "nothing to report"
+	}
+	return strings.Join(parts, ", ")
 }
 
 // What a step did. A step that did not run says so rather than reporting
@@ -236,16 +255,14 @@ func ReportFlags(fs *flag.FlagSet) {
 // seconds to minutes, and failing afterwards on a typo in --fail-on wastes
 // every one of them.
 func (c Call) CheckReportFlags() error {
-	switch s := c.Value("fail-on"); s {
-	case "", SevError, SevWarning, SevInfo:
-	default:
-		near := Nearest(s, []string{SevError, SevWarning, SevInfo})
-		if near != "" {
-			return c.Usagef("--fail-on %q — did you mean %q?", s, near)
-		}
-		return c.Usagef("--fail-on %q: want error, warning or info", s)
+	s := c.Value("fail-on")
+	if s == "" || slices.Contains(Severities, s) {
+		return nil
 	}
-	return nil
+	if near := Nearest(s, Severities); near != "" {
+		return c.Usagef("--fail-on %q — did you mean %q?", s, near)
+	}
+	return c.Usagef("--fail-on %q: want %s", s, EitherOr(Severities))
 }
 
 // Record writes the run to DIR as a timestamped file and refreshes
@@ -396,8 +413,14 @@ func Measure(name, provides string, look func() ([]Finding, string, error)) Meas
 	}
 	if err != nil {
 		step.Status, step.Note = StatusSkipped, err.Error()
-		return Measured{Step: step}
 	}
+	// Findings are kept whether or not look also returned an error, because a
+	// look that returns both is saying "this could not be done, and here is
+	// why in the report's own terms" — which is what a zone nothing answers
+	// for is. Dropping them left the step advertising a note the report did
+	// not hold, so `dev fronting` on an unknown host printed "1 note" and
+	// "nothing to report" two lines apart.
+	//
 	// Every finding says which part found it. Left to each caller this was
 	// done in some and not others, so a report could name a problem without
 	// naming what noticed it.
@@ -492,8 +515,7 @@ func (c Call) Write(r *Report) {
 			mark, wide, s.Name, s.Took, Or(s.Covered, s.Note), Plural(s.Findings, "note"))
 	}
 	c.Findings(r)
-	fmt.Fprintf(c.Stdout, "%s in %s: %s\n", r.Outcome, r.Took,
-		Plural(r.BySeverity[SevError], "problem"))
+	fmt.Fprintf(c.Stdout, "%s in %s: %s\n", r.Outcome, r.Took, r.Summary())
 }
 
 // Findings prints what a report found, which is the half every command shows

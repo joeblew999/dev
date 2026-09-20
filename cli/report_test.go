@@ -6,6 +6,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"io"
 	"os"
@@ -332,5 +333,57 @@ func TestFinishIsTheWholeTail(t *testing.T) {
 	}
 	if !strings.Contains(jsOut.String(), `"outcome"`) {
 		t.Errorf("stdout is not the report: %q", jsOut.String())
+	}
+}
+
+// A report that says two things about the same run is worse than a quiet
+// one, and it said two things twice: the summary counted errors alone and
+// called them problems, so four warnings and two notes summed to "0
+// problems"; and a look that returned findings *and* an error had its
+// findings dropped while its step still advertised the count, so `dev
+// fronting` on an unknown host printed "1 note" and "nothing to report" two
+// lines apart.
+func TestTheSummarySaysWhatTheFindingsSay(t *testing.T) {
+	r := NewReport("t", "target")
+	r.Record(Measure("both", "findings and a reason it stopped", func() ([]Finding, string, error) {
+		return []Finding{{Severity: SevInfo, ID: "no-zone", Message: "nothing answers for it"}}, "", errors.New("no zone")
+	}))
+	r.Record(Measure("warned", "two warnings", func() ([]Finding, string, error) {
+		return []Finding{
+			{Severity: SevWarning, ID: "a", Message: "m"},
+			{Severity: SevWarning, ID: "b", Message: "m"},
+		}, "", nil
+	}))
+	if len(r.Findings) != 3 {
+		t.Fatalf("report holds %d findings; the step that also returned an error had its own dropped", len(r.Findings))
+	}
+	// And the finding a failing look returned is still named by its step.
+	for _, f := range r.Findings {
+		if f.ID == "no-zone" && f.Tool != "both" {
+			t.Errorf("a failing look's finding does not say what found it: %+v", f)
+		}
+	}
+	r.Done(time.Now(), SevError)
+	if got := r.Summary(); got != "2 warnings, 1 info" {
+		t.Errorf("summary = %q; want every severity that occurred, most serious first", got)
+	}
+	if r.Outcome != "pass" {
+		t.Errorf("outcome = %q; nothing reached --fail-on error", r.Outcome)
+	}
+	if empty := NewReport("t", "t"); empty.Summary() != "nothing to report" {
+		t.Errorf("an empty report summarises as %q", empty.Summary())
+	}
+}
+
+// One list of severities: the rank, what a summary counts, and what --fail-on
+// takes were three copies of it.
+func TestSeveritiesAreOneList(t *testing.T) {
+	for i, sev := range Severities {
+		if SevRank(sev) != i {
+			t.Errorf("%s ranks %d and is %d in the list", sev, SevRank(sev), i)
+		}
+	}
+	if SevRank("nonsense") != len(Severities) {
+		t.Error("an unknown severity does not sort last, so it could satisfy a gate")
 	}
 }
