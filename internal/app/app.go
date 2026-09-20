@@ -27,23 +27,20 @@ import (
 //go:embed usage.md
 var Usage string
 
-// Run is every deployed-app verb. DIR comes first; the target's own Run
-// reads the flags.
-// The deploy verbs' flags. Both clouds register the same ones, checked verb
-// by verb, with one exception: a Worker's smoke takes --path, --expect and
-// --timeout and a Fly app's takes none, because only the Worker is run
-// locally under workerd. The signature shows the Worker's, which is the
-// larger set, and smoke's description says so.
+// The deploy verbs' flags. Both clouds register the same ones, checked verb by
+// verb, with one exception: a Worker's smoke takes --path, --expect and
+// --timeout and a Fly app's takes none, because only the Worker is run locally
+// under workerd. The signature shows the Worker's, which is the larger set,
+// and smoke's description says so.
 //
 // This is the one place a signature cannot be the whole truth: which cloud a
-// verb is talking to is read from DIR, so it is not known until the verb
-// runs. `<verb> DIR --help` resolves the directory first and prints that
-// cloud's flags.
+// verb is talking to is read from DIR, so it is not known until the verb runs.
+// `<verb> DIR --help` resolves the directory first and prints that cloud's
+// flags.
 
-// EnvFlag is the wrangler environment, taken by every deploy verb.
-// EnvFlag is stage's, because the environment is a property of the build and
-// not of the deploy. Written out here as well, the two wordings drifted the
-// moment either was edited.
+// EnvFlag is the environment a deploy verb acts in. It is stage's, because the
+// environment is a property of the build and not of the deploy; written out
+// here as well, the two wordings drifted the moment either was edited.
 func EnvFlag(fs *flag.FlagSet) { stage.EnvFlag(fs) }
 
 // URLFlags are what `url` takes.
@@ -93,7 +90,7 @@ func DeleteVerb(c cli.Call) error { return to(c, "delete") }
 // WaitVerb is the one verb here that talks to no cloud: it polls a URL.
 func WaitVerb(c cli.Call) error {
 	d, _ := c.ValueAs("timeout", time.ParseDuration)
-	return cloudflare.Wait(c.Stdout, c.Args[0], d)
+	return Wait(c.Stdout, c.Args[0], d)
 }
 
 // cloud is what only a target knows: how to reach it. Everything a verb does
@@ -187,7 +184,7 @@ func to(c cli.Call, verb string) error {
 		if err != nil {
 			return err
 		}
-		return cloudflare.Wait(c.Stdout, u+c.Value("wait"), 2*time.Minute)
+		return Wait(c.Stdout, u+c.Value("wait"), 2*time.Minute)
 	case "logs":
 		return t.Logs(c)
 	case "delete":

@@ -134,7 +134,7 @@ and green first.
 | `main.go` | the verb table, its order, and the prose around it |
 | `cli/` | the public API: verbs, the manual, the markdown it is written in |
 | `internal/stage/` | build, wasm, check, run, workerd: one command directory, read from what it holds |
-| `internal/app/` | url, deploy, logs, smoke, wait: which cloud a directory deploys to, and the dispatch |
+| `internal/app/` | url, deploy, logs, smoke, wait: which cloud a directory deploys to, the dispatch, and waiting for an address that belongs to neither |
 | `internal/cloudflare/` | the Workers target: wrangler, the workers.dev subdomain, the throwaway deploy copy |
 | `internal/fly/` | the Fly target: flyctl from the repo root, `<app>.fly.dev` |
 | `internal/secrets/` | set and push: fnox in, the cloud's CLI out, values never as arguments |
