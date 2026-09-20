@@ -21,7 +21,22 @@
 // are signed with, so the one instruction a reader follows before they have
 // the tool cannot name a key that no longer signs.
 //
-// And the manuals are split, a page per section. They were already written
+// The manuals are one page each, and that is a decision rather than the
+// absence of one. They were split a page per heading to close
+// perf.dom_size.metrics, which counts nodes under <body> — the metric
+// improved and the site got worse: a manual is a reference somebody scans
+// and searches, and cutting it into thirty-four pages means no page holds
+// the answer and none of them can be found with ctrl-F. The checker was
+// measuring a proxy for "this page is too heavy for a reader", and the
+// reader it was standing in for wants the whole manual.
+//
+// So dom_size stays open on /dev/ and /cli/, and the reason it stays open is
+// written down here. A finding a person has read and declined is not the
+// same as one nobody has looked at, and the loop has to be able to tell
+// them apart or it will make this change again.
+//
+// The old comment, kept because it is the thing that was wrong: they were
+// already written
 // that way — a verb group carries its own prose and reading one has never
 // meant reading the one above it — and one scroll of fifteen sections was
 // also what made `perf.dom_size.metrics` fire: 90 children of <body> against
@@ -35,6 +50,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"html"
@@ -97,9 +114,8 @@ var sources = []source{
 		File: "skills/dev/SKILL.md", Base: "/dev/", Nav: "The dev manual",
 		H1:     "The dev manual",
 		Title:  "The dev manual — every verb, a group at a time",
-		Desc:   "Build, check, run, release and deploy a repo on this stack. Every verb dev has, a page per group, rendered from the verbs themselves.",
+		Desc:   "Build, check, run, release and deploy a repo on this stack: every verb dev has, rendered from the verbs themselves.",
 		Suffix: "dev, the stack's developer tool",
-		Split:  true,
 	},
 	{
 		File: "skills/cli/SKILL.md", Base: "/cli/", Nav: "Writing a command",
@@ -107,7 +123,6 @@ var sources = []source{
 		Title:  "The cli manual — writing a command on this stack",
 		Desc:   "The verb system every command on this stack is built on: what a verb declares, the helpers it is given, and the tests that hold a manual to its code.",
 		Suffix: "cli, the stack's verb system",
-		Split:  true,
 	},
 }
 
@@ -125,14 +140,25 @@ func main() {
 	out := flag.String("out", "site/public", "where to write the site")
 	origin := flag.String("origin", "", "the site's own origin, for canonical links")
 	urls := flag.String("urls", "site/urls.txt", "where to write the page list the sitemap is built from")
+	csp := flag.String("csp", "site/csp.txt", "where to write the policy these pages are meant to be served under")
 	flag.Parse()
-	if err := build(*out, *origin, *urls); err != nil {
+	if err := build(*out, *origin, *urls, *csp); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
 
-func build(out, origin, urls string) error {
+func build(out, origin, urls, csp string) error {
+	// Emptied first, because what this writes is decided by the sources and
+	// not by what is already there. Without it a run that renders fewer pages
+	// than the last one leaves the rest on disk, and they deploy: the split
+	// manuals left thirty-one orphans behind when they became three, every
+	// one of them still reachable, still in nobody's sitemap, and still
+	// claiming a canonical URL. It is safe to be this blunt because gen runs
+	// first in site:build and every other file in here is written after it.
+	if err := os.RemoveAll(out); err != nil {
+		return err
+	}
 	var pages []page
 	for _, s := range sources {
 		got, err := s.pages()
@@ -160,7 +186,29 @@ func build(out, origin, urls string) error {
 		}
 	}
 	fmt.Fprintf(os.Stderr, "  wrote %d pages from %d markdown files\n", len(pages), len(sources))
-	return pageList(urls, origin, pages)
+	if err := pageList(urls, origin, pages); err != nil {
+		return err
+	}
+	return stated(csp, "policy", policy()+"\n")
+}
+
+// stated writes one fact about the site this just generated, for the command
+// that runs next to read.
+//
+// Two of them now — the page list and the policy — and both are the same
+// shape: something only the generator knows, that `dev seo write` has to be
+// told. Kept in a task's arguments they were a copy of a generated fact,
+// which is a copy that is wrong the first time a section is renamed or a
+// colour changes, and wrong silently.
+func stated(path, what, text string) error {
+	if path == "" {
+		return nil
+	}
+	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "  wrote %-28s the %s\n", path, what)
+	return nil
 }
 
 // pageList writes the URLs the sitemap, llms.txt and the checkers are all
@@ -172,20 +220,13 @@ func build(out, origin, urls string) error {
 // reads this one file: `dev seo write --urls` builds the sitemap from it, and
 // `dev seo check` is pointed at the site it describes.
 func pageList(path, origin string, pages []page) error {
-	if path == "" {
-		return nil
-	}
 	var b strings.Builder
 	b.WriteString("# Written by site/gen. Every page of the site, in the order it\n")
 	b.WriteString("# renders them; the sitemap and llms.txt are built from this.\n")
 	for _, p := range pages {
 		b.WriteString(origin + p.Path + "\n")
 	}
-	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
-		return err
-	}
-	fmt.Fprintf(os.Stderr, "  wrote %-28s %d URLs\n", path, len(pages))
-	return nil
+	return stated(path, fmt.Sprintf("%d URLs", len(pages)), b.String())
 }
 
 // searchable holds every page to the ranges Search works in, and names all of
@@ -439,37 +480,18 @@ func clip(text string, max int) string {
 	return strings.TrimRight(cut, " ,;:—-") + "…"
 }
 
-// document is the page around the rendered markdown: the tags Search and a
-// link preview read, the navigation, and nothing a reader has to download.
+// styles is the whole of what this site looks like, and it is inline.
 //
-// The CSS is inline, and it stays inline on measurement rather than on
-// taste. Linking it would let the Content-Security-Policy drop
-// 'unsafe-inline' from style-src, which two checkers report — and it would
-// trade those for `perf.render_blocking.styles`, a third checker's warning
-// about exactly the round trip this site does not need. The answer that costs
-// nothing is a policy that names this block's sha256, which is a change to
-// the policy and not to the page.
-func document(p page, origin, body string, all []page) string {
-	canonical := origin + p.Path
-	return `<!doctype html>
-<html lang="en">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>` + html.EscapeString(p.Title) + `</title>
-<meta name="description" content="` + html.EscapeString(p.Desc) + `">
-<link rel="canonical" href="` + html.EscapeString(canonical) + `">
-<link rel="icon" href="/icon.png">
-<link rel="apple-touch-icon" href="/icon.png">
-<meta property="og:type" content="website">
-<meta property="og:title" content="` + html.EscapeString(p.Title) + `">
-<meta property="og:description" content="` + html.EscapeString(p.Desc) + `">
-<meta property="og:url" content="` + html.EscapeString(canonical) + `">
-<meta property="og:image" content="` + html.EscapeString(origin) + `/icon.png">
-<meta name="twitter:card" content="summary">
-<script type="application/ld+json">
-{"@context":"https://schema.org","@type":"TechArticle","url":"` + canonical + `","name":"` + p.Title + `","description":"` + p.Desc + `"}
-</script>
-<style>
+// It stays inline on measurement rather than on taste. Linking it would let
+// the Content-Security-Policy drop 'unsafe-inline' from style-src, which two
+// checkers report — and it would buy those two warnings with a third,
+// `perf.render_blocking.styles`, about exactly the round trip a text site
+// does not need before it can paint. The answer that costs neither is a
+// policy that names this block's own sha256, which is what policy() is.
+//
+// Kept as its own constant for that reason: the hash has to be over exactly
+// the bytes between <style> and </style>, so the bytes have to have a name.
+const styles = `
 :root{--ink:#111;--dim:#555;--line:#e3e3e3;--bg:#fff;--code:#f6f6f6}
 @media(prefers-color-scheme:dark){:root{--ink:#e8e8e8;--dim:#a0a0a0;--line:#2c2c2c;--bg:#111;--code:#1c1c1c}}
 *{box-sizing:border-box}
@@ -493,7 +515,52 @@ pre code{background:none;padding:0}
 table{border-collapse:collapse;width:100%;margin:1.5rem 0;display:block;overflow-x:auto}
 th,td{border:1px solid var(--line);padding:.5rem .75rem;text-align:left;vertical-align:top}
 blockquote{margin:1.5rem 0;padding-left:1rem;border-left:3px solid var(--line);color:var(--dim)}
-</style>
+`
+
+// policy is the Content-Security-Policy these pages are meant to be served
+// with, and the generator states it because it is a fact about the page.
+//
+// It was a literal in the task that writes the headers, which is the one
+// place that cannot know it: style-src has to allow this page's inline
+// stylesheet, and the only safe way to allow one inline block is to name its
+// sha256. A hash written by hand in a task file is wrong the first time a
+// colour changes, silently, in the browser — so it is computed here, from the
+// same bytes the page carries, and written out for the task to pass on.
+//
+// Everything else is the smallest policy a static text site can be served
+// under: nothing loads from anywhere but here, no script runs at all, and
+// nobody frames it.
+func policy() string {
+	sum := sha256.Sum256([]byte(styles))
+	return "default-src 'self'; " +
+		"style-src 'self' 'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'; " +
+		"script-src 'none'; img-src 'self' data:; " +
+		"base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+}
+
+// document is the page around the rendered markdown: the tags Search and a
+// link preview read, the navigation, and nothing a reader has to download.
+func document(p page, origin, body string, all []page) string {
+	canonical := origin + p.Path
+	return `<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>` + html.EscapeString(p.Title) + `</title>
+<meta name="description" content="` + html.EscapeString(p.Desc) + `">
+<link rel="canonical" href="` + html.EscapeString(canonical) + `">
+<link rel="icon" href="/icon.png">
+<link rel="apple-touch-icon" href="/icon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="` + html.EscapeString(p.Title) + `">
+<meta property="og:description" content="` + html.EscapeString(p.Desc) + `">
+<meta property="og:url" content="` + html.EscapeString(canonical) + `">
+<meta property="og:image" content="` + html.EscapeString(origin) + `/icon.png">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"TechArticle","url":"` + canonical + `","name":"` + p.Title + `","description":"` + p.Desc + `"}
+</script>
+<style>` + styles + `</style>
 ` + topNav(p) + `
 <h1>` + html.EscapeString(p.H1) + `</h1>
 ` + body + sectionNav(p, all) + `

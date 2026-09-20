@@ -293,9 +293,31 @@ verb — and only the command knows its own verbs, so every command on this
 stack writes that one itself with its `llms` verb. Pass `--skip llms` here
 when it has, or this overwrites it with the page list.
 
+One of them is a picture, because two findings had no file to answer them: a
+tab with no favicon shows the blank-page glyph, and a shared link with no
+`og:image` previews as a grey rectangle. Nothing here can invent a photograph
+of your site, so `icon.png` is the next honest thing — a mark five cells
+across, mirrored, drawn from a hash of the site's own origin, the way a
+version control host draws one for an account with no avatar. The same bytes
+every rebuild, so it is not a change in every diff. A PNG rather than an SVG
+because one file does both jobs and only PNG does: no social scraper renders
+an SVG, so an SVG mark would fix the tab and leave the preview empty. Pass
+`--image` for a real card — 1200×630 with your own words on it — and
+`og:image` uses that instead.
+
+`_headers` answers the three things a page is judged on that the page cannot
+say about itself. Four security headers everywhere; a `Cache-Control` with a
+minute of freshness, because a host's default asks again for every file on
+every view and a longer one is only safe on a name that changes when its
+content does; and `Content-Type: text/html; charset=utf-8` on `/`, `/*/` and
+`/*.html` only — the URLs a static site serves pages at have no extension for
+a host to work the type out from, and a charset on `sitemap.xml` would be a
+header claiming a file is something it is not.
+
 The files are a chain, and each writer declares its own links in it: robots.txt
-ends by naming sitemap.xml and llms.txt points at it, so both depend on the
-writer that produces it. That is why `--only llms` writes the sitemap as well
+ends by naming sitemap.xml and llms.txt points at it, head.html points two
+`<link rel="icon">` tags and its `og:image` at icon.png, so each depends on the
+writer that produces what it names. That is why `--only llms` writes the sitemap as well
 and says so — it was asked for a file whose whole content is a claim about
 another, and writing it alone produced an index pointing at nothing. Naming a
 writer in `--only` and what it depends on in `--skip` is refused rather than

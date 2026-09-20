@@ -250,6 +250,19 @@ scry check <url> -o json
 - Its category is the first half of the check name. `accessibility` is dropped
   for the same reason kitsune's is: a different subject with its own tools.
 - It is the only checker here that sees TLS expiry and the security headers.
+- **`health/missing-charset` cannot pass, and that is scry's bug and not your
+  site's.** `fetcher.go`'s `parseContentType` cuts the header at the first `;`
+  — "extracts the MIME type without parameters" — and stores the result as
+  `page.ContentType`. `health.go`'s `checkMissingCharset` then reads that same
+  stripped field and faults it for having no charset. The charset is removed
+  and then reported missing, so every HTML page fails it however it is served.
+  Verified here against a live site: scry's own JSON records
+  `"Content-Type": ["text/html; charset=utf-8"]` under `headers` and
+  `"content_type": "text/html"` beside it, and reports the finding anyway.
+  The route stays — a site that really has no charset is fixed by `_headers`,
+  and the advice is right — but `--record` will keep saying `UNFIXED ...
+  headers claims this and N runs have not closed it`, and that line is true
+  about the checker. Fixed upstream, it passes with no change here.
 
 ### `ldlint` — the schema.org vocabulary
 

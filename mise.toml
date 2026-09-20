@@ -38,12 +38,11 @@ node = "latest"
 [vars]
 site_origin = "https://dev-docs.gedw99.workers.dev"
 
-# What the site says it is, and what it is allowed to load. Both were written
-# into two tasks each, which is two chances to change one and not the other —
-# and a --csp that disagrees between the task that writes the files and the
-# task that fixes them is a header that flickers with whichever ran last.
+# What the site says it is. The policy that goes with it is NOT here: it
+# names the sha256 of the page's own inline stylesheet, so the generator
+# writes it to site/csp.txt and the tasks read that. A hash kept in a task
+# file is wrong the first time a colour changes, silently, in the browser.
 site_desc = "The developer tool of the mise + fnox + hk + packslip stack."
-site_csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 [hooks]
 postinstall = { task = "bootstrap" }
@@ -254,8 +253,8 @@ run = ".bin/dev release . --snapshot"
 [tasks."site:build"]
 description = "Render the manuals to HTML and write every file Google and a model ask for"
 depends = ["build"]
-sources = ["site/gen/main.go", "skills/*/SKILL.md"]
-outputs = ["site/public/index.html", "site/public/sitemap.xml", "site/public/llms.txt"]
+sources = ["site/gen/main.go", "skills/*/SKILL.md", "README.md"]
+outputs = ["site/public/index.html", "site/public/sitemap.xml", "site/public/llms.txt", "site/urls.txt", "site/csp.txt"]
 # The order is the chain, and dev enforces it: llms.txt comes from the command
 # itself — its verbs, which only the command knows — so `dev llms` writes that
 # one and `dev seo write` is told to skip it rather than overwrite it with a
@@ -264,7 +263,7 @@ outputs = ["site/public/index.html", "site/public/sitemap.xml", "site/public/llm
 run = [
   "go run ./site/gen --out site/public --origin {{ vars.site_origin }}",
   ".bin/dev llms site/public --origin {{ vars.site_origin }}",
-  ".bin/dev seo write site/public --url {{ vars.site_origin }}/ --urls site/urls.txt --skip llms,head --title dev --desc '{{ vars.site_desc }}' --csp \"{{ vars.site_csp }}\"",
+  ".bin/dev seo write site/public --url {{ vars.site_origin }}/ --urls site/urls.txt --skip llms,head --title dev --desc '{{ vars.site_desc }}' --csp \"$(cat site/csp.txt)\"",
 ]
 
 [tasks."site:run"]
@@ -297,7 +296,7 @@ depends = ["build"]
 # It ends with a second check rather than a claim, because "fixed" is a thing
 # the site says, not a thing this says about the site.
 run = [
-  ".bin/dev seo check {{ vars.site_origin }}/ --fix site/public --urls site/urls.txt --title dev --desc '{{ vars.site_desc }}' --csp \"{{ vars.site_csp }}\" --record .reports/site",
+  ".bin/dev seo check {{ vars.site_origin }}/ --fix site/public --urls site/urls.txt --title dev --desc '{{ vars.site_desc }}' --csp \"$(cat site/csp.txt)\" --record .reports/site",
   ".bin/dev deploy site",
   ".bin/dev seo check {{ vars.site_origin }}/ --record .reports/site",
 ]

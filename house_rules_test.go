@@ -130,3 +130,40 @@ func goFiles(t *testing.T) []string {
 	}
 	return out
 }
+
+// Nothing big is committed, and this is here because the gate that was
+// supposed to say so cannot see the files it is for.
+//
+// hk's check_added_large_files works — a five megabyte text file fails it —
+// but hk never passes it a binary. Staging a five megabyte Mach-O and
+// running `hk check -v` shows the file list it hands the step, and the
+// binary is not in it. So the one check whose whole subject is "somebody
+// committed a build artifact" is structurally blind to build artifacts.
+//
+// It let a 4.5MB `gen` into this repo, written by `go build ./site/...`
+// which names its output after the directory and drops it in the working
+// directory. It reached a commit, and every clone of this repo afterwards.
+//
+// git ls-files rather than a walk: what matters is what is committed, not
+// what is lying around, and .gitignore's job is the rest.
+func TestNothingLargeIsCommitted(t *testing.T) {
+	const maxKB = 500
+	out, err := exec.Command("git", "ls-files", "-z").Output()
+	if err != nil {
+		t.Skip("not a git checkout")
+	}
+	for name := range strings.SplitSeq(strings.TrimRight(string(out), "\x00"), "\x00") {
+		if name == "" {
+			continue
+		}
+		info, err := os.Stat(name)
+		if err != nil {
+			continue // deleted but still in the index; git's problem, not this one
+		}
+		if kb := info.Size() / 1024; kb > maxKB {
+			t.Errorf("%s is %dKB and committed; the limit is %dKB.\n"+
+				"A build artifact belongs in .gitignore — check what wrote it, because "+
+				"the tool that puts a binary in the working directory will do it again.", name, kb, maxKB)
+		}
+	}
+}

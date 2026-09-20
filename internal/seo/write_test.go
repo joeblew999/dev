@@ -104,3 +104,147 @@ func TestSkippingWhatAChosenWriterNeedsIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// A head fragment promises a mark: two <link rel="icon"> tags and an og:image
+// all pointing at one file. Whether that file exists is the icon writer's
+// business, and the chain is what makes the promise true — so choosing head
+// has to choose it, the same way choosing llms chooses the sitemap.
+func TestChoosingTheHeadChoosesTheIconItPointsAt(t *testing.T) {
+	p := &picked{only: cli.ToSet([]string{"head"}), skip: map[string]bool{}}
+	if err := chain(cli.Call{}, p); err != nil {
+		t.Fatal(err)
+	}
+	if !p.only["icon"] {
+		t.Errorf("--only head selected %v; head's tags point at %s and nothing would write it",
+			p.only, iconFile)
+	}
+}
+
+// The tags whose absence a checker reports. og:image is the one that changed:
+// it used to be written only when --image was given, so every site that did
+// not pass one shipped an incomplete Open Graph set and previewed as a grey
+// box. The icon writer guarantees a file, so there is always an answer.
+func TestHeadCarriesTheTagsThatWereReportedMissing(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		site Site
+		want []string
+	}{
+		{"no --image falls back to the icon this also writes",
+			Site{Origin: "https://example.com", URL: "https://example.com/", Title: "T", Desc: "D"},
+			[]string{
+				`<link rel="icon" href="/icon.png">`,
+				`<link rel="apple-touch-icon" href="/icon.png">`,
+				`<meta property="og:image" content="https://example.com/icon.png">`,
+			}},
+		{"--image is a real card and wins",
+			Site{Origin: "https://example.com", URL: "https://example.com/", Title: "T", Desc: "D",
+				Image: "https://example.com/card.png"},
+			[]string{`<meta property="og:image" content="https://example.com/card.png">`}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, covered, err := writeHead(tc.site)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(got, want) {
+					t.Errorf("head.html does not carry %s\n%s", want, got)
+				}
+			}
+			if !strings.Contains(covered, "icon") {
+				t.Errorf("covered = %q; a reader cannot tell the page now has a mark", covered)
+			}
+		})
+	}
+}
+
+// An og:image a scraper cannot fetch is worse than none: a broken image where
+// a preview would be. With no origin there is no absolute URL to build, and a
+// relative one is not resolved.
+func TestNoOriginMeansNoOpenGraphImage(t *testing.T) {
+	got, _, err := writeHead(Site{URL: "/page", Title: "T", Desc: "D"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(got, "og:image") {
+		t.Errorf("head.html names an og:image with no host to fetch it from:\n%s", got)
+	}
+}
+
+// The icon has to be a PNG a browser and a social scraper will both take, and
+// big enough that a link preview keeps it — Facebook and LinkedIn drop one
+// under 200×200 and say nothing. Its own validator is what says so, and the
+// bytes it validates are the bytes the writer produced.
+func TestIconIsAPngBigEnoughToSurviveAPreview(t *testing.T) {
+	content, covered, err := writeIcon(Site{Origin: "https://example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found, read := validateIcon(iconFile, content, "https://example.com")
+	for _, f := range found {
+		t.Errorf("the icon just written does not validate: %s %s — %s", f.Severity, f.ID, f.Message)
+	}
+	for _, want := range []string{covered, read} {
+		if !strings.Contains(want, "512×512") {
+			t.Errorf("%q does not say what was drawn", want)
+		}
+	}
+	// A file that is not a PNG at all is the failure a browser shows as a
+	// broken image and no checker here would otherwise see.
+	if found, _ := validateIcon(iconFile, "<svg/>", ""); len(found) == 0 {
+		t.Error("an SVG passed as icon.png: no scraper renders one, and nothing said so")
+	}
+}
+
+// Two sites get two marks, and one site gets the same mark twice. The second
+// half is what keeps a rebuild that changed nothing out of the diff, and the
+// first is the only reason to draw one at all.
+func TestTheMarkIsTheSiteAndOnlyTheSite(t *testing.T) {
+	one, _, err := writeIcon(Site{Origin: "https://example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, _, _ := writeIcon(Site{Origin: "https://example.com"})
+	other, _, _ := writeIcon(Site{Origin: "https://elsewhere.org"})
+	if one != again {
+		t.Error("two runs on one origin drew different marks; every rebuild would be a change")
+	}
+	if one == other {
+		t.Error("two origins drew the same mark; the point of it is telling them apart")
+	}
+}
+
+// Not every header belongs everywhere. A charset says what an HTML page is,
+// and saying it on sitemap.xml would be a header claiming a file is something
+// it is not — which is the exact fault nosniff exists to stop mattering.
+func TestHeadersSayTheCharsetOnPagesAndNowhereElse(t *testing.T) {
+	content, covered, err := writeHeaders(Site{CSP: "default-src 'self'"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, block := range append([]string{everywhere}, htmlPaths...) {
+		if !strings.Contains(content, "\n"+block+"\n") {
+			t.Errorf("no %q block:\n%s", block, content)
+		}
+	}
+	// The two that a live site reported and nothing could write.
+	for _, want := range []string{"Cache-Control: public, max-age=60", "Content-Type: " + htmlUTF8} {
+		if !strings.Contains(content, want) {
+			t.Errorf("_headers does not set %q:\n%s", want, content)
+		}
+	}
+	// The charset belongs to the page blocks. If it had reached /* it would
+	// be on the sitemap and the icon too, which is the bug this names.
+	//
+	// Matched as a whole line, because the first version of this looked for
+	// "Content-Type" anywhere and found it inside X-Content-Type-Options —
+	// a test that failed on a file that was right.
+	everywhereBlock, _, _ := strings.Cut(content[strings.Index(content, everywhere+"\n"):], "\n/")
+	if strings.Contains(everywhereBlock, "\n  Content-Type:") {
+		t.Errorf("the charset reached %s, so every file claims to be HTML:\n%s", everywhere, everywhereBlock)
+	}
+	if !strings.Contains(covered, "path") {
+		t.Errorf("covered = %q; it does not say the file is now more than one block", covered)
+	}
+}

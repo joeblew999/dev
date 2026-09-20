@@ -235,6 +235,7 @@ func (c Call) drift(prev, cur *Report, path string) {
 // meant to cut through.
 func (c Call) stood(cur *Report, path string) {
 	history := c.History(path)
+	unkept := ToSet(Map(Unkept(history, cur), func(f Finding) string { return f.ID + "|" + f.Message }))
 	for _, f := range cur.Findings {
 		n := Standing(history, f)
 		if n <= 2 {
@@ -253,7 +254,7 @@ func (c Call) stood(cur *Report, path string) {
 		// sitemap claiming seo.sitemap.unreferenced when it is robots.txt
 		// that does the referencing. Nothing could have told them apart from
 		// a hard problem, so nobody looked.
-		if f.FixedBy != "" {
+		if unkept[f.ID+"|"+f.Message] {
 			fmt.Fprintf(c.Stderr, "    UNFIXED %-11s %s — %s claims this and %s have not closed it\n",
 				f.Tool, Or(f.ID, f.Message), f.FixedBy, Plural(n, "run"))
 			continue

@@ -12,3 +12,7 @@
 
 # the site is generated; only its source is committed
 /site/public/
+# `go build ./site/...` writes the generator's binary here, named for its
+# directory. 4.5MB of it reached a commit before this line existed, and the
+# large-file check did not stop it.
+/gen
