@@ -146,20 +146,44 @@ func entriesOf(v any) []map[string]any {
 	return nil
 }
 
-// Scaffold is a conventional wrangler.toml for a directory that has none.
+// Scaffold is a wrangler.toml worth having: the settings a production Worker
+// wants, each with the reason it is there.
 //
-// compatibility_date is the one field with no safe default: wrangler pins the
-// runtime's behaviour to it, and a date that drifts is a Worker that changes
-// under you. It is written as the day the file was made, which is what
-// wrangler itself does when it scaffolds.
+// Observability is the one nobody adds afterwards and everybody needs.
+// Cloudflare's own guidance puts it plainly — a production Worker without it
+// is a black box, and when an intermittent error shows up the data has to
+// already be being collected. It cannot be turned on retroactively for the
+// failure you are looking at.
 //
-// main names the wasm entry dev builds, so the file agrees with `dev wasm`
-// without anybody having to know what that produces.
+// Logs are sampled at 1 and traces at 0.01 because they cost differently: a
+// log line per request is the point of logs, and a trace per request is a
+// bill. A high-traffic Worker lowers the first; the file says so.
+//
+// compatibility_date is the day the file was made, which is what wrangler
+// does when it scaffolds: it pins runtime behaviour, so a date that drifts is
+// a Worker that changes underneath you.
 func Scaffold(dir, name string) string {
 	return "# Written by `dev deploy --to cloudflare` because " + dir + " had no " + ConfigFile + ".\n" +
 		"# It is the convention, not a ceiling: edit it, commit it, it is yours.\n" +
 		"name = " + strconv.Quote(name) + "\n" +
-		"main = \"./main.mjs\"\n" +
+		"# What `dev wasm` builds.\n" +
+		"main = \"./main.mjs\"\n\n" +
+		"# Pins runtime behaviour to this day. Move it forward deliberately,\n" +
+		"# on a day you can test; leaving it still is the safe state.\n" +
 		"compatibility_date = " + strconv.Quote(time.Now().Format("2006-01-02")) + "\n" +
-		"compatibility_flags = [\"nodejs_compat\"]\n"
+		"compatibility_flags = [\"nodejs_compat\"]\n\n" +
+		"# A Worker without this is a black box: when an intermittent error\n" +
+		"# appears, the data has to already be being collected. It cannot be\n" +
+		"# switched on afterwards for the failure you are looking at.\n" +
+		"[observability]\n" +
+		"  enabled = true\n\n" +
+		"  # Every request. Lower it if the volume becomes the cost.\n" +
+		"  [observability.logs]\n" +
+		"    head_sampling_rate = 1\n" +
+		"    invocation_logs = true\n\n" +
+		"  # One in a hundred: a trace per request is a bill, and a sample is\n" +
+		"  # enough to see the shape of what is slow.\n" +
+		"  [observability.traces]\n" +
+		"    enabled = true\n" +
+		"    head_sampling_rate = 0.01\n"
 }

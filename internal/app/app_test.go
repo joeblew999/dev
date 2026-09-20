@@ -210,3 +210,58 @@ func TestScaffoldWritesTheFileThatNamesTheTarget(t *testing.T) {
 		t.Errorf("the error does not offer the name that was meant: %v", err)
 	}
 }
+
+// A config dev writes has to be one dev can read. Each target parses its own
+// file to answer what the app is called, so a scaffold that does not come
+// back through that is worse than none: it deploys nothing and the failure
+// lands somewhere else entirely.
+//
+// This is the round trip — write it, then ask the same cloud what the app in
+// that directory is named.
+func TestAScaffoldIsReadableByTheTargetThatWroteIt(t *testing.T) {
+	for name, c := range clouds {
+		dir := t.TempDir()
+		if err := scaffold(io.Discard, dir, name); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		got, err := c.Name(dir, "")
+		if err != nil {
+			t.Errorf("%s wrote a config it cannot read: %v", name, err)
+			continue
+		}
+		if want := filepath.Base(dir); got != want {
+			t.Errorf("%s: the config it wrote names %q; want %q", name, got, want)
+		}
+	}
+}
+
+// The settings that are the point of writing a config at all rather than an
+// empty file. Each is one a project would otherwise discover it wanted after
+// the incident that needed it.
+func TestScaffoldsCarryTheSettingsWorthHaving(t *testing.T) {
+	for name, want := range map[string][]string{
+		// A Worker without observability is a black box, and it cannot be
+		// turned on retroactively for the failure being investigated.
+		"cloudflare": {"[observability]", "enabled = true", "head_sampling_rate", "compatibility_flags"},
+		// Fly routes to a machine it believes healthy, so a service it does
+		// not check is one it routes to before the service is ready. The
+		// rest is what keeps an idle demo from billing.
+		"fly": {"[[http_service.checks]]", "grace_period", "auto_stop_machines", "min_machines_running", "[[vm]]", "concurrency"},
+	} {
+		c, ok := clouds[name]
+		if !ok {
+			t.Fatalf("no cloud %q", name)
+		}
+		written := c.Scaffold(".", "probe")
+		for _, line := range want {
+			if !strings.Contains(written, line) {
+				t.Errorf("%s's config does not set %s:\n%s", name, line, written)
+			}
+		}
+		// Every setting says why it is there, or it is a line nobody dares
+		// delete and nobody understands.
+		if strings.Count(written, "#") < 5 {
+			t.Errorf("%s's config explains too little of itself:\n%s", name, written)
+		}
+	}
+}

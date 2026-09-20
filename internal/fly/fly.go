@@ -223,23 +223,54 @@ var (
 	lookPath = exec.LookPath
 )
 
-// Scaffold is a conventional fly.toml for a directory that has none: the
-// smallest file that deploys, with the two settings that are wrong by default
-// for anything this stack builds.
+// Scaffold is a fly.toml worth having: the settings a production HTTP service
+// wants, each with the reason it is there, so a reader can delete what does
+// not apply rather than wonder what any of it does.
 //
-// auto_stop_machines keeps a demo from billing while nobody is looking, and
-// min_machines_running = 0 is what makes that mean anything. The port is the
-// one a Go main on this stack listens on, because the Dockerfile sets PORT and
-// the code reads it.
+// Two are chosen against Fly's own recommendation, deliberately.
+// min_machines_running is 0 where the docs say 1, because this stack deploys
+// many small apps and a developer's own suffixed copy of each, and a machine
+// held up for something nobody is looking at is a bill. A repo that cannot
+// afford a cold start sets it to 1, and the file says so.
+//
+// The health check matters beyond Fly: `deploy --wait PATH` and `dev smoke`
+// both ask whether the thing is actually answering, and a service Fly does
+// not check is one Fly will route to before it is ready.
 func Scaffold(dir, name string) string {
 	return "# Written by `dev deploy --to fly` because " + dir + " had no " + ConfigFile + ".\n" +
 		"# It is the convention, not a ceiling: edit it, commit it, it is yours.\n" +
 		"app = " + strconv.Quote(name) + "\n\n" +
 		"[build]\n\n" +
 		"[http_service]\n" +
+		"  # The Dockerfile sets PORT and a Go main on this stack reads it.\n" +
 		"  internal_port = 8080\n" +
 		"  force_https = true\n" +
+		"  # Stop when idle and start on a request. min_machines_running = 1\n" +
+		"  # keeps one warm if a cold start costs more than the machine does.\n" +
 		"  auto_stop_machines = \"stop\"\n" +
 		"  auto_start_machines = true\n" +
-		"  min_machines_running = 0\n"
+		"  min_machines_running = 0\n\n" +
+		"  # Requests rather than connections: one connection can carry many,\n" +
+		"  # so counting connections lets a few clients look like no load.\n" +
+		"  [http_service.concurrency]\n" +
+		"    type = \"requests\"\n" +
+		"    soft_limit = 200\n" +
+		"    hard_limit = 250\n\n" +
+		"  # Fly routes to a machine it believes is healthy, so without this it\n" +
+		"  # routes to one that has not finished starting. grace_period has to\n" +
+		"  # exceed the slowest start, or a slow boot reads as a dead machine.\n" +
+		"  [[http_service.checks]]\n" +
+		"    method = \"GET\"\n" +
+		"    path = \"/\"\n" +
+		"    grace_period = \"10s\"\n" +
+		"    interval = \"30s\"\n" +
+		"    timeout = \"5s\"\n\n" +
+		"# The smallest machine that runs a Go binary comfortably. Raise it\n" +
+		"# when something is actually slow, not before.\n" +
+		"[[vm]]\n" +
+		"  size = \"shared-cpu-1x\"\n" +
+		"  memory = \"512mb\"\n\n" +
+		"# One machine at a time, so a bad release never takes them all.\n" +
+		"[deploy]\n" +
+		"  strategy = \"rolling\"\n"
 }
