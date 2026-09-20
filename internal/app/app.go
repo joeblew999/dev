@@ -51,8 +51,19 @@ var Usage string
 //
 // This is the one place a signature cannot be the whole truth: which cloud a
 // verb is talking to is read from DIR, so it is not known until the verb runs.
-// `<verb> DIR --help` resolves the directory first and prints that cloud's
-// flags.
+//
+// It once said here that `<verb> DIR --help` resolves the directory and prints
+// that cloud's flags. It does not, and it cannot: cli registers a verb's flags
+// from Verb.Flags, which is func(*flag.FlagSet) and never sees the directory,
+// so help is the same for both clouds and lists --env and --refresh on a Fly
+// app that refuses them. Changing that means changing a signature every
+// command on the stack implements, for help text.
+//
+// So the flags are the union, and Ignores below carries the other half: a
+// target says which of them it cannot act on, and asking for one is answered
+// with why rather than with silence. That was the real fault — --env was
+// refused and --refresh was accepted and did nothing, which reads as having
+// worked.
 
 // EnvFlag is the environment a deploy verb acts in. It is stage's, because the
 // environment is a property of the build and not of the deploy; written out
@@ -117,6 +128,13 @@ func WaitVerb(c cli.Call) error {
 // said the same thing in two wordings: print the URL, deploy then wait, hand
 // the rest straight on. A verb's meaning now lives where the verb does.
 type cloud struct {
+	// Ignores are the flags this target cannot act on, and why in words a
+	// person can use. A flag a target does nothing with is refused rather
+	// than accepted: --env was refused for Fly and --refresh was not, so one
+	// Worker-only flag said so and the other was taken in silence and had no
+	// effect, which reads as having worked.
+	Ignores map[string]string
+
 	Before   func(c cli.Call) error           // checked before any verb runs
 	URL      func(c cli.Call) (string, error) // what `url` prints, flags and all
 	Deployed func(c cli.Call) (string, error) // the deployed address, whatever --local says
@@ -156,12 +174,20 @@ var clouds = map[string]cloud{
 		PutSecret: cloudflare.PutSecret,
 	},
 	"fly": {
-		Before: func(c cli.Call) error { return fly.NoEnv(c.Dir, c.Value("env")) },
+		Ignores: map[string]string{
+			"env":     "a Fly app has no environments: fly.toml deploys one app, and a second app is a second directory",
+			"refresh": "--refresh re-asks the Workers API for a workers.dev name; a Fly app's address is its app name and is already exact",
+		},
 		URL: func(c cli.Call) (string, error) {
-			// A Fly app has no local address to work out: --local is whatever
-			// the caller runs it on.
-			if !c.Given("deployed") {
-				return c.Value("local"), nil
+			// A Fly app has no local address to work out, so --local is
+			// whatever the caller runs it on — and when they did not say, the
+			// app has exactly one address and that is the answer.
+			//
+			// Returning the empty --local regardless meant `dev url DIR`
+			// printed a blank line and exited 0, which reads as a broken tool
+			// rather than as a question that was not asked properly.
+			if local := c.Value("local"); local != "" && !c.Given("deployed") {
+				return local, nil
 			}
 			return fly.URL(c.Dir)
 		},
@@ -185,6 +211,13 @@ func to(c cli.Call, verb string) error {
 	t, err := cloudFor(c.Dir)
 	if err != nil {
 		return err
+	}
+	// A flag this target cannot act on is refused before anything runs, so
+	// the answer is the same whichever verb was asked for.
+	for _, name := range cli.SortedKeys(t.Ignores) {
+		if c.Set(name) {
+			return cli.Usagef("--%s: %s", name, t.Ignores[name])
+		}
 	}
 	if t.Before != nil {
 		if err := t.Before(c); err != nil {

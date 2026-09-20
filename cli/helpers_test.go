@@ -5,6 +5,7 @@
 package cli
 
 import (
+	"flag"
 	"reflect"
 	"slices"
 	"strings"
@@ -224,5 +225,45 @@ func TestNearestCatchesASwapButNotAStranger(t *testing.T) {
 	// was once offered "warning".
 	if got := Nearest("everything", []string{SevError, SevWarning, SevInfo}); got != "" {
 		t.Errorf("Nearest offered %q for a word that is not a severity", got)
+	}
+}
+
+// Set is whether a flag was actually given, which Given cannot answer: Given
+// is Value == "true", so it speaks for bools alone, and a string flag's only
+// other signal is a value differing from its default — which cannot tell
+// `--local ""` from no --local at all.
+func TestSetKnowsWhatWasActuallyGiven(t *testing.T) {
+	newFlags := func() *flag.FlagSet {
+		fs := flag.NewFlagSet("t", flag.ContinueOnError)
+		fs.String("local", "", "")
+		fs.String("env", "dev", "")
+		fs.Var(new(Bool), "refresh", "")
+		return fs
+	}
+	fs := newFlags()
+	if err := fs.Parse(nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"local", "env", "refresh"} {
+		if Set(fs, name) {
+			t.Errorf("Set(%q) is true with nothing given", name)
+		}
+	}
+	fs = newFlags()
+	if err := fs.Parse([]string{"--local", "", "--env", "dev", "--refresh=false"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"local", "env", "refresh"} {
+		if !Set(fs, name) {
+			t.Errorf("Set(%q) is false though it was given", name)
+		}
+	}
+	// Each of those is invisible to Given and to a default comparison: an
+	// empty --local, an --env equal to its default, and a bool set to false.
+	if Given(fs, "refresh") {
+		t.Error("Given says --refresh=false is set; that is what Set is for")
+	}
+	if Set(fs, "nosuchflag") {
+		t.Error("Set is true for a flag that is not registered")
 	}
 }

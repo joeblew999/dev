@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/joeblew999/dev/cli"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,5 +83,39 @@ func TestEveryCloudIsWholeSoAddingOneIsOneEdit(t *testing.T) {
 		if c.Smoke == nil && c.NoSmoke == "" {
 			t.Errorf("cloud %q cannot smoke and does not say why", name)
 		}
+	}
+}
+
+// A flag a target cannot act on is refused, and refusing means saying why.
+// --env was refused for Fly and --refresh was not: one Worker-only flag said
+// so and the other was taken in silence and had no effect, which a reader has
+// no way to tell from having worked.
+func TestAnIgnoredFlagIsRefusedWithAReason(t *testing.T) {
+	for name, c := range clouds {
+		for flag, why := range c.Ignores {
+			if why == "" {
+				t.Errorf("cloud %q ignores --%s and does not say why", name, flag)
+			}
+			// The reason is for a person to act on, so it has to be a sentence
+			// and not the flag's name again.
+			if len(why) < 20 {
+				t.Errorf("cloud %q: --%s is refused with %q, which tells nobody anything", name, flag, why)
+			}
+		}
+	}
+	// Fly is the case this came from: it has environments in neither sense,
+	// and no workers.dev name to re-ask for.
+	fly, ok := clouds["fly"]
+	if !ok {
+		t.Fatal("no fly cloud")
+	}
+	for _, flag := range []string{"env", "refresh"} {
+		if _, refused := fly.Ignores[flag]; !refused {
+			t.Errorf("a Fly app still accepts --%s, which it does nothing with", flag)
+		}
+	}
+	// And Cloudflare acts on both, so it must not refuse them.
+	if cf := clouds["cloudflare"]; len(cf.Ignores) > 0 {
+		t.Errorf("cloudflare refuses %v; it is the cloud these flags are for", cli.SortedKeys(cf.Ignores))
 	}
 }

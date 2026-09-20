@@ -247,6 +247,25 @@ func Given(fs *flag.FlagSet, name string) bool {
 	return Value(fs, name) == "true"
 }
 
+// Set reports whether a flag was actually given, whatever its type.
+//
+// Given cannot answer this: it is Value == "true", so it speaks for bools
+// alone, and for a string flag the only signal is a value differing from the
+// default — which cannot tell "--local ”" from not passing --local. Visit
+// walks the flags that were set and nothing else, so this is exact.
+func Set(fs *flag.FlagSet, name string) bool {
+	found := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
+}
+
+// Set reports whether this call was given the named flag.
+func (c Call) Set(name string) bool { return Set(c.Flags, name) }
+
 // ValueAs parses a named flag's value with parse, for flags that are not
 // strings: durations, ints, and the like. It is a generic method, which Go
 // 1.27 allows: before, this had to be a generic function taking the Call,
