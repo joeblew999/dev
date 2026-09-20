@@ -108,7 +108,7 @@ func (c Command) LLMs(origin string) LLMsDoc {
 		// verb in it, which at least tells two such sections apart.
 		section := LLMsSection{Name: Or(heading(g.prose), paths[0])}
 		for _, path := range paths {
-			v, _, ok := lookup(verbs, path)
+			v, ok := lookup(verbs, path)
 			if !ok {
 				continue
 			}

@@ -91,7 +91,7 @@ func (c Cmd) Capture() (Result, error) {
 	}
 	started := time.Now()
 	runErr := cmd.Run()
-	res := Result{Bin: c.Bin, Out: out.String(), Took: time.Since(started), Code: exitCode(cmd, runErr)}
+	res := Result{Bin: c.Bin, Out: out.String(), Took: time.Since(started), Code: exitCode(runErr)}
 	report(res, c.Quiet)
 	if why := unpinned(c.Bin, res.Out); why != nil {
 		return res, why
@@ -247,7 +247,7 @@ func Attached(dir, bin string, args ...string) error {
 // when it failed, and -1 when it never ran at all — a missing binary, a
 // directory that is not there — which is not an exit status and must not be
 // mistaken for one.
-func exitCode(cmd *exec.Cmd, runErr error) int {
+func exitCode(runErr error) int {
 	if runErr == nil {
 		return 0
 	}

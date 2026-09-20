@@ -68,14 +68,14 @@ const tunnelTarget = ".cfargotunnel.com"
 // set to flexible, and an origin that insists on HTTPS.
 func Fronting(c cli.Call, host string) error {
 	return c.Reported("fronting", host, func(rep *cli.Report) error {
-		return fronting(c, rep, host)
+		return fronting(rep, host)
 	})
 }
 
 // fronting is the questions themselves, against a report somebody else opened
 // and will finish. Returning nil is a finished report, which is what a host
 // no zone answers for is: an answer, not a failure.
-func fronting(c cli.Call, rep *cli.Report, host string) error {
+func fronting(rep *cli.Report, host string) error {
 	// The zone decides whether there is anything else to ask, so it is asked
 	// first and alone. Everything after it is a question about that zone.
 	zone, err := cloudflare.ZoneFor(host)
@@ -108,7 +108,7 @@ func fronting(c cli.Call, rep *cli.Report, host string) error {
 						Message: "no DNS record in " + zone.Name + " for " + host,
 						Fix:     "add a CNAME to the origin and proxy it, or a CNAME to the tunnel"}}, "none", nil
 				}
-				return front(zone, records), cli.Plural(len(records), "record"), nil
+				return front(records), cli.Plural(len(records), "record"), nil
 			}},
 		{Name: "ssl", Provides: "how Cloudflare speaks to the origin",
 			Look: func() ([]cli.Finding, string, error) {
@@ -128,7 +128,7 @@ func fronting(c cli.Call, rep *cli.Report, host string) error {
 }
 
 // front says what arrangement the records describe.
-func front(zone cloudflare.Zone, records []cloudflare.Record) []cli.Finding {
+func front(records []cloudflare.Record) []cli.Finding {
 	var out []cli.Finding
 	for _, r := range records {
 		switch {

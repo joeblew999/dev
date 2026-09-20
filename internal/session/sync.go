@@ -103,7 +103,10 @@ func Check(c cli.Call) error {
 	// reported. The first only decides what to run; reporting it would say
 	// "fail" about a state the same command had just put right, which is the
 	// report contradicting itself one more way.
-	look := func(rep *cli.Report) error {
+	// No error to return: every part reports its own failure as a finding,
+	// which is the whole point of a report. Declaring one anyway made two
+	// call sites check a value that is always nil.
+	look := func(rep *cli.Report) {
 		cli.Parts(rep, 1, []cli.Part{
 			{Name: "skills", Provides: "every agent's directory holds what session.toml pins", Look: lockedSkills},
 			{Name: "settings", Provides: ".claude/settings.json holds what [claude] implies",
@@ -112,22 +115,17 @@ func Check(c cli.Call) error {
 		})
 		cli.Attribute(rep, fixers())
 		rep.Fail = "what agents read does not match " + pins.File
-		return nil
 	}
 	target := cli.Or(cli.English(vendored.Dirs()), "nowhere")
 	if c.Given("fix") {
 		first := cli.NewReport("session", target)
-		if err := look(first); err != nil {
-			return err
-		}
+		look(first)
 		if err := c.Fix(first, fixers()); err != nil {
 			return err
 		}
 	}
 	return c.Reported("session", target, func(rep *cli.Report) error {
-		if err := look(rep); err != nil {
-			return err
-		}
+		look(rep)
 		warnStaleSessions(c.Stderr, time.Now())
 		if !c.Given("fix") {
 			c.Fixable(rep, fixers(), pins.SyncCommand())

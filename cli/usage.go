@@ -77,7 +77,7 @@ func Verbs(name string, verbs map[string]Verb, paths []string) string {
 func expand(verbs map[string]Verb, paths []string) []string {
 	var out []string
 	for _, path := range paths {
-		v, _, ok := lookup(verbs, path)
+		v, ok := lookup(verbs, path)
 		switch {
 		case !ok:
 			continue
@@ -94,7 +94,7 @@ func expand(verbs map[string]Verb, paths []string) []string {
 
 // one is a single verb as the manual shows it: its signature, then its line.
 func one(name string, verbs map[string]Verb, path string) string {
-	v, _, ok := lookup(verbs, path)
+	v, ok := lookup(verbs, path)
 	if !ok {
 		return ""
 	}
@@ -105,23 +105,25 @@ func one(name string, verbs map[string]Verb, path string) string {
 	return out
 }
 
-// lookup finds the verb a path names, following Subs for "secrets push", and
-// returns it with the path as the signature should print it.
-func lookup(verbs map[string]Verb, path string) (Verb, string, bool) {
+// lookup finds the verb a path names, following Subs for "secrets push".
+//
+// It returned the path as well, which both callers discarded: it was the
+// path they had just passed in, handed back unchanged.
+func lookup(verbs map[string]Verb, path string) (Verb, bool) {
 	parts := strings.Fields(path)
 	if len(parts) == 0 {
-		return Verb{}, "", false
+		return Verb{}, false
 	}
 	v, ok := verbs[parts[0]]
 	if !ok {
-		return Verb{}, "", false
+		return Verb{}, false
 	}
 	for _, p := range parts[1:] {
 		sub, ok := v.Subs[p]
 		if !ok {
-			return Verb{}, "", false
+			return Verb{}, false
 		}
 		v = sub
 	}
-	return v, path, true
+	return v, true
 }
