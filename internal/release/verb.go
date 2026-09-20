@@ -52,5 +52,5 @@ func Run(c cli.Call) error {
 	if c.Given("snapshot") {
 		return r.snapshot()
 	}
-	return r.publish(version)
+	return r.publish(c.Stdout, version)
 }

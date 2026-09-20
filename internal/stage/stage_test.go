@@ -1,7 +1,6 @@
 package stage
 
 import (
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -97,7 +96,7 @@ func main() { cli.Main(cli.Command{Name: "tool"}) }
 			t.Errorf("Inspect(%s).CLI = %v, want %v", path, d.CLI, want)
 		}
 	}
-	if err := Build(io.Discard, "cmd/tool", false, ""); err != nil {
+	if err := Build("cmd/tool", false, ""); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	for _, dir := range []string{cli.ShippedDir, cli.ClaudeDir, cli.AgentsDir} {

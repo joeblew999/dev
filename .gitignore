@@ -9,3 +9,6 @@
 .agents/skills/hk-configure
 .agents/skills/hk-debug
 .reports/
+
+# the site is generated; only its source is committed
+/site/public/

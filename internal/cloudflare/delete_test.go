@@ -13,7 +13,7 @@ import (
 
 func TestDeleteTakesTheWorkerAndOnlyWhatWranglerProvisioned(t *testing.T) {
 	t.Chdir(t.TempDir())
-	if err := os.WriteFile("wrangler.toml", []byte("name = \"api\"\nmain = \"x.mjs\"\nkv_namespaces = [{ binding = \"GROK_AUTH\" }]\n[env.tinygo]\nkv_namespaces = [{ binding = \"GROK_AUTH\" }]\n"), 0o644); err != nil {
+	if err := os.WriteFile("wrangler.toml", []byte("name = \"api\"\nmain = \"x.mjs\"\nkv_namespaces = [{ binding = \"SOME_STORE\" }]\n[env.tinygo]\nkv_namespaces = [{ binding = \"SOME_STORE\" }]\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	var ran []string
@@ -22,7 +22,7 @@ func TestDeleteTakesTheWorkerAndOnlyWhatWranglerProvisioned(t *testing.T) {
 		line := strings.Join(u.Args, " ")
 		ran = append(ran, line)
 		if strings.HasPrefix(line, "wrangler kv namespace list") {
-			out := " ⛅️ wrangler 4.131.1\n[{\"id\":\"1\",\"title\":\"api-grok-auth\"},{\"id\":\"2\",\"title\":\"GROK_AUTH\"},{\"id\":\"3\",\"title\":\"api-alice-grok-auth\"}]\n"
+			out := " ⛅️ wrangler 4.131.1\n[{\"id\":\"1\",\"title\":\"api-some-store\"},{\"id\":\"2\",\"title\":\"SOME_STORE\"},{\"id\":\"3\",\"title\":\"api-alice-some-store\"}]\n"
 			if u.Out != nil {
 				io.WriteString(u.Out, out)
 			}
@@ -40,7 +40,7 @@ func TestDeleteTakesTheWorkerAndOnlyWhatWranglerProvisioned(t *testing.T) {
 	if strings.Join(ran, "; ") != strings.Join(want, "; ") {
 		t.Errorf("ran %q\nwant %q", ran, want)
 	}
-	if strings.Contains(out.String(), "GROK_AUTH (2)") {
+	if strings.Contains(out.String(), "SOME_STORE (2)") {
 		t.Error("a namespace made by hand was slated for deletion")
 	}
 

@@ -6,8 +6,14 @@ you never tell the tool which one you are on, and the same task works for
 either.
 
 Only a Worker can be run locally, so the verbs that do that take flags a Fly
-app has no use for. Asking one of these verbs for help resolves the directory
-first, so it tells you what your directory really takes.
+app has no use for. `--help` cannot tell you which of them your directory
+takes: it is printed before any directory is read, so it lists both clouds'
+flags together. What it does instead is refuse the ones your cloud cannot act
+on, at the moment you pass one, and say why.
+
+`url DIR` prints the address to talk to. With `--local URL` that is the one
+you gave; otherwise it is the deployed address, because that is the only
+other address there is.
 
 A developer's own copy of every app comes from DEPLOY_SUFFIX in gitignored
 mise.local.toml, so two people deploying the same repo never fight over one.
@@ -83,3 +89,9 @@ cloud's conventional config and carries on, the way a release writes
 goreleaser's when a repo has none. This one stays and is committed: the file's
 presence is what names the target, so a temporary one would deploy nowhere the
 next time anybody looked. Read it — it is the convention, not a ceiling.
+
+On a directory that already deploys somewhere, `--to` is checked rather than
+ignored: naming the cloud it is already on changes nothing, and naming a
+different one is refused. It used to be read only when there was no config, so
+`--to cloudflare` on a Fly directory deployed to Fly without a word, and a
+typo did the same.

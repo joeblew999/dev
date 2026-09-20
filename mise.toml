@@ -11,7 +11,16 @@ packslip = "latest"
 gh = "latest"
 fnox = "latest"   # the one way to a secret; dev release reads the signing key from it
 "go:golang.org/x/tools/cmd/deadcode" = "latest"   # what `mise run dead` reports
-"go:github.com/mibk/dupl" = "latest"   # what `mise run dup` reports: the same code written twice
+# dupl is pinned where the rest of these float, because of how it is
+# maintained. It was dormant from 2020-12-17 to 2026-03-04 and then, in one
+# burst, added Go generics support AND changed its default threshold from 15
+# to 100. `mise run dup` passes -threshold 40 explicitly, so that default
+# change did not bite here — but six commits in twelve months, one of which
+# silently rewrote what the tool does when you say nothing, is not a release
+# stream to take sight unseen.
+"go:github.com/mibk/dupl" = "v1.1.0"   # what `mise run dup` reports: the same code written twice
+"go:mvdan.cc/unparam" = "latest"   # what `mise run unread` reports: a parameter the body never touches
+"go:github.com/jgautheron/goconst/cmd/goconst" = "v1.11.0"   # what `mise run repeated` reports: one string written in three places
 "go:honnef.co/go/tools/cmd/staticcheck" = "latest"   # an hk step: every commit, and lint
 "go:github.com/nelsonlaidev/scoutly/cmd/scoutly" = "v0.5.0"   # what `dev seo` runs: crawl and on-page
 "go:github.com/raviqqe/muffet/v2" = "v2.11.5"   # dev seo: the link layer
@@ -20,6 +29,14 @@ fnox = "latest"   # the one way to a secret; dev release reads the signing key f
 "go:github.com/jimsmart/grobotstxt/cmd/icanhasrobot" = "latest"   # dev seo: Google own robots matcher, ported
 "go:github.com/meysam81/scry" = "latest"   # dev seo: the broad one, TLS and headers included
 "go:github.com/kevhq/ldlint/cmd/ldlint" = "latest"   # dev seo: schema.org vocabulary
+wrangler = { version = "latest", allow_builds = ["esbuild", "sharp", "workerd"] }
+node = "latest"
+
+# The site's own address, named once: three tasks write it into canonical
+# links, a sitemap and an llms.txt, and a fourth checks the deployed thing.
+# Four spellings of one URL is four chances to point at the wrong site.
+[vars]
+site_origin = "https://dev-docs.gedw99.workers.dev"
 
 [hooks]
 postinstall = { task = "bootstrap" }
@@ -101,6 +118,44 @@ description = "the same code written twice, as a report"
 # in the tree and says nothing.
 run = "dupl -threshold 40 -plumbing $(git ls-files '*.go') || true"
 
+[tasks.unread]
+description = "parameters nothing reads, so a signature cannot promise what the body ignores"
+# A report, never a gate, and most of what it says is fine: a parameter kept
+# to satisfy an interface is normal, and "always receives X" is usually a
+# helper still waiting for its second caller.
+#
+# The one kind worth reading is the other: a parameter the body never touches
+# at all. That is a signature saying something the code does not do, and every
+# caller threads a value through believing it. Nothing else in this gate says
+# it — the compiler allows it, go vet is silent, staticcheck only reports
+# unused locals, and deadcode counts the function as reached. stage.run took
+# an io.Writer it never wrote to, through four callers, for exactly as long as
+# nothing was looking.
+run = "unparam ./... || true"
+
+[tasks.repeated]
+description = "a fact spelled out in three places, where a constant would say it once"
+# A report, not a gate, because about half of what it finds is a verb's own
+# name, and `dev ` + verbName reads worse than writing the word. Reading past
+# that half is the price of the other one.
+#
+# The other half is the "a fact belongs in one place" rule, detected
+# mechanically: a string in three files that all mean the same thing, or a
+# literal written beside the const that already holds it. Those drift the day
+# one of them is edited, which is the whole reason the rule exists.
+#
+# Three occurrences, not two: two is a coincidence. Tests are excluded because
+# a test repeating a fixture's name on purpose is how a test stays readable.
+run = "goconst -min-occurrences 3 -ignore-tests ./... || true"
+
+[tasks.smells]
+description = "every report at once: dead code, duplication, unread parameters, repeated strings"
+# Four tasks of one shape, so there is one door to them. Each says what a
+# change left behind; none of them fails a build, and none of them is in
+# hk.pkl or in test. That is the whole distinction: lint and check are gates
+# and must be green, these are reports and are read.
+depends = ["dead", "dup", "unread", "repeated"]
+
 [tasks.lint]
 description = "hk checks: gofmt, vet, tidy, staticcheck, whitespace, secrets"
 # What runs is hk.pkl's list, which is also what runs on commit — named in one
@@ -179,3 +234,63 @@ run = ".bin/dev release ."
 description = "Build and sign the release, publishing nothing (check runs this)"
 depends = ["build"]
 run = ".bin/dev release . --snapshot"
+
+# ------------------------------------------------------------------------------
+# The site dev serves about itself: this repo dogfooding its own verbs.
+#
+# Nothing here is a new capability. Every page is a manual `dev skill` already
+# renders from the verbs, every SEO file is one `dev seo write` already writes,
+# and the deploy is the same `dev deploy` any repo on this stack runs. If a
+# verb is wrong, this is where it shows.
+# ------------------------------------------------------------------------------
+
+[tasks."site:build"]
+description = "Render the manuals to HTML and write every file Google and a model ask for"
+depends = ["build"]
+sources = ["site/gen/main.go", "skills/*/SKILL.md"]
+outputs = ["site/public/index.html", "site/public/sitemap.xml", "site/public/llms.txt"]
+# The order is the chain, and dev enforces it: llms.txt comes from the command
+# itself — its verbs, which only the command knows — so `dev llms` writes that
+# one and `dev seo write` is told to skip it rather than overwrite it with a
+# page list. Everything else `dev seo write` produces, pulling in what each
+# file it writes depends on.
+run = [
+  "go run ./site/gen --out site/public --origin {{ vars.site_origin }}",
+  ".bin/dev llms site/public --origin {{ vars.site_origin }}",
+  ".bin/dev seo write site/public --url {{ vars.site_origin }}/ --urls site/urls.txt --skip llms,head --title dev --desc 'The developer tool of the mise + fnox + hk + packslip stack.' --csp \"default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'\"",
+]
+
+[tasks."site:run"]
+description = "Serve the site here, the way Cloudflare will: the same files, no deploy"
+depends = ["site:build"]
+# Through dev, so what runs locally is what deploys — the alternative is a
+# second server that agrees until the day it does not.
+run = ".bin/dev run site"
+
+[tasks."site:deploy"]
+description = "Put the site on Cloudflare, from the working tree: no commit, no release"
+depends = ["site:build"]
+run = ".bin/dev deploy site"
+
+[tasks."site:check"]
+description = "Run every SEO checker against the deployed site, which is the only thing Google sees"
+depends = ["build"]
+# Against the URL and not the directory on purpose: what Search reads is what
+# the edge serves, headers and all, not what the source says it will.
+run = ".bin/dev seo check {{ vars.site_origin }}/"
+
+[tasks."site:evolve"]
+description = "Check the live site, write the files that fix what was found, deploy, and check again"
+depends = ["build"]
+# The loop dev already knew how to describe and stopped short of running:
+# every finding carries the writer whose artifact resolves it, so the report
+# chooses what to write. Nothing here decides what is wrong — the checkers
+# did, against the deployed site, which is the only thing Google sees.
+#
+# It ends with a second check rather than a claim, because "fixed" is a thing
+# the site says, not a thing this says about the site.
+run = [
+  ".bin/dev seo check {{ vars.site_origin }}/ --fix site/public --urls site/urls.txt --title dev --desc 'The developer tool of the mise + fnox + hk + packslip stack.' --csp \"default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'\"",
+  ".bin/dev deploy site",
+  ".bin/dev seo check {{ vars.site_origin }}/",
+]

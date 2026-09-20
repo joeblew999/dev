@@ -51,7 +51,20 @@ func CheckFlags(fs *flag.FlagSet) {
 	fs.Int("max-pages", 20, "stop crawling after this many `PAGES`")
 	pickFlags(fs)
 	fs.Int("jobs", 0, "checkers to run at once (default: all of them)")
+	fs.String("fix", "", "write the files that resolve what was found, into `DIR`")
+	pageFlags(fs)
 	cli.ReportFlags(fs)
+}
+
+// pageFlags are what a page says about itself: the same four words whether a
+// verb is writing the files or fixing them, because they are the same four
+// facts and a second spelling of them would drift.
+func pageFlags(fs *flag.FlagSet) {
+	fs.String("title", "", "the `TEXT` Search shows as the headline")
+	fs.String("desc", "", "the `TEXT` Search shows under it")
+	fs.String("image", "", "the `URL` a shared link previews")
+	fs.String("urls", "", "a `FILE` of URLs, one per line, for the sitemap")
+	fs.String("csp", "", "the Content-Security-Policy this site wants, as a `POLICY`")
 }
 
 // pickFlags choose which of a registry's entries run. The same two words for
@@ -65,10 +78,7 @@ func pickFlags(fs *flag.FlagSet) {
 func WriteFlags(fs *flag.FlagSet) {
 	pickFlags(fs)
 	fs.String("url", "", "the page the head fragment describes, and the site the sitemap covers")
-	fs.String("title", "", "the `TEXT` Search shows as the headline")
-	fs.String("desc", "", "the `TEXT` Search shows under it")
-	fs.String("image", "", "the `URL` a shared link previews")
-	fs.String("urls", "", "a `FILE` of URLs, one per line, for the sitemap")
+	pageFlags(fs)
 	cli.ReportFlags(fs)
 }
 
@@ -114,6 +124,9 @@ func runCheck(c cli.Call) error {
 		return err
 	}
 	Audit(c, rep, c.Args[0], maxPages, pick)
+	if err := repair(c, rep); err != nil {
+		return err
+	}
 	return c.Finish(rep, started, func(r *cli.Report) { write(c, r) })
 }
 
@@ -124,6 +137,15 @@ func onDir(c cli.Call, do func(*cli.Report, *picked) error) error {
 	rep, pick, started, err := start(c, c.Dir, writerNames())
 	if err != nil {
 		return err
+	}
+	// Choosing a writer chooses what its output is about. Done here rather
+	// than inside each writer because it is a fact about the selection, and
+	// both write and validate go through this door.
+	if err := chain(c, pick); err != nil {
+		return err
+	}
+	for _, why := range pick.pulled {
+		fmt.Fprintf(c.Stderr, "also writing %s\n", why)
 	}
 	if err := do(rep, pick); err != nil {
 		return err
@@ -142,11 +164,23 @@ func runWrite(c cli.Call) error {
 		return err
 	}
 	return onDir(c, func(rep *cli.Report, pick *picked) error {
-		return Write(c, c.Dir, Site{
-			Origin: originOf(url), URL: url, Now: time.Now().UTC(), URLs: urls,
-			Title: c.Value("title"), Desc: c.Value("desc"), Image: c.Value("image"),
-		}, rep, pick)
+		return Write(c, c.Dir, site(c, url, urls), rep, pick)
 	})
+}
+
+// site is what the page says about itself, out of the flags that say it.
+//
+// One function because two verbs write files now — `write` and `check --fix`
+// — and they were building the same struct from the same flags. They had
+// already drifted by the time the second was a day old: --csp reached the
+// fixer and not the writer, so a site that named its policy had one written
+// only when a checker complained.
+func site(c cli.Call, url string, urls []string) Site {
+	return Site{
+		Origin: originOf(url), URL: url, Now: time.Now().UTC(), URLs: urls,
+		Title: c.Value("title"), Desc: c.Value("desc"), Image: c.Value("image"),
+		CSP: c.Value("csp"),
+	}
 }
 
 // runValidate is `dev seo validate DIR`.
@@ -230,7 +264,13 @@ func names[T any](of []T, name func(T) string) []string { return cli.Map(of, nam
 
 // picked is what --only and --skip resolved to. A name that is not a checker
 // names itself rather than silently running nothing.
-type picked struct{ only, skip map[string]bool }
+type picked struct {
+	only, skip map[string]bool
+	// pulled is what a dependency dragged in, so the report can say why a
+	// writer nobody named ran anyway. Silently running more than was asked
+	// for is the same sin as silently running less.
+	pulled []string
+}
 
 func selection(c cli.Call, names []string) (*picked, error) {
 	read := func(flag string) (map[string]bool, error) {

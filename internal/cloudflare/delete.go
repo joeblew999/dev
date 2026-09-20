@@ -51,7 +51,7 @@ func Delete(stdin io.Reader, out io.Writer, dir, env, name string, yes bool) err
 	// Worker that was not there failed as a bare exit status saying nothing
 	// about whether it was missing, not yours, or a credentials problem — and
 	// a cleanup run failed the second time for having worked the first.
-	said, err := fnox.Ask(dir, "wrangler", "delete", "--name", name, "--force")
+	said, err := fnox.Ask(dir, WranglerBin, "delete", "--name", name, "--force")
 	fmt.Fprint(out, said)
 	if err != nil {
 		if strings.Contains(said, noSuchWorker) {
@@ -61,7 +61,7 @@ func Delete(stdin io.Reader, out io.Writer, dir, env, name string, yes bool) err
 		return fmt.Errorf("wrangler delete %s failed: %w\n%s", name, err, cli.Indent(said))
 	}
 	for _, ns := range doomed {
-		if err := fnox.Exec(dir, nil, out, "wrangler", "kv", "namespace", "delete", "--namespace-id", ns.ID); err != nil {
+		if err := fnox.Exec(dir, nil, out, WranglerBin, "kv", "namespace", "delete", "--namespace-id", ns.ID); err != nil {
 			return fmt.Errorf("deleting KV namespace %s (%s): %w", ns.Title, ns.ID, err)
 		}
 	}
@@ -94,7 +94,7 @@ type namespace struct {
 // namespaces lists the account's KV namespaces through wrangler.
 func namespaces(dir string) ([]namespace, error) {
 	var buf bytes.Buffer
-	if err := fnox.Exec(dir, nil, &buf, "wrangler", "kv", "namespace", "list"); err != nil {
+	if err := fnox.Exec(dir, nil, &buf, WranglerBin, "kv", "namespace", "list"); err != nil {
 		return nil, fmt.Errorf("wrangler kv namespace list failed: %w", err)
 	}
 	// wrangler prints its banner before the JSON; DecodeJSON starts at it.

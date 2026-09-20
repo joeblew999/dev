@@ -83,14 +83,11 @@ func TestURLReadsTheSubdomainOnceAndKeepsIt(t *testing.T) {
 	calls := fakeAccount(t, "tok", "someone")
 	stubFnox(t, map[string]string{"CLOUDFLARE_API_TOKEN": "tok", "CLOUDFLARE_ACCOUNT_ID": "acct"})
 
-	if got, _ := URL(".", "", false, "http://127.0.0.1:1", false); got != "http://127.0.0.1:1" {
-		t.Fatalf("local: got %q", got)
-	}
-	got, err := URL(".", "", true, "", false)
+	got, err := URL(".", "", false)
 	if err != nil || got != "https://app.someone.workers.dev" {
 		t.Fatalf("worker: got %q, %v", got, err)
 	}
-	got, err = URL(".", "tinygo", true, "", false)
+	got, err = URL(".", "tinygo", false)
 	if err != nil || got != "https://app-tinygo.someone.workers.dev" {
 		t.Fatalf("tinygo: got %q, %v", got, err)
 	}
@@ -101,7 +98,7 @@ func TestURLReadsTheSubdomainOnceAndKeepsIt(t *testing.T) {
 	if !strings.Contains(string(data), "CLOUDFLARE_WORKERS_SUBDOMAIN = \"someone\"") {
 		t.Fatalf("mise.local.toml:\n%s", data)
 	}
-	if _, err := URL(".", "", true, "", true); err != nil || *calls != 2 {
+	if _, err := URL(".", "", true); err != nil || *calls != 2 {
 		t.Fatalf("refresh: %v, calls %d", err, *calls)
 	}
 }
@@ -110,7 +107,7 @@ func TestURLNamesTheMissingCredential(t *testing.T) {
 	t.Chdir(t.TempDir())
 	os.WriteFile(ConfigFile, []byte("name = \"app\"\n"), 0o644)
 	stubFnox(t, map[string]string{})
-	_, err := URL(".", "", true, "", false)
+	_, err := URL(".", "", false)
 	want := "CLOUDFLARE_API_TOKEN is not in fnox; store it with: fnox set -g CLOUDFLARE_API_TOKEN"
 	if err == nil || err.Error() != want {
 		t.Fatalf("got %v", err)
@@ -122,7 +119,7 @@ func TestURLReportsWhatCloudflareSaid(t *testing.T) {
 	os.WriteFile(ConfigFile, []byte("name = \"app\"\n"), 0o644)
 	fakeAccount(t, "right", "x")
 	stubFnox(t, map[string]string{"CLOUDFLARE_API_TOKEN": "wrong", "CLOUDFLARE_ACCOUNT_ID": "acct"})
-	_, err := URL(".", "", true, "", false)
+	_, err := URL(".", "", false)
 	if err == nil || !strings.Contains(err.Error(), "HTTP 403: Invalid API token") {
 		t.Fatalf("got %v", err)
 	}
@@ -190,6 +187,19 @@ func TestWaitReadyReadsTheLog(t *testing.T) {
 	os.WriteFile(log, []byte("still starting\n"), 0o644)
 	if err := waitReady(log, 0); err == nil || !strings.Contains(err.Error(), "did not become ready") {
 		t.Fatalf("timeout: %v", err)
+	}
+	// The one failure dev causes itself, so it gets a sentence rather than a
+	// log to read: the scaffold writes today's compatibility_date, and the
+	// workerd inside a pinned wrangler only understands dates up to its own
+	// release. The Worker deploys and will not run locally, which makes
+	// `dev smoke` fail on a config `dev deploy --to cloudflare` just wrote.
+	os.WriteFile(log, []byte(`✘ [ERROR] service core:user:x: This Worker requires compatibility date "2026-09-20", `+tooNew+` "2026-05-15".`+"\n"), 0o644)
+	err := waitReady(log, time.Minute)
+	if err == nil || !strings.Contains(err.Error(), "compatibility_date") {
+		t.Fatalf("a runtime older than the config said %v; want it named", err)
+	}
+	if !strings.Contains(err.Error(), "mise.toml") {
+		t.Errorf("the error does not say what to change: %v", err)
 	}
 }
 

@@ -77,11 +77,26 @@ func excerpt(body []byte) string {
 	return s
 }
 
+// tooNew is wrangler saying the local runtime it carries is older than the
+// Worker's compatibility_date.
+//
+// It is read from wrangler's prose, which is not how anything here decides
+// something — only how a failure that has already happened gets a sentence.
+// It is worth the one match because dev causes it: the scaffold writes
+// today's date, as Cloudflare's own guidance says to, and the workerd inside
+// a pinned wrangler only understands dates up to its own release. So the
+// deploy works, and `dev smoke` — the verb that exists to prove the thing
+// before it ships — fails on a config dev just wrote.
+const tooNew = "but the newest date supported by this server binary is"
+
 // waitReady watches a wrangler dev log for readiness or an error.
 func waitReady(log string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
 		data, _ := os.ReadFile(log)
+		if bytes.Contains(data, []byte(tooNew)) {
+			return fmt.Errorf("this Worker's compatibility_date is newer than the workerd inside the pinned wrangler, so it deploys but will not run locally; move the wrangler pin in mise.toml forward, or set compatibility_date back to a date that wrangler knows. Its log is above")
+		}
 		if bytes.Contains(data, []byte("ERROR")) {
 			return fmt.Errorf("wrangler dev failed; its log is above")
 		}

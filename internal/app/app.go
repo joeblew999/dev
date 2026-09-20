@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -90,11 +91,18 @@ func toFlag(fs *flag.FlagSet) {
 
 // LogsFlags are what logs takes. --json turns a stream into an answer that
 // ends, and the two bounds are only meaningful with it.
+//
+// Both are typed rather than strings so that flag parsing refuses a value
+// that is not one. They were strings parsed later with the error thrown away,
+// so `--since banana` became the default hour and `--limit lots` became the
+// default hundred: a window nobody asked for, reported as the window they
+// did. A typed flag also gives --help a name for what it takes instead of
+// "string".
 func LogsFlags(fs *flag.FlagSet) {
 	EnvFlag(fs)
 	cli.JSONFlags(fs)
-	fs.String("since", "1h", "how far back to read, with --json")
-	fs.String("limit", "100", "at most this many events, with --json")
+	fs.Duration("since", time.Hour, "how far `BACK` to read, with --json")
+	fs.Int("limit", 100, "at most this `MANY` events, with --json")
 	fs.Var(new(cli.Bool), "raw", "carry each cloud's own record too: the headers, timings and everything the shared shape has nowhere to put")
 }
 
@@ -207,9 +215,17 @@ type cloud struct {
 	// effect, which reads as having worked.
 	Ignores map[string]string
 
-	Before   func(c cli.Call) error           // checked before any verb runs
-	URL      func(c cli.Call) (string, error) // what `url` prints, flags and all
-	Deployed func(c cli.Call) (string, error) // the deployed address, whatever --local says
+	// Needs is the CLI this target does all its work through, so a machine
+	// without it is told that rather than handed the exit status of a shim
+	// that could not resolve. Fly checked for flyctl and Cloudflare checked
+	// for nothing, so the same missing-tool failure read as a clear sentence
+	// on one cloud and as `exit status 1` on the other.
+	Needs string
+
+	// Deployed is the one address the app really has. `url` prints it, and
+	// `deploy --wait` polls it; there is no second address either of them
+	// could mean, which is why `url` has no entry of its own here.
+	Deployed func(c cli.Call) (string, error)
 	Deploy   func(c cli.Call) error
 	Logs     func(c cli.Call) error
 	Delete   func(c cli.Call) error
@@ -253,11 +269,13 @@ var clouds = map[string]cloud{
 	"cloudflare": {
 		ConfigFile: cloudflare.ConfigFile,
 		Scaffold:   cloudflare.Scaffold,
-		URL: func(c cli.Call) (string, error) {
-			return cloudflare.URL(c.Dir, c.Value("env"), c.Given("deployed"), c.Value("local"), c.Given("refresh"))
-		},
+		Needs:      cloudflare.WranglerBin,
+		// --refresh belongs here rather than at the `url` verb: the deployed
+		// address is the only thing that reads the workers.dev subdomain, so
+		// re-asking for it is a property of finding the address and not of
+		// the verb that happens to print it.
 		Deployed: func(c cli.Call) (string, error) {
-			return cloudflare.URL(c.Dir, c.Value("env"), true, "", false)
+			return cloudflare.URL(c.Dir, c.Value("env"), c.Given("refresh"))
 		},
 		Deploy: func(c cli.Call) error { return cloudflare.Deploy(c.Stdout, c.Dir, c.Value("env")) },
 		Logs:   func(c cli.Call) error { return cloudflare.Logs(c.Dir, c.Value("env")) },
@@ -282,7 +300,7 @@ var clouds = map[string]cloud{
 				return nil, err
 			}
 			return cli.Map(said, func(e cloudflare.Event) Event {
-				return Event{At: e.At, Level: e.Level, Message: e.Message,
+				return Event{At: at(e.At), Level: e.Level, Message: e.Message,
 					From:    from(e.Type == cloudflare.WorkerLine),
 					Request: request(e.Method, e.URL, e.ID, e.Status),
 					Raw:     e.Raw}
@@ -292,22 +310,10 @@ var clouds = map[string]cloud{
 	"fly": {
 		ConfigFile: fly.ConfigFile,
 		Scaffold:   fly.Scaffold,
+		Needs:      fly.FlyctlBin,
 		Ignores: map[string]string{
 			"env":     "a Fly app has no environments: fly.toml deploys one app, and a second app is a second directory",
 			"refresh": "--refresh re-asks the Workers API for a workers.dev name; a Fly app's address is its app name and is already exact",
-		},
-		URL: func(c cli.Call) (string, error) {
-			// A Fly app has no local address to work out, so --local is
-			// whatever the caller runs it on — and when they did not say, the
-			// app has exactly one address and that is the answer.
-			//
-			// Returning the empty --local regardless meant `dev url DIR`
-			// printed a blank line and exited 0, which reads as a broken tool
-			// rather than as a question that was not asked properly.
-			if local := c.Value("local"); local != "" && !c.Given("deployed") {
-				return local, nil
-			}
-			return fly.URL(c.Dir)
 		},
 		Deployed: func(c cli.Call) (string, error) { return fly.URL(c.Dir) },
 		Deploy:   func(c cli.Call) error { return fly.Deploy(c.Stdout, c.Dir, c.Args) },
@@ -326,7 +332,7 @@ var clouds = map[string]cloud{
 				return nil, err
 			}
 			return cli.Map(said, func(e fly.Event) Event {
-				return Event{At: e.At, Level: e.Level, Message: e.Message, Source: e.Source,
+				return Event{At: at(e.At), Level: e.Level, Message: e.Message, Source: e.Source,
 					From:    from(e.Provider == fly.AppLine),
 					Request: request(e.Method, e.URL, e.ID, e.Status),
 					Raw:     e.Raw}
@@ -344,14 +350,19 @@ func to(c cli.Call, verb string) error {
 	// the whole of "make it if it is not there": the config is written at the
 	// moment something needs it, not by a separate verb nobody remembers.
 	if want := c.Value("to"); want != "" && verb == "deploy" {
-		if _, err := Target(c.Dir); err != nil {
-			if err := scaffold(c.Stdout, c.Dir, want); err != nil {
-				return err
-			}
+		if err := toward(c, want); err != nil {
+			return err
 		}
 	}
 	t, err := cloudFor(c.Dir)
 	if err != nil {
+		return err
+	}
+	// The CLI this target works through, before anything is attempted with
+	// it. Without this the answer to "wrangler is not installed" was the exit
+	// status of a mise shim that could not resolve a version — true, and
+	// nothing anybody can act on.
+	if err := reachable(t); err != nil {
 		return err
 	}
 	// A flag this target cannot act on is refused before anything runs, so
@@ -361,14 +372,9 @@ func to(c cli.Call, verb string) error {
 			return cli.Usagef("--%s: %s", name, t.Ignores[name])
 		}
 	}
-	if t.Before != nil {
-		if err := t.Before(c); err != nil {
-			return err
-		}
-	}
 	switch verb {
 	case "url":
-		u, err := t.URL(c)
+		u, err := address(c, t)
 		if err != nil {
 			return err
 		}
@@ -443,6 +449,69 @@ func to(c cli.Call, verb string) error {
 		[]string{"url", "deploy", "logs", "delete", "smoke"}))
 }
 
+// address is what `url` prints and what `deploy --wait` polls: what --local
+// says when that is what was asked for, and otherwise the one address the app
+// really has.
+//
+// It is here rather than per cloud because the rule is the same on both and
+// was written for one of them. A Fly app's entry had it and a Worker's did
+// not, so `dev url DIR` on a Worker printed a blank line and exited 0 — which
+// reads as a broken tool rather than as a question nobody asked properly.
+func address(c cli.Call, t cloud) (string, error) {
+	if local := c.Value("local"); local != "" && !c.Given("deployed") {
+		return local, nil
+	}
+	return t.Deployed(c)
+}
+
+// toward settles --to before a deploy runs.
+//
+// It used to be read only when the directory had no config, so a --to naming
+// a cloud the directory does not deploy to was taken and ignored: `deploy DIR
+// --to cloudflare` on a Fly directory deployed to Fly and said nothing, and a
+// typo did the same. A flag that names the destination has to be either true
+// or refused.
+func toward(c cli.Call, want string) error {
+	if _, err := chosen(want); err != nil {
+		return err
+	}
+	switch got, err := Target(c.Dir); {
+	case err != nil:
+		// Nothing deploys it yet, so --to is the answer: write that cloud's
+		// config and carry on.
+		return scaffold(c.Stdout, c.Dir, want)
+	case got == want:
+		// Already what was asked for. Saying so would be noise on every
+		// deploy a task spells out in full.
+		return nil
+	default:
+		return cli.Usagef("--to %s, but %s holds %s, so it deploys to %s; a directory deploys to one cloud, and changing which one is deleting that file and deploying again",
+			want, c.Dir, clouds[got].ConfigFile, got)
+	}
+}
+
+// reachable refuses before the work when the CLI a target does everything
+// through is not on PATH.
+//
+// One wording for both clouds. Fly looked for flyctl and said what to add to
+// mise.toml; Cloudflare looked for nothing, so the same missing tool came back
+// as the exit status of a shim that could not resolve a version — true, and
+// nothing anybody can act on.
+func reachable(t cloud) error { return onPath(t.Needs) }
+
+func onPath(bin string) error {
+	if bin == "" {
+		return nil
+	}
+	if _, err := lookPath(bin); err != nil {
+		return fmt.Errorf("%s is not installed; add to mise.toml under [tools]: %s = \"latest\", then: mise install", bin, bin)
+	}
+	return nil
+}
+
+// lookPath is a variable so a test can say what is installed without one.
+var lookPath = exec.LookPath
+
 // Target names the cloud dir deploys to, "cloudflare" or "fly", from the
 // config file it holds.
 func Target(dir string) (string, error) {
@@ -490,6 +559,11 @@ func PutSecret(dir, env, name, value string) error {
 	if err != nil {
 		return err
 	}
+	// The one path here that shells out without a verb behind it, so it wants
+	// the same answer a verb gets when the target's CLI is not installed.
+	if err := reachable(to); err != nil {
+		return err
+	}
 	return to.PutSecret(dir, env, name, value)
 }
 
@@ -503,9 +577,9 @@ func PutSecret(dir, env, name, value string) error {
 // difference is that this file stays — the presence of it is what names the
 // target, so a temporary one would deploy nowhere the next time anyone looked.
 func scaffold(out io.Writer, dir, want string) error {
-	to, ok := clouds[want]
-	if !ok {
-		return cli.Usagef("--to: %v", cli.Unknown("cloud", want, cli.SortedKeys(clouds)))
+	to, err := chosen(want)
+	if err != nil {
+		return err
 	}
 	if to.Scaffold == nil {
 		return fmt.Errorf("--to %s: that target writes no config of its own; add %s by hand", want, to.ConfigFile)
@@ -527,6 +601,17 @@ func mustAbs(dir string) string {
 		return dir
 	}
 	return abs
+}
+
+// chosen is the cloud --to names, or a usage error offering the ones there
+// are. Both the check and the writing need it, and a second wording of "no
+// such cloud" is a second wording to keep true.
+func chosen(want string) (cloud, error) {
+	to, ok := clouds[want]
+	if !ok {
+		return cloud{}, cli.Usagef("--to: %v", cli.Unknown("cloud", want, cli.SortedKeys(clouds)))
+	}
+	return to, nil
 }
 
 // cloudFor is the target a directory deploys to, as the thing that can act on

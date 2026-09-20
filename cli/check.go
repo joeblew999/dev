@@ -212,22 +212,28 @@ func described(t TB, c Command, v Verb, path string) {
 	}
 }
 
-// CheckSurfaces fails the test when a verb reaches one of a command's two
-// surfaces and not the other.
+// CheckSurfaces fails the test when a verb reaches one of a command's
+// surfaces and not the others.
 //
-// The terminal index and the skill a repo's agents read are one render with
-// one difference: the terminal flattens the markdown so a shell can show it
-// with no renderer. Nothing said so, and nothing would have noticed a change
-// that let them part — a group filtered on one path and not the other, say.
-// Then a verb would exist for a developer and not for an agent, or the
-// reverse, and the only way to find out would be for someone to go looking.
+// The terminal index, the skill a repo's agents read and the llms.txt a docs
+// site serves are one render three ways: the terminal flattens the markdown
+// so a shell can show it with no renderer, and the llms.txt turns each verb
+// into a link to the manual. Nothing said so, and nothing would have noticed
+// a change that let them part — a group filtered on one path and not the
+// others, say. Then a verb would exist for a developer and not for an agent,
+// or for neither and only for a model, and the only way to find out would be
+// for someone to go looking.
+//
+// The third one is why this is a list rather than two comparisons: adding a
+// surface is adding a line here, and every repo on the stack is held to it
+// the next time it runs its tests.
 //
 // A command's main_test.go calls it, so `go test` — and so `dev check` —
-// holds the two together for every repo on the stack rather than for the one
+// holds them together for every repo on the stack rather than for the one
 // that happened to write the test.
 func CheckSurfaces(t TB, c Command) {
 	t.Helper()
-	index, skill := c.index(), c.render()
+	index, skill, llms := c.index(), c.render(), c.LLMs("").String()
 	for name, v := range c.all() {
 		sig := c.Name + " " + name
 		if v.Args != "" {
@@ -236,6 +242,7 @@ func CheckSurfaces(t TB, c Command) {
 		for _, surface := range []struct{ what, text, who string }{
 			{"the terminal index", index, "a developer"},
 			{"the skill", skill, "an agent"},
+			{"the llms.txt", llms, "a model reading the docs site"},
 		} {
 			if !strings.Contains(surface.text, sig) {
 				t.Errorf("%q is not in %s, so %s cannot find it", sig, surface.what, surface.who)
@@ -328,7 +335,7 @@ func miseTools(config string) map[string]string {
 		// version, and a key is quoted because of the : and / in a backend
 		// path, not because mise calls it that.
 		value, _, _ = strings.Cut(value, "#")
-		tools[unquoted(key)] = unquoted(value)
+		tools[unquoted(key)] = version(value)
 	}
 	return tools
 }
@@ -336,3 +343,31 @@ func miseTools(config string) map[string]string {
 // unquoted is one TOML string: trimmed, and without the quotes it was
 // written with.
 func unquoted(s string) string { return strings.Trim(strings.TrimSpace(s), `"`) }
+
+// version is what a [tools] value asks for, whether it is written as a string
+// or as a table.
+//
+// mise lets a pin carry settings — wrangler needs
+// allow_builds = ["esbuild", "sharp", "workerd"] before npm will install it —
+// and then the line is an inline table rather than a version. Reading
+// everything after the first = as the version made that whole brace-blob the
+// version, so a repo that legitimately pins wrangler with its build allowance
+// was told its pin disagreed with a registry that says the same thing. Any
+// repo on this stack using allow_builds would have hit it.
+func version(value string) string {
+	value = strings.TrimSpace(value)
+	if !strings.HasPrefix(value, "{") {
+		return unquoted(value)
+	}
+	// One field out of the table, by name: the others are how to install it,
+	// not which one to install.
+	_, rest, ok := strings.Cut(value, "version")
+	if !ok {
+		return ""
+	}
+	if _, rest, ok = strings.Cut(rest, `"`); !ok {
+		return ""
+	}
+	got, _, _ := strings.Cut(rest, `"`)
+	return got
+}

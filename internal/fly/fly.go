@@ -32,14 +32,10 @@ const (
 	OrgEnv = "FLY_ORG"
 )
 
-// NoEnv refuses --env: a Fly app has one environment, and a second app is a
-// second directory. app checks this before any Fly verb runs.
-func NoEnv(dir, env string) error {
-	if env != "" {
-		return fmt.Errorf("a Fly app has no environments (--env %q): %s deploys one app; a second app is a second directory", env, filepath.Join(dir, ConfigFile))
-	}
-	return nil
-}
+// Refusing --env used to be a function here, called by nothing: package app
+// refuses it from the registry's Ignores instead, so the sentence lived in
+// two places and only one of them was reached. Its own test was what kept it
+// out of `mise run dead`, which is the way dead code survives a report.
 
 // App is the app dir's fly.toml deploys, with the developer's suffix.
 func App(dir string) (string, error) {
@@ -336,31 +332,36 @@ func Orgs() ([]string, error) {
 	if err := installed(); err != nil {
 		return nil, err
 	}
-	said, err := fnox.Ask(".", FlyctlBin, "orgs", "list", "--json")
+	seen, err := orgs()
 	if err != nil {
 		return nil, fmt.Errorf("flyctl orgs list failed: %w — %s", err, credentials("an app"))
 	}
-	orgs, err := cli.DecodeJSON[map[string]string]("flyctl orgs list", said)
+	return seen, nil
+}
+
+// orgs is the question itself, asked without explaining a failure — because
+// credentials() below calls it to explain one, and an explanation that asks
+// for an explanation is a loop. Orgs adds the sentence; orgsSeen wants the
+// answer or nothing.
+func orgs() ([]string, error) {
+	said, err := fnox.Ask(".", FlyctlBin, "orgs", "list", "--json")
 	if err != nil {
 		return nil, err
 	}
-	return cli.SortedKeys(orgs), nil
+	// A map of slug to display name.
+	byName, err := cli.DecodeJSON[map[string]string]("flyctl orgs list", said)
+	if err != nil {
+		return nil, err
+	}
+	return cli.SortedKeys(byName), nil
 }
 
 // orgsSeen is the organisations these credentials can reach, which is the
 // fact that decides whether an app is reachable at all. Empty when Fly will
 // not say.
 func orgsSeen() []string {
-	said, err := fnox.Ask(".", FlyctlBin, "orgs", "list", "--json")
-	if err != nil {
-		return nil
-	}
-	// A map of slug to display name.
-	orgs, err := cli.DecodeJSON[map[string]string]("flyctl orgs list", said)
-	if err != nil {
-		return nil
-	}
-	return cli.SortedKeys(orgs)
+	seen, _ := orgs()
+	return seen
 }
 
 // List is every app these credentials can see, which is every app in the

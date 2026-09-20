@@ -84,12 +84,15 @@ func Name(dir, env string) (string, error) {
 	return workerName(cfg, env), nil
 }
 
-// URL is the address to talk to: the workers.dev URL of the Worker in dir when
-// worker is set, otherwise local as given.
-func URL(dir, env string, worker bool, local string, refresh bool) (string, error) {
-	if !worker {
-		return local, nil
-	}
+// URL is the deployed address of the Worker in dir: its workers.dev name for
+// this account and environment.
+//
+// It used to take the local address and a flag saying which of the two was
+// wanted, and answered the empty local one with an empty string — so `dev url
+// DIR` printed a blank line and exited 0. Choosing between local and deployed
+// is the same choice on every cloud, so package app makes it once and this
+// answers the only question that is Cloudflare's.
+func URL(dir, env string, refresh bool) (string, error) {
 	cfg, err := config(dir)
 	if err != nil {
 		return "", err

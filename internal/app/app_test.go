@@ -1,8 +1,10 @@
 package app
 
 import (
-	"github.com/joeblew999/dev/cli"
+	"flag"
 	"io"
+
+	"github.com/joeblew999/dev/cli"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,8 +71,10 @@ func TestEveryCloudIsWholeSoAddingOneIsOneEdit(t *testing.T) {
 		if c.ConfigFile == "" {
 			t.Errorf("cloud %q names no config file, so Target can never choose it", name)
 		}
+		if c.Needs == "" {
+			t.Errorf("cloud %q names no CLI, so a machine without it gets an exit status instead of a sentence", name)
+		}
 		for what, missing := range map[string]bool{
-			"URL":       c.URL == nil,
 			"Deployed":  c.Deployed == nil,
 			"Deploy":    c.Deploy == nil,
 			"Logs":      c.Logs == nil,
@@ -89,6 +93,121 @@ func TestEveryCloudIsWholeSoAddingOneIsOneEdit(t *testing.T) {
 		// rather than a nil.
 		if c.Smoke == nil && c.NoSmoke == "" {
 			t.Errorf("cloud %q cannot smoke and does not say why", name)
+		}
+	}
+}
+
+// called is a verb's Call with the flags it registers, parsed from args.
+func called(t *testing.T, dir string, flags func(*flag.FlagSet), args ...string) cli.Call {
+	t.Helper()
+	fs := flag.NewFlagSet("probe", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	flags(fs)
+	if err := fs.Parse(args); err != nil {
+		t.Fatal(err)
+	}
+	return cli.Call{Verb: "dev probe", Dir: dir, Flags: fs, Stdout: io.Discard, Stderr: io.Discard}
+}
+
+// `url` with neither --local nor --deployed has one sensible answer — the
+// address the app really has — and it was written into one cloud's entry
+// rather than into the rule, so the other cloud printed a blank line and
+// exited 0. Driven by a made-up target, so it holds for a cloud added later
+// as well as for the two here.
+func TestTheAddressIsTheDeployedOneUnlessLocalWasAskedFor(t *testing.T) {
+	asked := 0
+	target := cloud{Deployed: func(cli.Call) (string, error) {
+		asked++
+		return "https://deployed/", nil
+	}}
+	for name, tc := range map[string]struct {
+		args []string
+		want string
+	}{
+		"neither":            {nil, "https://deployed/"},
+		"--local":            {[]string{"--local", "http://127.0.0.1:1"}, "http://127.0.0.1:1"},
+		"--deployed":         {[]string{"--deployed"}, "https://deployed/"},
+		"--deployed --local": {[]string{"--deployed", "--local", "http://127.0.0.1:1"}, "https://deployed/"},
+	} {
+		got, err := address(called(t, ".", URLFlags, tc.args...), target)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if got != tc.want {
+			t.Errorf("%s: printed %q, want %q", name, got, tc.want)
+		}
+		if got == "" {
+			t.Errorf("%s: printed nothing, which reads as a broken tool", name)
+		}
+	}
+	if asked == 0 {
+		t.Error("the target was never asked for its address")
+	}
+}
+
+// --to names where a deploy goes, so it is either true or refused. It used to
+// be read only when the directory had no config, so `--to cloudflare` on a
+// Fly directory deployed to Fly and said nothing — and a typo did the same.
+func TestToIsCheckedEvenWhenTheDirectoryAlreadyDeploysSomewhere(t *testing.T) {
+	names := cli.SortedKeys(clouds)
+	if len(names) < 2 {
+		t.Skip("one cloud cannot disagree with another")
+	}
+	is, other := names[0], names[1]
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, clouds[is].ConfigFile), []byte("name = \"x\"\napp = \"x\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The cloud it is already on: nothing to say, and nothing refused.
+	if err := toward(called(t, dir, DeployFlags, "--to", is), is); err != nil {
+		t.Errorf("--to %s on a directory that deploys there: %v", is, err)
+	}
+	// A different cloud: refused, naming the file that decided and the cloud
+	// it really deploys to.
+	err := toward(called(t, dir, DeployFlags, "--to", other), other)
+	if err == nil {
+		t.Fatalf("--to %s deployed to %s without a word", other, is)
+	}
+	for _, want := range []string{other, is, clouds[is].ConfigFile} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal does not mention %q: %v", want, err)
+		}
+	}
+	// A cloud nobody has heard of is a typo, whether or not the directory
+	// already deploys somewhere.
+	for _, where := range []string{dir, t.TempDir()} {
+		if err := toward(called(t, where, DeployFlags, "--to", "clowdflare"), "clowdflare"); err == nil {
+			t.Errorf("--to accepted a cloud that does not exist in %s", where)
+		}
+	}
+}
+
+// The CLI a target works through is named in the registry, so a machine
+// without it is told which tool and what to add. Fly checked and Cloudflare
+// did not, so the same failure was a sentence on one cloud and the exit
+// status of a shim that could not resolve a version on the other.
+func TestAMissingCLIIsNamedForEveryCloud(t *testing.T) {
+	old := lookPath
+	lookPath = func(string) (string, error) { return "", os.ErrNotExist }
+	t.Cleanup(func() { lookPath = old })
+	for name, c := range clouds {
+		err := reachable(c)
+		if err == nil {
+			t.Errorf("cloud %q ran with no %s installed", name, c.Needs)
+			continue
+		}
+		for _, want := range []string{c.Needs, "mise.toml"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("cloud %q: %q does not mention %q", name, err, want)
+			}
+		}
+	}
+	// And with the tool there, nothing is in the way.
+	lookPath = func(string) (string, error) { return "/x/bin", nil }
+	for name, c := range clouds {
+		if err := reachable(c); err != nil {
+			t.Errorf("cloud %q refused with its CLI installed: %v", name, err)
 		}
 	}
 }

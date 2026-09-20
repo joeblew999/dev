@@ -60,20 +60,36 @@ func unmark(s string) string {
 // paths are the verbs this group covers, in the order the manual reads them.
 func Verbs(name string, verbs map[string]Verb, paths []string) string {
 	var b strings.Builder
-	for _, path := range paths {
-		v, _, ok := lookup(verbs, path)
-		if !ok {
-			continue
-		}
-		if len(v.Subs) > 0 {
-			for _, sub := range SortedKeys(v.Subs) {
-				b.WriteString(one(name, verbs, path+" "+sub))
-			}
-			continue
-		}
+	for _, path := range expand(verbs, paths) {
 		b.WriteString(one(name, verbs, path))
 	}
 	return b.String()
+}
+
+// expand is the verb paths a group really lists: a verb that has subcommands
+// stands for its subcommands, in name order, and a name that is no longer a
+// verb is dropped rather than printed as an empty line.
+//
+// It is a func of its own because the manual is not the only thing that lists
+// a group's verbs any more — the llms.txt lists the same ones — and a second
+// loop over Subs is how one of them comes to show a subcommand the other does
+// not.
+func expand(verbs map[string]Verb, paths []string) []string {
+	var out []string
+	for _, path := range paths {
+		v, _, ok := lookup(verbs, path)
+		switch {
+		case !ok:
+			continue
+		case len(v.Subs) == 0:
+			out = append(out, path)
+		default:
+			for _, sub := range SortedKeys(v.Subs) {
+				out = append(out, path+" "+sub)
+			}
+		}
+	}
+	return out
 }
 
 // one is a single verb as the manual shows it: its signature, then its line.

@@ -134,6 +134,15 @@ func request(method, url, id string, status int) *Request {
 	return &r
 }
 
+// at is a time as the shared shape reports it, which is UTC.
+//
+// The envelope is the part that unifies, and it was not unified here: Fly
+// sends an RFC 3339 time and it stayed UTC, Cloudflare sends milliseconds and
+// time.UnixMilli gives them the machine's own zone — so the same `dev logs
+// --json` answered in two different zones depending on which cloud it asked.
+// A reader comparing two apps has no way to see that from the output.
+func at(t time.Time) time.Time { return t.UTC() }
+
 // Who said a line: the application itself, or the platform running it.
 const (
 	FromApp      = "app"

@@ -38,6 +38,28 @@ type Writer struct {
 	// scoutly's missing-canonical both land on the same writer.
 	Fixes []string
 
+	// Needs are the artifacts this writer's own output asserts exist, by the
+	// file name that produces them.
+	//
+	// robots.txt ends with "Sitemap: <origin>/sitemap.xml" and llms.txt points
+	// at the same file — both are claims about a file another writer makes.
+	// Until this existed the claim was true only because the registry happened
+	// to list sitemap first, and `--only robots` wrote a robots.txt naming a
+	// sitemap that was never written, and reported pass. A chain held by the
+	// order of a slice literal is a chain nobody is holding.
+	//
+	// One declaration, three things read from it: the order writers run in,
+	// what a selection has to pull in with them, and a test that the graph is
+	// real and acyclic.
+	Needs []string
+
+	// Pages says this writer's subject is which pages exist, so it has
+	// something to answer for when nobody gave it a page list. Needs is about
+	// the artifacts a writer depends on; this is about the input it depends
+	// on, and they fail differently — a missing artifact is a broken chain, a
+	// missing page list is a file that is valid and wrong.
+	Pages bool
+
 	// Write returns the file's content and what it put in it, in the words
 	// that apply to that file: a sitemap counts URLs, a head fragment names
 	// the tags. The report has a column for it either way — a write that says
@@ -63,6 +85,10 @@ type Site struct {
 	Image  string
 	URLs   []string
 	Now    time.Time
+	// CSP is the Content-Security-Policy this site wants, when it has one.
+	// The only header with no safe default and exactly one right answer per
+	// site, so it is the one thing _headers takes rather than decides.
+	CSP string
 }
 
 var writers = []Writer{
@@ -70,6 +96,7 @@ var writers = []Writer{
 		Name:     "sitemap",
 		Provides: "sitemap.xml — the list of pages Google should fetch",
 		Produces: Artifact{Name: "sitemap.xml", Validate: validateSitemap},
+		Pages:    true,
 		Fixes:    []string{"sitemap-", "seo.sitemap.", "seo/sitemap", "SITEMAP"},
 		Write:    writeSitemap,
 	},
@@ -77,6 +104,8 @@ var writers = []Writer{
 		Name:     "llms",
 		Provides: "llms.txt — the site in the shape a language model reads it",
 		Produces: Artifact{Name: "llms.txt", Validate: validateLlms},
+		Needs:    []string{"sitemap.xml"},
+		Pages:    true,
 		Fixes:    []string{"llms-", "seo.llms."},
 		Write:    writeLlms,
 	},
@@ -84,6 +113,7 @@ var writers = []Writer{
 		Name:     "robots",
 		Provides: "robots.txt — what a crawler may fetch, and where the sitemap is",
 		Produces: Artifact{Name: "robots.txt", Validate: validateRobots},
+		Needs:    []string{"sitemap.xml"},
 		Fixes:    []string{"robots-", "seo.robots_txt.", "seo/robots", "blocked-by-robots"},
 		Write:    writeRobots,
 	},
@@ -121,6 +151,25 @@ var writers = []Writer{
 // writeSitemap emits a sitemaps.org urlset. The spec is small and the whole
 // of it is here: absolute locations, a lastmod in W3C date format, and a
 // priority the first URL wins.
+// onePage is the warning every writer built from the page list owes the
+// reader when there is no page list.
+//
+// sitemapURLs falls back to the single --url when --urls names no file, so a
+// sitemap and an llms.txt could be written for a whole site and list one
+// page, and the report said pass — the file was valid, and wrong. A writer
+// whose entire subject is which pages exist cannot be silent about having
+// been given none.
+func onePage(w Writer, s Site) []cli.Finding {
+	if !w.Pages || len(s.URLs) > 1 {
+		return nil
+	}
+	return []cli.Finding{{
+		Severity: cli.SevWarning, ID: "one-page", Where: w.Produces.Name,
+		Message: w.Produces.Name + " lists one page, because --url is all it was given",
+		Fix:     "pass --urls FILE, one page per line, when the site has more than one",
+	}}
+}
+
 func writeSitemap(s Site) (content, covered string, err error) {
 	type url struct {
 		Loc        string `xml:"loc"`
@@ -201,7 +250,7 @@ func writeHead(s Site) (content, covered string, err error) {
 // timing, the step, attributing findings to the writer — was written twice.
 func each(rep *cli.Report, pick *picked, do func(Writer) (found []cli.Finding, covered, path string, err error)) int {
 	ran := 0
-	for _, w := range writers {
+	for _, w := range ordered() {
 		if why := pick.skipped(w.Name); why != "" {
 			rep.NotRun(cli.Step{Name: w.Name, Provides: w.Provides}, why)
 			continue
@@ -245,7 +294,9 @@ func Write(c cli.Call, dir string, s Site, rep *cli.Report, pick *picked) error 
 			fmt.Fprintf(c.Stderr, "  wrote %-14s %s\n", w.Produces.Name, w.Provides)
 		}
 		found, _ := w.Produces.Validate(w.Produces.Name, content, s.Origin)
-		return found, covered, path, nil
+		// The validator reads the file and cannot know the page list was a
+		// fallback rather than the site, so the writer says it.
+		return append(found, onePage(w, s)...), covered, path, nil
 	})
 	return nil
 }
@@ -332,20 +383,29 @@ func fixedBy(id string) string {
 // The same Site the other four writers read, so a repo that can write a
 // sitemap can write this with no new input: the URLs are the pages, the title
 // and description are the site's own words.
+//
+// The shape is cli.LLMsDoc's, not this file's. A command on this stack writes
+// an llms.txt about itself — its verbs, from the one table its manual is
+// rendered from, which is a thing only the command knows — and that document
+// and this one are the same format about different subjects. Written out
+// twice, the two would disagree about the format the first time either was
+// edited; so the format is declared once and each side fills it in.
 func writeLlms(s Site) (content, covered string, err error) {
-	var b strings.Builder
-	fmt.Fprintf(&b, "# %s\n\n", cli.Or(s.Title, hostOf(s.Origin)))
-	if s.Desc != "" {
-		fmt.Fprintf(&b, "> %s\n\n", s.Desc)
+	doc := cli.LLMsDoc{
+		Title:   cli.Or(s.Title, hostOf(s.Origin)),
+		Summary: s.Desc,
+		Sections: []cli.LLMsSection{
+			{Name: "Pages", Links: cli.Map(s.URLs, func(u string) cli.LLMsLink {
+				return cli.LLMsLink{Text: pathOf(u), URL: u}
+			})},
+			// The sitemap is named rather than listed among the pages: a
+			// model that wants the whole list should be told where it is, not
+			// handed it twice.
+			{Name: "Optional", Links: []cli.LLMsLink{{Text: "sitemap.xml",
+				URL: s.Origin + "/sitemap.xml", Note: "every page, machine-readable"}}},
+		},
 	}
-	fmt.Fprintf(&b, "## Pages\n\n")
-	for _, u := range s.URLs {
-		fmt.Fprintf(&b, "- [%s](%s)\n", pathOf(u), u)
-	}
-	// Named rather than listed among the pages: a model that wants the whole
-	// list should be told where it is, not handed it twice.
-	fmt.Fprintf(&b, "\n## Optional\n\n- [sitemap.xml](%s/sitemap.xml): every page, machine-readable\n", s.Origin)
-	return b.String(), cli.Plural(len(s.URLs), "page") + " listed", nil
+	return doc.String(), cli.Plural(len(s.URLs), "page") + " listed", nil
 }
 
 // pathOf is what to call a URL in a list of links: the last part of its path,
@@ -364,4 +424,137 @@ func hostOf(origin string) string {
 		return parsed.Host
 	}
 	return origin
+}
+
+// producer is which writer makes an artifact, by the artifact's file name.
+// One map, because both the ordering and the selection ask the same question.
+func producer(name string) (Writer, bool) {
+	for _, w := range writers {
+		if w.Produces.Name == name {
+			return w, true
+		}
+	}
+	return Writer{}, false
+}
+
+// ordered is the writers in an order that respects Needs: nothing runs before
+// what it depends on.
+//
+// Derived rather than kept, because the registry literal's order was the only
+// thing making robots.txt's claim about sitemap.xml true, and a fact held by
+// where a line sits in a slice is one an edit breaks silently. Registry order
+// still decides between writers that do not depend on each other, so a report
+// reads the same way it always did.
+//
+// A cycle is a programming error and a test names it; here it is broken by
+// running the writer anyway, because a report that is wrong about one file
+// beats a command that hangs.
+func ordered() []Writer {
+	var out []Writer
+	done := map[string]bool{}
+	var add func(w Writer, seen map[string]bool)
+	add = func(w Writer, seen map[string]bool) {
+		if done[w.Name] || seen[w.Name] {
+			return
+		}
+		seen[w.Name] = true
+		for _, need := range w.Needs {
+			if dep, ok := producer(need); ok {
+				add(dep, seen)
+			}
+		}
+		done[w.Name] = true
+		out = append(out, w)
+	}
+	for _, w := range writers {
+		add(w, map[string]bool{})
+	}
+	return out
+}
+
+// chain adds to --only whatever the chosen writers depend on, so choosing a
+// writer chooses the ones its output is about.
+//
+// `--only llms` asked for a file whose whole content is a claim about
+// sitemap.xml; writing it alone produced an index pointing at a file that did
+// not exist, and called it pass. Pulling the dependency in is what the person
+// meant — they named the artifact they wanted, not the set of files they were
+// willing to have written.
+//
+// --skip is the one place this refuses instead. Naming a writer in --only and
+// its dependency in --skip is asking for both halves of a contradiction, and
+// quietly honouring either one is worse than saying so.
+func chain(c cli.Call, p *picked) error {
+	if p == nil || len(p.only) == 0 {
+		return nil
+	}
+	for again := true; again; {
+		again = false
+		for _, w := range ordered() {
+			if !p.only[w.Name] {
+				continue
+			}
+			for _, need := range w.Needs {
+				dep, ok := producer(need)
+				switch {
+				case !ok:
+					continue
+				case p.skip[dep.Name]:
+					return c.Usagef("--only %s wants %s, and only %s writes it — but --skip excludes %s",
+						w.Name, need, dep.Name, dep.Name)
+				case !p.only[dep.Name]:
+					p.only[dep.Name] = true
+					p.pulled = append(p.pulled, dep.Name+", which "+w.Name+" needs for "+need)
+					again = true
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// repair writes the files that resolve what the checkers found.
+//
+// `check` already knew how — every finding carries FixedBy, the writer whose
+// artifact resolves it — and stopped at telling you, printing the `dev seo
+// write` line to run next. That is a loop a person closes by hand, and a loop
+// a person closes by hand is one that stops being closed: the report named
+// five fixable findings on this repo's own site and they stayed there.
+//
+// So it closes itself. The findings choose the writers, the chain pulls in
+// what those writers depend on, and the files land in the directory the site
+// is built from — deploy again and the next check is against what was fixed.
+// Nothing here decides what is wrong; the checkers did that, and this only
+// acts on it.
+//
+// Only what was found, deliberately. Writing every artifact would overwrite a
+// file somebody edited to answer a finding that is no longer there, and the
+// whole value of a fix that reads a report is that it touches what the report
+// is about.
+func repair(c cli.Call, rep *cli.Report) error {
+	dir := c.Value("fix")
+	if dir == "" {
+		return nil
+	}
+	wanted := cli.Unique(cli.Collect(rep.Findings, func(f cli.Finding) (string, bool) {
+		return f.FixedBy, f.FixedBy != ""
+	}))
+	if len(wanted) == 0 {
+		fmt.Fprintf(c.Stderr, "nothing found that writing a file would fix\n")
+		return nil
+	}
+	pick := &picked{only: cli.ToSet(wanted), skip: map[string]bool{}}
+	if err := chain(c, pick); err != nil {
+		return err
+	}
+	for _, why := range pick.pulled {
+		fmt.Fprintf(c.Stderr, "also writing %s\n", why)
+	}
+	url := rep.Target
+	urls, err := sitemapURLs(c, url)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(c.Stderr, "fixing %s in %s\n", cli.English(wanted), dir)
+	return Write(c, dir, site(c, url, urls), rep, pick)
 }

@@ -49,7 +49,13 @@ const (
 
 // run runs a tool in dir. Progress and the tool's own output go to stderr:
 // stdout is for data, and a task that depends on a build may be piped.
-func run(out io.Writer, dir string, env []string, name string, args ...string) error {
+//
+// So it takes no writer, and for a while it took one it never used — an
+// io.Writer threaded down from the verb through four callers, past a comment
+// saying everything goes to stderr, and written to by nothing. A parameter
+// the body never touches is a signature promising what the code does not do;
+// `mise run unread` is what says so now.
+func run(dir string, env []string, name string, args ...string) error {
 	fmt.Fprintf(os.Stderr, "$ %s %s\n", name, strings.Join(args, " "))
 	// Stdout to stderr on purpose: a build's output is progress, and stdout
 	// belongs to whatever the task piping this is building.
@@ -58,11 +64,11 @@ func run(out io.Writer, dir string, env []string, name string, args ...string) e
 
 // generate runs the gsx code generator when the directory has gsx sources.
 // Both build paths need it and both had written the same four lines.
-func generate(out io.Writer, d Dir) error {
+func generate(d Dir) error {
 	if !d.GSX {
 		return nil
 	}
-	return run(out, d.Path, nil, GoBin, "tool", "gsx", "generate", "-q")
+	return run(d.Path, nil, GoBin, "tool", "gsx", "generate", "-q")
 }
 
 // worker refuses a directory that is not one, in the words both verbs that
@@ -78,51 +84,57 @@ func (d Dir) worker() error {
 // then go build to .bin/<dir>. With asWorker it builds the Worker's wasm for
 // env instead: the environment's main names the output directory, and one
 // under build/tinygo is built with TinyGo, any other with Go.
-func Build(out io.Writer, path string, asWorker bool, env string) error {
+//
+// It takes no writer, unlike Check below, and the difference is real rather
+// than an oversight: a build produces no data, only progress, and progress
+// goes to stderr so that a task piping a build's stdout gets nothing from it.
+// Check does write — a smoke round trip and a browser probe both report — so
+// it takes the verb's stdout and this does not.
+func Build(path string, asWorker bool, env string) error {
 	d, err := Inspect(path)
 	if err != nil {
 		return err
 	}
 	if asWorker {
-		return buildWorker(out, d, env)
+		return buildWorker(d, env)
 	}
 	if d.WasmOnly {
 		return fmt.Errorf("%s builds only a Worker; build it with --worker", d.Path)
 	}
 	if d.NPM {
 		if stale(filepath.Join(d.Path, "package-lock.json"), filepath.Join(d.Path, "node_modules", ".package-lock.json")) {
-			if err := run(out, d.Path, nil, NpmBin, "ci"); err != nil {
+			if err := run(d.Path, nil, NpmBin, "ci"); err != nil {
 				return err
 			}
 		}
-		if err := run(out, d.Path, nil, NpmBin, "run", "build"); err != nil {
+		if err := run(d.Path, nil, NpmBin, "run", "build"); err != nil {
 			return err
 		}
 	}
-	if err := generate(out, d); err != nil {
+	if err := generate(d); err != nil {
 		return err
 	}
 	if err := cli.Ignore(d.Root, BinDir); err != nil {
 		return err
 	}
 	bin := filepath.Join(d.Root, BinDir, d.Name)
-	if err := run(out, d.Path, nil, GoBin, "build", "-o", bin, "."); err != nil {
+	if err := run(d.Path, nil, GoBin, "build", "-o", bin, "."); err != nil {
 		return err
 	}
 	if d.CLI {
 		// A verb-table command writes its own manual. Building it rewrites
 		// every copy, so a changed verb reaches this repo's agents with no
 		// step taken; go test holds them when nothing built.
-		return run(out, d.Root, nil, bin, "skill")
+		return run(d.Root, nil, bin, "skill")
 	}
 	return nil
 }
 
-func buildWorker(out io.Writer, d Dir, env string) error {
+func buildWorker(d Dir, env string) error {
 	if err := d.worker(); err != nil {
 		return err
 	}
-	if err := generate(out, d); err != nil {
+	if err := generate(d); err != nil {
 		return err
 	}
 	var err error
@@ -136,14 +148,14 @@ func buildWorker(out io.Writer, d Dir, env string) error {
 		if filepath.Base(outDir) == "tinygo" {
 			mode = "tinygo"
 		}
-		if err := run(out, d.Path, nil, GoBin, "run", "github.com/syumai/workers-go/cmd/workers-assets-gen", "-mode="+mode, "-o", outDir); err != nil {
+		if err := run(d.Path, nil, GoBin, "run", "github.com/syumai/workers-go/cmd/workers-assets-gen", "-mode="+mode, "-o", outDir); err != nil {
 			return err
 		}
 		wasm := filepath.Join(outDir, "app.wasm")
 		if mode == "tinygo" {
-			err = run(out, d.Path, nil, TinyGoBin, "build", "-o", wasm, "-target", "wasm", "-no-debug", ".")
+			err = run(d.Path, nil, TinyGoBin, "build", "-o", wasm, "-target", "wasm", "-no-debug", ".")
 		} else {
-			err = run(out, d.Path, goEnv, GoBin, "build", "-o", wasm, ".")
+			err = run(d.Path, goEnv, GoBin, "build", "-o", wasm, ".")
 		}
 		if err != nil {
 			return err
@@ -196,22 +208,22 @@ func Check(out io.Writer, path, reqPath, expect string) error {
 		return err
 	}
 	if d.GSX {
-		if err := run(out, d.Path, nil, GoBin, "tool", "gsx", "fmt", "-l", "."); err != nil {
+		if err := run(d.Path, nil, GoBin, "tool", "gsx", "fmt", "-l", "."); err != nil {
 			return fmt.Errorf("unformatted .gsx above; fix with: go tool gsx fmt -w %s", d.Path)
 		}
 	}
 	// A directory with a Worker has a wasm target; one with a native main has
 	// that too. Vet every target it has, test where tests can run.
 	if !d.WasmOnly {
-		if err := run(out, d.Path, nil, GoBin, "vet", "./..."); err != nil {
+		if err := run(d.Path, nil, GoBin, "vet", "./..."); err != nil {
 			return err
 		}
-		if err := run(out, d.Path, nil, GoBin, "test", "./..."); err != nil {
+		if err := run(d.Path, nil, GoBin, "test", "./..."); err != nil {
 			return err
 		}
 	}
 	if d.WasmOnly || d.Wrangler {
-		if err := run(out, d.Path, []string{GoOSEnv + "=js", GoArchEnv + "=wasm"}, GoBin, "vet", "./..."); err != nil {
+		if err := run(d.Path, []string{GoOSEnv + "=js", GoArchEnv + "=wasm"}, GoBin, "vet", "./..."); err != nil {
 			return err
 		}
 	}

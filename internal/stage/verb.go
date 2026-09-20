@@ -32,8 +32,8 @@ func CheckFlags(fs *flag.FlagSet) {
 // and its Flags — so none of them opens with a FlagSet, a DirAnd and an error
 // check the way all five used to.
 
-func BuildVerb(c cli.Call) error   { return Build(c.Stdout, c.Dir, false, "") }
-func WasmVerb(c cli.Call) error    { return Build(c.Stdout, c.Dir, true, c.Value("env")) }
+func BuildVerb(c cli.Call) error   { return Build(c.Dir, false, "") }
+func WasmVerb(c cli.Call) error    { return Build(c.Dir, true, c.Value("env")) }
 func RunVerb(c cli.Call) error     { return Exec(c.Dir, false, "", c.Args) }
 func WorkerdVerb(c cli.Call) error { return Exec(c.Dir, true, c.Value("env"), c.Args) }
 

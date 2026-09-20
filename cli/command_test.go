@@ -232,7 +232,8 @@ func TestVersionPinNeedsBoth(t *testing.T) {
 	}
 }
 
-// The unification of the two surfaces is held by cli.CheckSurfaces, which
-// every command on the stack calls from its own main_test.go rather than only
-// this package testing its own synthetic command.
-func TestBothSurfacesShowTheSameVerbs(t *testing.T) { CheckSurfaces(t, testCommand()) }
+// The unification of the surfaces — the terminal index, the skill and the
+// llms.txt — is held by cli.CheckSurfaces, which every command on the stack
+// calls from its own main_test.go rather than only this package testing its
+// own synthetic command.
+func TestEverySurfaceShowsTheSameVerbs(t *testing.T) { CheckSurfaces(t, testCommand()) }

@@ -5,6 +5,9 @@
 // thing that catches people out here. flyctl prints pretty-printed JSON
 // objects one after another, not one per line, so every line-based reader
 // finds nothing but fragments and reports no logs at all.
+//
+// The shape is real and the app's name in it is not: it named a repo on this
+// stack, and nothing here is allowed to know about one.
 package fly
 
 import (

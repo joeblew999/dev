@@ -1,0 +1,24 @@
+# The site dev serves about itself, from the manuals this repo already ships.
+#
+# Assets only: there is no Worker script, because every page is written at
+# build time by `mise run site:build` and nothing has to run per request.
+# Cloudflare serves them from its edge for no invocation and no cold start.
+name = "dev-docs"
+
+# Pins runtime behaviour to this day. Move it forward deliberately, on a day
+# you can test; leaving it still is the safe state.
+compatibility_date = "2026-09-20"
+
+# What `mise run site:build` writes: the rendered manuals, and the four files
+# `dev seo write` produces beside them.
+[assets]
+directory = "./public"
+not_found_handling = "404-page"
+
+# A Worker without this is a black box: when an intermittent error appears,
+# the data has to already be being collected.
+[observability]
+  enabled = true
+  [observability.logs]
+    head_sampling_rate = 1
+    invocation_logs = true

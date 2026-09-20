@@ -121,9 +121,6 @@ func TestErrorsNameTheirFix(t *testing.T) {
 	if _, err := App(dir); err == nil || !strings.Contains(err.Error(), `app = "<name>"`) {
 		t.Errorf("no app: %v; want the line to add", err)
 	}
-	if err := NoEnv(dir, "staging"); err == nil || !strings.Contains(err.Error(), "second directory") {
-		t.Errorf("--env on Fly: %v; want the way to have two apps", err)
-	}
 }
 
 func TestDestroyAsksThenRunsFlyctl(t *testing.T) {

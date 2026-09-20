@@ -30,5 +30,5 @@ func PutSecret(dir, env, name, value string) error {
 	if err != nil {
 		return err
 	}
-	return fnox.Exec(dir, strings.NewReader(value), io.Discard, "wrangler", "secret", "put", name, "--env", env, "--name", target)
+	return fnox.Exec(dir, strings.NewReader(value), io.Discard, WranglerBin, "secret", "put", name, "--env", env, "--name", target)
 }

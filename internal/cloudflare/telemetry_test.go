@@ -7,6 +7,11 @@
 // every event came back with the right time and an empty message — which
 // reads as a Worker that logged nothing, and is the worst kind of wrong,
 // because it looks like an answer.
+//
+// The shape is real and the identities in it are not: the account, the
+// Worker's name and the visitor's address were replaced. A fixture is kept
+// for what Cloudflare's answer looks like, and a test that knows whose
+// account it came from is a test that only holds for that account.
 package cloudflare
 
 import (
@@ -130,7 +135,7 @@ func TestTheRequestIsReadAndTheHeadersAreLeftWhereTheyAre(t *testing.T) {
 		if e.Method != "GET" {
 			t.Errorf("method = %q; the fixture is a GET", e.Method)
 		}
-		if !strings.Contains(e.URL, "dev-probe-worker") {
+		if !strings.Contains(e.URL, "workers.dev") {
 			t.Errorf("url = %q", e.URL)
 		}
 		// A line the Worker logged carries the request it was serving and no

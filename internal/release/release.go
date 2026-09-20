@@ -16,6 +16,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -272,7 +273,17 @@ func snapshotVersion(describe string) (version, tag string) {
 // registers how to put it back, and they are put back in reverse on the way
 // out — until the release is actually published, after which there is
 // nothing to undo and the error says what is there.
-func (r *release) publish(version string) (err error) {
+//
+// stdout is the verb's, threaded in rather than reached for: the one line
+// this prints — the URL of the release that now exists — is the verb's
+// result, and everything else here is progress on stderr. It was the only
+// fmt.Printf left in the tree, which meant `dev release` was the one verb
+// whose answer a test could not capture and a caller could not redirect.
+// TestOnlyTheCallsStdoutIsWrittenTo holds that now.
+//
+// Not named out: that is already the package's "run this and give me what it
+// said", and two lines below here call it.
+func (r *release) publish(stdout io.Writer, version string) (err error) {
 	defer r.cleanup()
 	var undo rollback
 	defer func() {
@@ -366,7 +377,7 @@ func (r *release) publish(version string) (err error) {
 			return err
 		}
 	}
-	fmt.Printf("published %s %s: https://github.com/%s/releases/tag/%s\n", r.name, tag, r.slug, tag)
+	fmt.Fprintf(stdout, "published %s %s: https://github.com/%s/releases/tag/%s\n", r.name, tag, r.slug, tag)
 	return nil
 }
 

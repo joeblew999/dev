@@ -271,6 +271,13 @@ and green first.
   in this tree until staticcheck was added to the gate.
 - **`mise run dead` is a report, not a gate.** Dead code is normal mid-refactor;
   the point is to see what a change left behind, not to fail on it.
+- **`mise run smells` is all four of them**, and they are all reports: `dead`,
+  `dup`, `unread` (a parameter the body never touches — a signature promising
+  what the code does not do) and `repeated` (one fact spelled out in three
+  files). None of them fails a build and none is in `hk.pkl`, so read them
+  after a refactor rather than running them to green. About half of what the
+  last two say is fine as written; reading past that half is the price of the
+  other one.
 
 
 ## Layout

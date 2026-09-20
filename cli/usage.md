@@ -1,6 +1,27 @@
 ### The tool itself
 
-Every command built on this verb system gets these two without writing them.
+Every command built on this verb system gets these without writing them.
+
+### Describing the command to a model
+
+`llms` is this command as an llms.txt, the file llmstxt.org asks a site to
+serve at its root: the command's name, the one line its manual's frontmatter
+already says about it, then every verb under the heading of the group it
+belongs to, each with what it is for and a link to the manual that explains
+it. It is rendered from the verb table, the same one `skill` renders and the
+same one the index prints, so a verb cannot reach one of them and not the
+others.
+
+`--origin` is the site the manual is published on, which makes those links
+absolute; without it they are the repo-relative paths `skill` writes, which is
+what a reader has to go on before anything is published. A directory writes
+the file into it, because the convention reads it from the root of a site and
+nowhere else; with no directory it goes to stdout, where a build can pipe it.
+
+Write this rather than an llms.txt generated from a list of pages when the
+site documents a command. The two answer different questions — what the
+command does, against what pages exist — and only the command can answer the
+first about itself.
 
 ### Tools
 

@@ -203,15 +203,24 @@ func helpPath(verb string, rest []string) string {
 	return path.String()
 }
 
-// all is the table plus the two verbs every command has.
+// all is the table plus the verbs every command has without declaring them.
+//
+// They are a table of their own rather than assignments, so how many there
+// are is counted where they are written: the line that sized the map said
+// two long after there were four, which is the same fact in two places doing
+// what that always does.
 func (c Command) all() map[string]Verb {
-	m := make(map[string]Verb, len(c.Verbs)+2)
-	maps.Copy(m, c.Verbs)
 	own := c.ownUsage()
-	m["skill"] = Verb{Run: c.skill, Flags: checkFlag, Desc: "rewrite the manual from the verbs, in all three places it is read", Usage: own}
-	m["skills"] = Verb{Run: c.skills, Flags: JSONFlags, Desc: "list what every agent in this repo can read, and where each came from", Usage: own}
-	m["version"] = Verb{Run: c.version, Flags: pinFlag, Desc: "print the version, or with --pin the line that installs this build", Usage: own}
-	m["tools"] = Verb{Run: c.tools, Flags: ToolsFlags, Desc: "every program this command may run, the mise line that installs it, and whether it is here", Usage: own}
+	builtin := map[string]Verb{
+		"skill":   {Run: c.skill, Flags: checkFlag, Desc: "rewrite the manual from the verbs, in all three places it is read", Usage: own},
+		"skills":  {Run: c.skills, Flags: JSONFlags, Desc: "list what every agent in this repo can read, and where each came from", Usage: own},
+		"llms":    {Run: c.llms, Args: "[DIR]", Flags: llmsFlags, Desc: "describe this command for a language model, as the llms.txt a docs site serves", Usage: own},
+		"version": {Run: c.version, Flags: pinFlag, Desc: "print the version, or with --pin the line that installs this build", Usage: own},
+		"tools":   {Run: c.tools, Flags: ToolsFlags, Desc: "every program this command may run, the mise line that installs it, and whether it is here", Usage: own},
+	}
+	m := make(map[string]Verb, len(c.Verbs)+len(builtin))
+	maps.Copy(m, c.Verbs)
+	maps.Copy(m, builtin)
 	return m
 }
 

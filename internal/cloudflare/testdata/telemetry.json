@@ -6,13 +6,13 @@
     "timestamp": 1789878480242,
     "source": {
      "level": "info",
-     "message": "GET https://dev-probe-worker.gedw99.workers.dev/"
+     "message": "GET https://probe.someone.workers.dev/"
     },
     "$metadata": {
      "type": "cf-worker-event",
      "requestId": "64bc15a885d40d5d8f9222ebe93ce18a",
      "trigger": "GET /",
-     "service": "dev-probe-worker"
+     "service": "probe"
     },
     "$workers": {
      "eventType": "fetch",
@@ -24,18 +24,18 @@
        "headers": {
         "accept": "*/*",
         "accept-encoding": "gzip, br",
-        "cf-connecting-ip": "2405:9800:b540:d5a:3074:e68c:f256:75e3",
+        "cf-connecting-ip": "2001:db8::1",
         "cf-ipcountry": "TH",
         "cf-ray": "a3de14b51f187b3e",
         "cf-visitor": "{\"scheme\":\"https\"}",
         "connection": "Keep-Alive",
-        "host": "dev-probe-worker.gedw99.workers.dev",
+        "host": "probe.someone.workers.dev",
         "user-agent": "curl/8.7.1",
         "x-forwarded-proto": "https",
-        "x-real-ip": "2405:9800:b540:d5a:3074:e68c:f256:75e3"
+        "x-real-ip": "2001:db8::1"
        },
        "method": "GET",
-       "url": "https://dev-probe-worker.gedw99.workers.dev/"
+       "url": "https://probe.someone.workers.dev/"
       },
       "response": {
        "status": 200
@@ -52,7 +52,7 @@
      "type": "cf-worker",
      "requestId": "64bc15a885d40d5d8f9222ebe93ce18a",
      "trigger": "GET /",
-     "service": "dev-probe-worker"
+     "service": "probe"
     },
     "$workers": {
      "eventType": "fetch",
@@ -62,7 +62,7 @@
      "event": {
       "request": {
        "method": "GET",
-       "url": "https://dev-probe-worker.gedw99.workers.dev/",
+       "url": "https://probe.someone.workers.dev/",
        "path": "/"
       },
       "response": null
@@ -73,13 +73,13 @@
     "timestamp": 1789878480119,
     "source": {
      "level": "info",
-     "message": "GET https://dev-probe-worker.gedw99.workers.dev/"
+     "message": "GET https://probe.someone.workers.dev/"
     },
     "$metadata": {
      "type": "cf-worker-event",
      "requestId": "fdd3a96a01ac60dfe10bb5322ea281fd",
      "trigger": "GET /",
-     "service": "dev-probe-worker"
+     "service": "probe"
     },
     "$workers": {
      "eventType": "fetch",
@@ -91,18 +91,18 @@
        "headers": {
         "accept": "*/*",
         "accept-encoding": "gzip, br",
-        "cf-connecting-ip": "2405:9800:b540:d5a:3074:e68c:f256:75e3",
+        "cf-connecting-ip": "2001:db8::1",
         "cf-ipcountry": "TH",
         "cf-ray": "a3de14b49e42f926",
         "cf-visitor": "{\"scheme\":\"https\"}",
         "connection": "Keep-Alive",
-        "host": "dev-probe-worker.gedw99.workers.dev",
+        "host": "probe.someone.workers.dev",
         "user-agent": "curl/8.7.1",
         "x-forwarded-proto": "https",
-        "x-real-ip": "2405:9800:b540:d5a:3074:e68c:f256:75e3"
+        "x-real-ip": "2001:db8::1"
        },
        "method": "GET",
-       "url": "https://dev-probe-worker.gedw99.workers.dev/"
+       "url": "https://probe.someone.workers.dev/"
       },
       "response": {
        "status": 200
@@ -119,7 +119,7 @@
      "type": "cf-worker",
      "requestId": "fdd3a96a01ac60dfe10bb5322ea281fd",
      "trigger": "GET /",
-     "service": "dev-probe-worker"
+     "service": "probe"
     },
     "$workers": {
      "eventType": "fetch",
@@ -129,7 +129,7 @@
      "event": {
       "request": {
        "method": "GET",
-       "url": "https://dev-probe-worker.gedw99.workers.dev/",
+       "url": "https://probe.someone.workers.dev/",
        "path": "/"
       },
       "response": null

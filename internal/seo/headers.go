@@ -40,13 +40,25 @@ func writeHeaders(s Site) (content, covered string, err error) {
 	for _, h := range headers {
 		b.WriteString("  " + h.name + ": " + h.value + "\n")
 	}
-	b.WriteString("\n# Not written, and not an oversight: a Content-Security-Policy\n")
-	b.WriteString("# describes one site's own sources, so a default would either\n")
-	b.WriteString("# allow everything and mean nothing, or break the page in the\n")
-	b.WriteString("# browser where no check here would see it. Write yours:\n")
-	b.WriteString("#   Content-Security-Policy: default-src 'self'; ...\n")
-	b.WriteString("# " + checkers.DocEssentials + "\n")
-	return b.String(), cli.Plural(len(headers), "header") + ", CSP left to you", nil
+	covered = cli.Plural(len(headers), "header")
+	// The fifth has no safe default and one right answer per site, so it is
+	// written when it is given and explained when it is not. Two checkers
+	// report it missing, and until --csp existed the only thing a reader
+	// could do with that finding was edit the file this verb had just
+	// written — which the next write would overwrite.
+	if s.CSP != "" {
+		b.WriteString("  Content-Security-Policy: " + s.CSP + "\n")
+		covered += ", CSP as given"
+	} else {
+		b.WriteString("\n# Not written, because none was given: a Content-Security-Policy\n")
+		b.WriteString("# describes one site's own sources, so a default would either\n")
+		b.WriteString("# allow everything and mean nothing, or break the page in the\n")
+		b.WriteString("# browser where no check here would see it. Pass yours:\n")
+		b.WriteString("#   dev seo write . --csp \"default-src 'self'\"\n")
+		b.WriteString("# " + checkers.DocEssentials + "\n")
+		covered += ", CSP left to you"
+	}
+	return b.String(), covered, nil
 }
 
 // validateHeaders reads them back. Presence, not policy: whether a value is

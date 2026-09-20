@@ -280,12 +280,42 @@ A skill a command ships through `Skills` travels the second way: it is a
 `skills/<name>/` directory like any other, so the release carries it and a
 consumer gets it on a pin bump. That is how this manual reaches you.
 
-## The two tests
+## Describing the command to a model
+
+One declaration reaches three readers. `<cmd> --help` prints the index a
+developer reads, `<cmd> skill` writes the manual an agent reads, and
+`<cmd> llms` writes the llms.txt a model reads when it lands on the docs site
+— all from the verb table, so none of them can carry a verb the others do not.
 
 ```go
-func TestSkill(t *testing.T)  { cli.CheckSkill(t, app) }
+doc := app.LLMs("https://example.com")  // an LLMsDoc
+fmt.Print(doc)                          // llmstxt.org's markdown
+```
+
+The file is llmstxt.org's shape: an H1 naming the command, the one line its
+`Skill` frontmatter already says about it as a `>` summary, then an H2 per
+group — named by that group's own heading — listing every verb with its
+signature, its `Desc` and a link to the manual. A last section, headed
+Manuals, names the manual itself and every skill the command ships through
+`Skills`.
+
+`--origin` is the site the manual is published on, so the links are absolute;
+without it they are the repo-relative paths `skill` writes. With a directory
+the verb writes `LLMsFile` into it, because the convention reads that file
+from the root of a site and nowhere else; with none it goes to stdout.
+
+`LLMsDoc`, `LLMsSection` and `LLMsLink` are the format itself, exported
+because a command that writes an llms.txt about something other than itself —
+a site, from a list of pages — should fill in the same shape rather than spell
+the format out a second time.
+
+## The tests
+
+```go
+func TestSkill(t *testing.T)      { cli.CheckSkill(t, app) }
 func TestUsage(t *testing.T)      { cli.CheckUsage(t, app) }
 func TestDescribed(t *testing.T)  { cli.CheckDescribed(t, app) }
+func TestSurfaces(t *testing.T)   { cli.CheckSurfaces(t, app) }
 ```
 
 - `CheckSkill` fails when any copy of the manual differs from what the verbs
@@ -294,6 +324,9 @@ func TestDescribed(t *testing.T)  { cli.CheckDescribed(t, app) }
   cannot read, or leaves a `<placeholder>` outside inline code.
 - `CheckDescribed` fails when a verb has no `Desc`, and when a `usage.md`
   lists verbs instead of explaining them.
+- `CheckSurfaces` fails when a verb reaches the index, the manual or the
+  llms.txt and not the other two, so a verb cannot exist for a developer and
+  not for an agent, or for an agent and not for a model.
 
 ## Seeing what an agent can read
 
