@@ -64,6 +64,9 @@ func TestEveryCloudIsWholeSoAddingOneIsOneEdit(t *testing.T) {
 		t.Fatal("no clouds, so the dispatch answers nothing")
 	}
 	for name, c := range clouds {
+		if c.ConfigFile == "" {
+			t.Errorf("cloud %q names no config file, so Target can never choose it", name)
+		}
 		for what, missing := range map[string]bool{
 			"URL":       c.URL == nil,
 			"Deployed":  c.Deployed == nil,
@@ -117,5 +120,45 @@ func TestAnIgnoredFlagIsRefusedWithAReason(t *testing.T) {
 	// And Cloudflare acts on both, so it must not refuse them.
 	if cf := clouds["cloudflare"]; len(cf.Ignores) > 0 {
 		t.Errorf("cloudflare refuses %v; it is the cloud these flags are for", cli.SortedKeys(cf.Ignores))
+	}
+}
+
+// The config file that names a target is the registry's, not something Target
+// spells out for itself. It used to name both files in one expression, so a
+// third cloud was an entry in clouds and an edit in Target — and the edit is
+// the one nobody would think to make, because everything else about adding a
+// cloud happens in the one place.
+func TestTargetChoosesByTheRegistrysConfigFiles(t *testing.T) {
+	for name, c := range clouds {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, c.ConfigFile), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		got, err := Target(dir)
+		if err != nil || got != name {
+			t.Errorf("a directory holding %s resolved to %q (%v); want %q", c.ConfigFile, got, err, name)
+		}
+	}
+	// Every config file is named when there is none, so a reader is told what
+	// would make the directory deployable rather than only that it is not.
+	empty := t.TempDir()
+	_, err := Target(empty)
+	if err == nil {
+		t.Fatal("an empty directory resolved to a cloud")
+	}
+	for _, file := range configFiles() {
+		if !strings.Contains(err.Error(), file) {
+			t.Errorf("the error does not mention %s: %v", file, err)
+		}
+	}
+	// Two is refused, and says which two.
+	both := t.TempDir()
+	for _, c := range clouds {
+		if err := os.WriteFile(filepath.Join(both, c.ConfigFile), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := Target(both); err == nil || !strings.Contains(err.Error(), "one cloud") {
+		t.Errorf("a directory holding every config gave %v", err)
 	}
 }

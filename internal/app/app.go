@@ -128,6 +128,13 @@ func WaitVerb(c cli.Call) error {
 // said the same thing in two wordings: print the URL, deploy then wait, hand
 // the rest straight on. A verb's meaning now lives where the verb does.
 type cloud struct {
+	// ConfigFile is the file whose presence in a directory names this target.
+	// It is here rather than read straight from the two packages because
+	// Target used to name both of them in one expression, so a third cloud
+	// was an entry here and an edit there — and the edit there is the one
+	// nobody would think to make.
+	ConfigFile string
+
 	// Ignores are the flags this target cannot act on, and why in words a
 	// person can use. A flag a target does nothing with is refused rather
 	// than accepted: --env was refused for Fly and --refresh was not, so one
@@ -155,6 +162,7 @@ type cloud struct {
 // clouds is every target, by the name Target answers with.
 var clouds = map[string]cloud{
 	"cloudflare": {
+		ConfigFile: cloudflare.ConfigFile,
 		URL: func(c cli.Call) (string, error) {
 			return cloudflare.URL(c.Dir, c.Value("env"), c.Given("deployed"), c.Value("local"), c.Given("refresh"))
 		},
@@ -174,6 +182,7 @@ var clouds = map[string]cloud{
 		PutSecret: cloudflare.PutSecret,
 	},
 	"fly": {
+		ConfigFile: fly.ConfigFile,
 		Ignores: map[string]string{
 			"env":     "a Fly app has no environments: fly.toml deploys one app, and a second app is a second directory",
 			"refresh": "--refresh re-asks the Workers API for a workers.dev name; a Fly app's address is its app name and is already exact",
@@ -266,19 +275,30 @@ func to(c cli.Call, verb string) error {
 // Target names the cloud dir deploys to, "cloudflare" or "fly", from the
 // config file it holds.
 func Target(dir string) (string, error) {
-	cf, fl := exists(filepath.Join(dir, cloudflare.ConfigFile)), exists(filepath.Join(dir, fly.ConfigFile))
-	switch {
-	case cf && fl:
-		return "", fmt.Errorf("%s has both wrangler.toml and fly.toml; a directory deploys to one cloud, so split it in two", dir)
-	case cf:
-		return "cloudflare", nil
-	case fl:
-		return "fly", nil
+	var found []string
+	for _, name := range cli.SortedKeys(clouds) {
+		if exists(filepath.Join(dir, clouds[name].ConfigFile)) {
+			found = append(found, name)
+		}
 	}
-	if st, err := os.Stat(dir); err != nil || !st.IsDir() {
-		return "", fmt.Errorf("%s is not a directory", dir)
+	switch len(found) {
+	case 1:
+		return found[0], nil
+	case 0:
+		if st, err := os.Stat(dir); err != nil || !st.IsDir() {
+			return "", fmt.Errorf("%s is not a directory", dir)
+		}
+		return "", fmt.Errorf("%s has no %s, so nothing deploys it; add one beside its main.go",
+			dir, cli.English(configFiles()))
 	}
-	return "", fmt.Errorf("%s has no wrangler.toml or fly.toml, so nothing deploys it; add one beside its main.go", dir)
+	return "", fmt.Errorf("%s has %s; a directory deploys to one cloud, so split it in two",
+		dir, cli.English(cli.Map(found, func(name string) string { return clouds[name].ConfigFile })))
+}
+
+// configFiles is what a deployable directory may hold, for a message that has
+// to list them.
+func configFiles() []string {
+	return cli.Sorted(cli.Map(cli.SortedKeys(clouds), func(name string) string { return clouds[name].ConfigFile }))
 }
 
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
