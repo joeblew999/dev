@@ -211,6 +211,36 @@ This file says only what is about developing the tool itself.
   about what `flyctl` says and which stream it says it on, and once about an
   empty list meaning a thing was absent.
 
+## DRY and generics, without being asked
+
+This is the standing instruction, not a preference to be reminded of. After
+any change, look for what it duplicated and collapse it — and do the same for
+what was already there beside it.
+
+- **A fact belongs in one place.** Two spellings of one fact drift the day
+  either is edited: a tool's mise pin written as both a spec and a TOML line,
+  a verb's subcommands listed in Subs and again in a switch, a manual's verbs
+  rendered twice. Derive the second from the first or delete it.
+- **Three of a shape is a generic.** Not two — two is a coincidence. Four
+  reports in this tree built a step by hand: start a clock, call the thing,
+  stop the clock, fill a Step, record it. The fifth line varied only by being
+  forgotten, which is what duplication actually costs.
+- **Generic methods exist.** Go 1.27 allows a type parameter on a method, so
+  `res.JSON[T]("what")` rather than a package function taking the receiver.
+  When a feature seems too new, `go doc` it rather than trusting memory.
+- **Generics for the shape, functions for the work.** `Map`, `Filter`,
+  `Collect`, `Sorted`, `Parallel`, `Gather` describe shapes. What runs inside
+  them is ordinary code.
+- **The pair keeps recurring: reconcile and establish.** `session sync` and
+  `session remove`, `front` and `unfront`, `tools --add` and `--fresh`. One
+  moves toward a declared state, the other makes it. When writing the first,
+  ask what the second is.
+- **A registry is one declaration everything else reads.** Adding a cloud, a
+  checker, a writer or a tool is adding one entry — and a test holds that by
+  failing when something reads around it. `Target` chose by naming both config
+  files itself, so a third cloud was an entry plus an edit nobody would think
+  to make.
+
 ## Refactoring without breaking it
 
 Three times in one day a refactor here was done by editing Go as text — a
