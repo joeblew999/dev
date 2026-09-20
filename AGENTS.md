@@ -116,12 +116,19 @@ This file says only what is about developing the tool itself.
   how many modules: it is the difference between a tool dev runs and code dev
   becomes.
 
-  So the API half stays hand-rolled. It is 256 lines and one generic sender
-  for six endpoints, and the cost of that is naming fields correctly — which
-  is a real cost, paid twice already in one day, and still cheaper than moving
-  a cloud's SDK inside the binary. If that ever stops being true the argument
-  has to be about the hand-rolled code being unsafe, not about the SDK being
-  convenient.
+  And there is no third door, which was worth an hour to establish rather than
+  assume. Cloudflare did ship a general-purpose CLI — `flarectl`, inside
+  cloudflare-go at `cmd/flarectl` — and dropped it in January 2025 when the
+  package became a generated SDK: present through v0.115.0, gone from v4.0.0
+  on. Nothing replaced it. `wrangler` is Workers only, `cloudflared` is
+  tunnels only, and no maintained general-purpose Cloudflare CLI exists.
+
+  So the API half stays hand-rolled, not because a library was weighed and
+  rejected, but because the only alternative to hand-rolled HTTP is a library.
+  It is 256 lines and one generic sender for six endpoints, and the cost is
+  naming fields correctly — a real cost, paid twice in one day. If that ever
+  stops being the right call the argument has to be that the hand-rolled code
+  is unsafe, not that an SDK is convenient.
 
   The cost of a CLI is parsing output, so prefer `--json` and decide from what
   parsed. Never decide from a tool's prose: this tree has been wrong twice
