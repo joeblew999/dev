@@ -51,6 +51,13 @@ site_fly_origin = "https://dev-site-fly.fly.dev"
 # file is wrong the first time a colour changes, silently, in the browser.
 site_desc = "The developer tool of the mise + fnox + hk + packslip stack."
 site_title = "dev"
+
+# What seals a test run off from the network. Every test here is meant to be
+# hermetic — fixtures, stubs and httptest — and "meant to be" is not a thing
+# anybody can check by reading. Prefixed to `go test` in check, so every run
+# proves it at no extra cost: a test that reaches a cloud finds a dead proxy
+# and fails, and localhost is excluded so httptest still works.
+sealed = "HTTP_PROXY=http://127.0.0.1:1 HTTPS_PROXY=http://127.0.0.1:1 NO_PROXY=127.0.0.1,localhost"
 # llms.txt comes from the command's own verbs, which only the command knows,
 # and head.html is a fragment this site's generator writes itself.
 site_skip = "llms,head"
@@ -185,7 +192,7 @@ depends = ["build"]
 # No vet here: hk.pkl runs it, on every commit and in lint. Running it again
 # was the same check declared in two files, and test ran it twice.
 run = [
-  "go test ./...",
+  "{{ vars.sealed }} go test ./...",
   ".bin/dev release . --snapshot",
 ]
 

@@ -269,6 +269,21 @@ and green first.
 - **`mise run lint` says what `go vet` will not** — a function nobody calls, a
   variable a refactor left behind, a deprecated call. Every one of those lived
   in this tree until staticcheck was added to the gate.
+- **The tests reach nothing.** `check` runs them behind a dead proxy —
+  `{{ vars.sealed }}` in mise.toml — with localhost excluded so `httptest`
+  still works. Every test here is fixtures, stubs or a local server, and that
+  was true by intention and checkable by nobody until the gate started
+  proving it on every run. A test that talks to a cloud passes on its own and
+  fails under `check`, which is the right way round: the one that reaches a
+  real account is the one that should be hard to land.
+
+  What is pointed at a real thing is the mise tasks, not the tests:
+  `site:*:check` and `site:health` take their origin from `[vars]`, so they
+  can be aimed anywhere, and the tests cannot be aimed at all. A `Call` built
+  by hand reads no environment, so running the suite from a task that sets
+  `DEV_URL` does not quietly test a different site than the fixtures
+  describe.
+
 - **`mise run dead` is a report, not a gate.** Dead code is normal mid-refactor;
   the point is to see what a change left behind, not to fail on it.
 - **`mise run smells` is all four of them**, and they are all reports: `dead`,
