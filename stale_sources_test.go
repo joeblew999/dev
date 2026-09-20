@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/joeblew999/dev/cli"
+	"github.com/BurntSushi/toml"
 )
 
 // Every file go:embed compiles in has to be in mise.toml's build sources, or
@@ -60,27 +60,37 @@ func embedded(t *testing.T) []string {
 	return out
 }
 
-// buildSources is the sources list of mise.toml's build task, read as the
-// lines between its brackets. Parsing the whole file with a TOML decoder
-// would read every task; this reads the one that matters.
+// buildSources is the sources list of mise.toml's build task, by name.
+//
+// It was three string cuts — find "sources = [", take what is before the
+// next "]" — and the comment defending that said parsing the whole file
+// would read every task. It read the wrong one instead. mise.toml has three
+// sources lists now, and strings.Cut takes the first, so this worked only
+// because [tasks.build] happens to be declared before [tasks."site:build"].
+//
+// Moving those two blocks past each other — a pure reordering, no change in
+// meaning — made this read site:build's three globs and report nine embedded
+// files as unguarded. The dangerous direction is the other one: land on a
+// task with a broader list and the test passes while guarding nothing, which
+// is exactly what it exists to prevent.
+//
+// BurntSushi/toml is already a direct dependency of this module. Asking it
+// for one task by name is six lines and cannot read a different one.
 func buildSources(t *testing.T) []string {
 	t.Helper()
-	data, err := os.ReadFile("mise.toml")
-	if err != nil {
+	var file struct {
+		Tasks map[string]struct {
+			Sources []string `toml:"sources"`
+		} `toml:"tasks"`
+	}
+	if _, err := toml.DecodeFile("mise.toml", &file); err != nil {
 		t.Fatal(err)
 	}
-	_, after, ok := strings.Cut(string(data), "sources = [")
-	if !ok {
+	got := file.Tasks["build"].Sources
+	if len(got) == 0 {
 		t.Fatal("mise.toml's build task has no sources list")
 	}
-	list, _, ok := strings.Cut(after, "]")
-	if !ok {
-		t.Fatal("mise.toml's sources list is not closed")
-	}
-	return cli.Collect(strings.Split(list, ","), func(s string) (string, bool) {
-		s = strings.Trim(strings.TrimSpace(s), `"`)
-		return s, s != "" && !strings.HasPrefix(s, "#")
-	})
+	return got
 }
 
 // matchesAny is mise's globbing as far as this needs it: ** crosses

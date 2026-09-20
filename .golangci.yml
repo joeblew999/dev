@@ -5,12 +5,19 @@
 # files, which is the thing hk.pkl exists to prevent. So `default: none`, and
 # the list below is the linters that add something.
 #
-# dupl is deliberately absent. golangci-lint runs analyzers per package, so
-# its dupl cannot see across package boundaries: measured on this tree it
-# found zero cross-file pairs at any threshold, where standalone dupl finds
-# the real one — internal/cloudflare/deploy.go against internal/fly/fly.go,
-# the same step written twice in the two cloud targets. That one stays in
-# `mise run dup`, standalone, as a report.
+# dupl is deliberately absent, and goconst is here with a caveat. golangci-
+# lint runs analyzers per package, so neither can see across package
+# boundaries. Measured on this tree: its dupl finds zero cross-file pairs at
+# any threshold where standalone dupl finds the real one —
+# internal/cloudflare/deploy.go against internal/fly/fly.go, the same step
+# written twice in the two cloud targets. And its goconst finds zero where
+# standalone goconst finds 371, every one of them a string repeated across
+# packages.
+#
+# So the two are different checks wearing one name. The gate below says "no
+# string is repeated inside a package"; `mise run repeated` and `mise run
+# dup`, standalone, say "a fact is spelled in one place", which is the rule
+# that actually matters. Both are kept, and this is why.
 version: "2"
 
 linters:
@@ -57,14 +64,22 @@ linters:
     - perfsprint      # fmt.Errorf with no verb in it, which is errors.New
     - wastedassign    # a value assigned and overwritten before it is read
     - thelper         # a test helper that does not call t.Helper()
+    - forcetypeassert # x.(T) without the comma-ok, which panics
+    - usestdlibvars   # "GET" where http.MethodGet says it
+    - unconvert       # string(s) where s is already a string
 
   settings:
     goconst:
       min-occurrences: 3
       ignore-tests: true
     forbidigo:
+      # The default matches the call as it is written, so `import f "fmt"`
+      # then f.Printf escapes it. This resolves the import instead.
+      analyze-types: true
       forbid:
-        - pattern: ^fmt\.Print(f|ln)?$
+        # print and println are builtins that write to stderr — near zero
+        # risk, one character to close.
+        - pattern: ^fmt\.Print(f|ln)?$|^print(ln)?$
           msg: writes to the process's stdout, around the Call the verb was handed. Use fmt.Fprintf(c.Stdout, ...) so a test can read it; progress and warnings go to c.Stderr.
     depguard:
       rules:

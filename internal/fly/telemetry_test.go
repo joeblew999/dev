@@ -11,6 +11,7 @@
 package fly
 
 import (
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -119,7 +120,7 @@ func TestTheHTTPBlockIsOnlyARequestWhenFlyFilledIt(t *testing.T) {
 	if err != nil || len(got) != 1 {
 		t.Fatalf("parsed %v (%v)", got, err)
 	}
-	if got[0].Method != "GET" || got[0].URL != "https://x/" || got[0].Status != 200 {
+	if got[0].Method != http.MethodGet || got[0].URL != "https://x/" || got[0].Status != 200 {
 		t.Errorf("the request was not read: %+v", got[0])
 	}
 }

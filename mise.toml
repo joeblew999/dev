@@ -19,7 +19,7 @@ fnox = "latest"   # the one way to a secret; dev release reads the signing key f
 # silently rewrote what the tool does when you say nothing, is not a release
 # stream to take sight unseen.
 "go:github.com/mibk/dupl" = "v1.1.0"   # what `mise run dup` reports: the same code written twice
-"go:mvdan.cc/unparam" = "latest"   # what `mise run unread` reports: a parameter the body never touches
+"go:golang.org/x/vuln/cmd/govulncheck" = "latest"   # what `mise run audit:deep` reports: a dependency with a known CVE
 "go:github.com/jgautheron/goconst/cmd/goconst" = "v1.11.0"   # what `mise run repeated` reports: one string written in three places
 "go:honnef.co/go/tools/cmd/staticcheck" = "latest"   # an hk step: every commit, and lint
 "go:github.com/nelsonlaidev/scoutly/cmd/scoutly" = "v0.5.0"   # what `dev seo` runs: crawl and on-page
@@ -143,20 +143,6 @@ description = "the same code written twice, as a report"
 # in the tree and says nothing.
 run = "dupl -threshold 40 -plumbing $(git ls-files '*.go') || true"
 
-[tasks.unread]
-description = "parameters nothing reads, so a signature cannot promise what the body ignores"
-# A report, never a gate, and most of what it says is fine: a parameter kept
-# to satisfy an interface is normal, and "always receives X" is usually a
-# helper still waiting for its second caller.
-#
-# The one kind worth reading is the other: a parameter the body never touches
-# at all. That is a signature saying something the code does not do, and every
-# caller threads a value through believing it. Nothing else in this gate says
-# it — the compiler allows it, go vet is silent, staticcheck only reports
-# unused locals, and deadcode counts the function as reached. stage.run took
-# an io.Writer it never wrote to, through four callers, for exactly as long as
-# nothing was looking.
-run = "unparam ./... || true"
 
 [tasks.repeated]
 description = "a fact spelled out in three places, where a constant would say it once"
@@ -174,12 +160,12 @@ description = "a fact spelled out in three places, where a constant would say it
 run = "goconst -min-occurrences 3 -ignore-tests ./... || true"
 
 [tasks.smells]
-description = "every report at once: dead code, duplication, unread parameters, repeated strings"
+description = "every report at once: dead code, duplication, strings repeated across packages"
 # Four tasks of one shape, so there is one door to them. Each says what a
 # change left behind; none of them fails a build, and none of them is in
 # hk.pkl or in test. That is the whole distinction: lint and check are gates
 # and must be green, these are reports and are read.
-depends = ["dead", "dup", "unread", "repeated"]
+depends = ["dead", "dup", "repeated"]
 
 [tasks.lint]
 description = "hk checks: gofmt, vet, tidy, staticcheck, whitespace, secrets"
@@ -190,11 +176,12 @@ run = "hk check --all"
 [tasks.audit]
 description = "golangci-lint: the checks nothing else here runs"
 # A gate, and it sits at zero. That is the whole difference between this and
-# the four reports: dead, dup, unread and repeated are ~50% true positive on
+# the three reports: dead, dup and repeated are ~50% true positive on
 # any real tree and a gate that cries wolf gets suppressed. This one is
-# configured to four linters that nothing else covers — unparam, goconst,
-# forbidigo, depguard — with default: none, so staticcheck is not run twice
-# in two files that could disagree.
+# configured to twenty linters that nothing else covers, with default: none,
+# so staticcheck is not run twice in two files that could disagree. Four of
+# them found something and it was fixed; the other sixteen sit at zero and
+# are there for the day they do not.
 #
 # check depends on it so it runs in the inner loop rather than when somebody
 # remembers. It was pinned and configured and wired to nothing for an hour,
@@ -470,4 +457,39 @@ depends = ["build"]
 run = [
   ".bin/dev delete site --yes",
   ".bin/dev delete site/fly --yes",
+]
+
+[tasks."audit:deep"]
+description = "Everything, slowly: for an agent to run while somebody else is coding"
+depends = ["build"]
+# The opposite trade from `audit`. That one is twenty linters at zero,
+# under a second warm, in the inner loop. This one is every check that is too
+# slow or too noisy to gate on, run to completion, and nothing here fails a
+# build — the output is for a reader to triage.
+#
+# What it adds that nothing else runs:
+#
+#   - govulncheck, the official scanner, which is the only check here about
+#     the world outside this repo. A dependency is fine until the day it is
+#     not, and nothing else would say so.
+#   - the race detector. This tree runs goroutines in Parallel, Gather and a
+#     memoised sync.Map, and `go test` alone cannot see a data race in any of
+#     them. Uncached, because a cached pass proves nothing.
+#   - golangci-lint with every linter it has, not the twenty the gate keeps.
+#     Expect hundreds: errcheck alone finds 225, of which zero were true
+#     positives last time they were read. That is the point — it is a net to
+#     drag, not a rule to obey, and a person decides what is real.
+#   - the three standalone reports, which see across packages where
+#     golangci-lint's copies cannot.
+#
+# `|| true` on every line: one finding must not stop the rest from running.
+run = [
+  "echo '=== govulncheck: a dependency with a known vulnerability ==='",
+  "govulncheck ./... || true",
+  "echo '=== race detector: uncached, all packages ==='",
+  "{{ vars.sealed }} go test -race -count=1 ./... || true",
+  "echo '=== golangci-lint, every linter it has ==='",
+  "golangci-lint run --no-config --default=all --timeout=10m ./... || true",
+  "echo '=== across packages, where the gate cannot see ==='",
+  "mise run smells || true",
 ]

@@ -22,6 +22,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 )
 
 // PluginManifest is where Claude Code plugins declare themselves. An upstream
@@ -157,8 +158,20 @@ func untar(archive []byte, top string) (map[string][]byte, error) {
 	}
 }
 
+// downloadClient is the one this package fetches through.
+//
+// http.Get uses http.DefaultClient, which has no timeout at all: a GitHub
+// tarball from a host that accepts the connection and then says nothing
+// hangs a sync forever, with no way to interrupt it but killing the process.
+// Every other client in this tree sets one; this was the site that drifted,
+// and nothing said so until a linter did.
+//
+// Two minutes rather than the thirty seconds the others use, because this
+// one is downloading an archive rather than asking a question.
+var downloadClient = &http.Client{Timeout: 2 * time.Minute}
+
 func download(url string) ([]byte, error) {
-	resp, err := http.Get(url)
+	resp, err := downloadClient.Get(url)
 	if err != nil {
 		return nil, err
 	}

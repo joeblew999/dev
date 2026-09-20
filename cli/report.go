@@ -49,11 +49,16 @@ func SevRank(s string) int {
 // warnings and two notes and then said "0 problems" underneath them. A
 // summary that contradicts what is directly above it is worse than none.
 func (r *Report) Summary() string {
+	open := Filter(r.Findings, func(f Finding) bool { return f.Declined == "" })
+	counts := CountBy(open, func(f Finding) string { return f.Severity })
 	var parts []string
 	for _, sev := range Severities {
-		if n := r.BySeverity[sev]; n > 0 {
+		if n := counts[sev]; n > 0 {
 			parts = append(parts, Plural(n, sev))
 		}
+	}
+	if left := len(r.Findings) - len(open); left > 0 {
+		parts = append(parts, fmt.Sprintf("%d left on purpose", left))
 	}
 	if len(parts) == 0 {
 		return "nothing to report"
@@ -83,6 +88,15 @@ type Finding struct {
 	// wrong but a route to fixing it. A verb that both checks and produces
 	// should say which of its own outputs closes each gap.
 	FixedBy string `json:"fixedBy,omitempty"`
+
+	// Declined is why somebody decided to leave this one, when they have.
+	// A finding with a reason is not work nobody has done — it is work
+	// somebody did and the answer was no. It still appears in the report,
+	// because a decision nobody can see is one nobody will revisit when it
+	// stops being true; what it does not do is fail a gate or count toward
+	// the summary.
+	Declined   string `json:"declined,omitempty"`
+	DeclinedOn string `json:"declinedOn,omitempty"`
 }
 
 // Step is one unit of work: what it was, whether it ran, how long it took,
@@ -283,7 +297,10 @@ func Unkept(history []*Report, cur *Report) []Finding {
 func (r *Report) Failed(failOn string) bool {
 	want := SevRank(Or(failOn, SevError))
 	for _, f := range r.Findings {
-		if SevRank(f.Severity) <= want {
+		// A declined finding cannot fail a gate. That is the whole of what
+		// declining does: the finding is still reported, with the reason,
+		// and it stops counting as work nobody has done.
+		if f.Declined == "" && SevRank(f.Severity) <= want {
 			return true
 		}
 	}

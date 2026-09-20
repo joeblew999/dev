@@ -23,7 +23,7 @@ func MCP(stdout, stderr io.Writer) error {
 	if err != nil && len(out) == 0 {
 		return fmt.Errorf("claude mcp list: %w (is Claude Code installed?)", err)
 	}
-	if bad := Unusable(string(out)); len(bad) > 0 {
+	if bad := Unusable(out); len(bad) > 0 {
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "A declared MCP server is not usable on a fresh clone:")
 		for _, b := range bad {

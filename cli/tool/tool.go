@@ -304,5 +304,9 @@ func FreePort() (int, error) {
 		return 0, err
 	}
 	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port, nil
+	addr, ok := l.Addr().(*net.TCPAddr)
+	if !ok {
+		return 0, fmt.Errorf("listening on tcp gave a %T, not a TCP address", l.Addr())
+	}
+	return addr.Port, nil
 }

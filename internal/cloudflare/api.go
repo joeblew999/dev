@@ -132,7 +132,11 @@ func sent[T any](method, what, url, token string, send io.Reader) (T, error) {
 //
 // Memoised per name rather than once for both, because a command that only
 // ever needs the token should not be made to fetch the account as well.
-var credentials sync.Map // name -> *sync.Once-guarded result
+// Typed, so reading it back is not an assertion that can panic. A sync.Map
+// of any holds whatever anybody put in it, and the one place that reads this
+// asserted the type without checking — correct today because one function
+// writes it, and a panic in a CLI the first time that stops being true.
+var credentials sync.Map // name -> *credential_
 
 type credential_ struct {
 	once  sync.Once
@@ -151,7 +155,10 @@ func forgetCredentials() { credentials.Clear() }
 
 func credential(name string) (string, error) {
 	c, _ := credentials.LoadOrStore(name, &credential_{})
-	got := c.(*credential_)
+	got, ok := c.(*credential_)
+	if !ok {
+		return "", fmt.Errorf("the memo for %s holds a %T; this is a bug in dev, not in your config", name, c)
+	}
 	got.once.Do(func() {
 		v, err := fnox.Get(name)
 		if err != nil || v == "" {

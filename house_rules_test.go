@@ -1,12 +1,25 @@
 // Two of AGENTS.md's rules, made mechanical.
 //
-// Both of these are ordinarily a linter's job, and neither can be one here:
-// forbidigo and depguard only exist inside golangci-lint, which this tree
-// measured and rejected, and standalone they both die on this toolchain with
-// `internal error: package "os" without types`. A rule that cannot run is a
-// comment, so they are written here instead — go/ast and go list are in the
-// standard library, they cost go.mod nothing, and `mise run check` already
-// runs every test.
+// These were written when golangci-lint was not in this tree, because
+// forbidigo and depguard only work inside it and standalone they both die on
+// this toolchain with `internal error: package "os" without types`. That has
+// changed: `.golangci.yml` enables both and `mise run check` depends on
+// `mise run audit`, so the fmt.Print rule now has two homes and the
+// forbidden-module list has two.
+//
+// The fmt.Print one is kept because it is free and it runs under `go test`
+// with no config, which is the one thing that reaches a repo that has not
+// adopted the gate yet.
+//
+// TestNothingImportsACloudSDK is kept for a better reason: it reads
+// `go list -deps ./...`, the whole transitive import graph, where depguard
+// reads only the import lines in this module's own files. An SDK pulled in
+// three packages down is caught here and missed there. The two are not
+// copies; this one is strictly stronger.
+//
+// The duplication that is left is the lists themselves, and it is real. If
+// either grows, put the new entry in `.golangci.yml` and make this read it,
+// rather than adding to both.
 package main
 
 import (

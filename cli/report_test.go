@@ -143,7 +143,8 @@ func TestParallelSurvivesAPanic(t *testing.T) {
 		func() string { return "third" },
 	}
 	got := Parallel(3, work, func(i int, v any) string {
-		return "recovered: " + v.(string)
+		text, _ := v.(string)
+		return "recovered: " + text
 	})
 	if !slices.Equal(got, []string{"first", "recovered: a parser gave up", "third"}) {
 		t.Errorf("got %v; want the panic recorded against its own unit", got)

@@ -16,6 +16,7 @@ package cloudflare
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -132,7 +133,7 @@ func TestTheRequestIsReadAndTheHeadersAreLeftWhereTheyAre(t *testing.T) {
 			continue
 		}
 		withRequest++
-		if e.Method != "GET" {
+		if e.Method != http.MethodGet {
 			t.Errorf("method = %q; the fixture is a GET", e.Method)
 		}
 		if !strings.Contains(e.URL, "workers.dev") {
