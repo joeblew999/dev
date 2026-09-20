@@ -135,6 +135,15 @@ func SmokeVerb(c cli.Call) error  { return to(c, "smoke") }
 func DeleteVerb(c cli.Call) error { return to(c, "delete") }
 func ListVerb(c cli.Call) error   { return to(c, "list") }
 
+// FrontingVerb takes a hostname rather than a directory: what stands in front
+// of an app is a fact about a name, not about where the code is. An app may
+// be fronted at a hostname that no directory here mentions, and a directory
+// may be reachable at several.
+func FrontingVerb(c cli.Call) error { return Fronting(c, c.Args[0]) }
+
+// FrontingFlags are what fronting takes.
+func FrontingFlags(fs *flag.FlagSet) { cli.ReportFlags(fs) }
+
 // WaitVerb is the one verb here that talks to no cloud: it polls a URL.
 func WaitVerb(c cli.Call) error {
 	d, _ := c.ValueAs("timeout", time.ParseDuration)

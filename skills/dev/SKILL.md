@@ -112,6 +112,8 @@ next time anybody looked. Read it — it is the convention, not a ceiling.
   put the command in the cloud its directory names
 - `dev delete DIR [--env NAME] [--name APP] [--yes]`
   remove a deployed app, and the storage created with it; asks first
+- `dev fronting HOST [--fail-on error|warning|info] [--json] [--out PATH] [--quiet] [--record DIR]`
+  what stands in front of a host on Cloudflare, and whether it will work
 - `dev list DIR [--env NAME]`
   what is deployed on this directory's cloud, with this one marked
 - `dev logs DIR [--env NAME] [--json] [--limit string] [--out PATH] [--raw] [--since string]`

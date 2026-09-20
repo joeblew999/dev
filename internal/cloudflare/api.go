@@ -85,12 +85,26 @@ func call[T any](method, what, endpoint string, body any) (T, error) {
 		}
 		send = bytes.NewReader(encoded)
 	}
-	req, err := http.NewRequest(method, fmt.Sprintf(endpoint, account), send)
+	return sent[T](method, what, fmt.Sprintf(endpoint, account), token, send)
+}
+
+// request is one GET against a URL that is already complete, for the endpoints
+// scoped to something other than the account — a zone, most of them.
+func request[T any](what, url, token string) (T, error) {
+	return sent[T](http.MethodGet, what, url, token, nil)
+}
+
+// sent is the request itself: the bearer header, the status check, the
+// success flag, and walking the errors to say why. Everything that reaches
+// Cloudflare's API here goes through it.
+func sent[T any](method, what, url, token string, send io.Reader) (T, error) {
+	var zero T
+	req, err := http.NewRequest(method, url, send)
 	if err != nil {
 		return zero, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
-	if body != nil {
+	if send != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	resp, err := httpClient.Do(req)
