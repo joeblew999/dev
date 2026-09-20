@@ -1,0 +1,44 @@
+# Written by `dev deploy --to fly` because site/fly had no fly.toml.
+# It is the convention, not a ceiling: edit it, commit it, it is yours.
+app = "dev-site-fly"
+
+[build]
+  # Relative to this file, not to the build context.
+  dockerfile = "Dockerfile"
+
+[http_service]
+  # The Dockerfile sets PORT and a Go main on this stack reads it.
+  internal_port = 8080
+  force_https = true
+  # Stop when idle and start on a request. min_machines_running = 1
+  # keeps one warm if a cold start costs more than the machine does.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  # Requests rather than connections: one connection can carry many,
+  # so counting connections lets a few clients look like no load.
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+  # Fly routes to a machine it believes is healthy, so without this it
+  # routes to one that has not finished starting. grace_period has to
+  # exceed the slowest start, or a slow boot reads as a dead machine.
+  [[http_service.checks]]
+    method = "GET"
+    path = "/"
+    grace_period = "10s"
+    interval = "30s"
+    timeout = "5s"
+
+# The smallest machine that runs a Go binary comfortably. Raise it
+# when something is actually slow, not before.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+# One machine at a time, so a bad release never takes them all.
+[deploy]
+  strategy = "rolling"

@@ -247,7 +247,21 @@ func Scaffold(dir, name string) string {
 	return "# Written by `dev deploy --to fly` because " + dir + " had no " + ConfigFile + ".\n" +
 		"# It is the convention, not a ceiling: edit it, commit it, it is yours.\n" +
 		"app = " + strconv.Quote(name) + "\n\n" +
-		"[build]\n\n" +
+		// Named at all, which an empty [build] is not: dev runs flyctl from
+		// the repository root so a command directory can import the module
+		// around it, and flyctl then looks for a Dockerfile at the root and
+		// reports "app does not have a Dockerfile or buildpacks configured"
+		// about a directory with one sitting beside this file.
+		//
+		// Relative to this file rather than to the build context, which is
+		// the part worth writing down because it is not what the two paths on
+		// the command line suggest: `flyctl deploy --config site/fly/fly.toml
+		// .` resolves the context from the argument and the dockerfile from
+		// the config's own directory. Naming it from the root gave
+		// site/fly/site/fly/Dockerfile.
+		"[build]\n" +
+		"  # Relative to this file, not to the build context.\n" +
+		"  dockerfile = \"Dockerfile\"\n\n" +
 		"[http_service]\n" +
 		"  # The Dockerfile sets PORT and a Go main on this stack reads it.\n" +
 		"  internal_port = 8080\n" +

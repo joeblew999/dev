@@ -31,12 +31,19 @@ fnox = "latest"   # the one way to a secret; dev release reads the signing key f
 "go:github.com/kevhq/ldlint/cmd/ldlint" = "latest"   # dev seo: schema.org vocabulary
 wrangler = { version = "latest", allow_builds = ["esbuild", "sharp", "workerd"] }
 node = "latest"
+flyctl = "latest"
 
 # The site's own address, named once: three tasks write it into canonical
 # links, a sitemap and an llms.txt, and a fourth checks the deployed thing.
 # Four spellings of one URL is four chances to point at the wrong site.
 [vars]
 site_origin = "https://dev-docs.gedw99.workers.dev"
+# The same site on the other cloud. Both are real deploys of one generator's
+# output, which is the point of having them: a stack that claims a command
+# runs on either has to be able to show it, and what the two serve is the
+# same files with the same headers — Cloudflare reads _headers itself and
+# site/fly reads the same file at startup.
+site_fly_origin = "https://dev-site-fly.fly.dev"
 
 # What the site says it is. The policy that goes with it is NOT here: it
 # names the sha256 of the page's own inline stylesheet, so the generator
@@ -273,12 +280,12 @@ depends = ["site:build"]
 # second server that agrees until the day it does not.
 run = ".bin/dev run site"
 
-[tasks."site:deploy"]
+[tasks."site:cf:deploy"]
 description = "Put the site on Cloudflare, from the working tree: no commit, no release"
 depends = ["site:build"]
 run = ".bin/dev deploy site"
 
-[tasks."site:check"]
+[tasks."site:cf:check"]
 description = "Run every SEO checker against the deployed site, which is the only thing Google sees"
 depends = ["build"]
 # Against the URL and not the directory on purpose: what Search reads is what
@@ -384,3 +391,61 @@ description = "Fail when any copy of the manual is behind the verbs it is render
 # ending a report with `|| true`: a manual that disagrees with the binary is
 # not a smell, it is the tool lying to the next agent that reads it.
 run = ".bin/dev skill --check"
+
+[tasks."site:fly:build"]
+description = "Render the same site into the Fly image's directory"
+depends = ["build"]
+sources = ["site/gen/main.go", "skills/*/SKILL.md", "README.md"]
+outputs = ["site/fly/public/index.html", "site/fly/public/sitemap.xml", "site/fly/public/llms.txt"]
+# The same three steps site:build runs, against the other origin. Not a copy
+# of site/public: a canonical link, a sitemap and an llms.txt all name the
+# site they are on, so the two differ in the only way they should.
+run = [
+  "go run ./site/gen --out site/fly/public --origin {{ vars.site_fly_origin }} --urls site/fly/urls.txt --csp site/fly/csp.txt",
+  ".bin/dev llms site/fly/public --origin {{ vars.site_fly_origin }}",
+  ".bin/dev seo write site/fly/public --url {{ vars.site_fly_origin }}/ --urls site/fly/urls.txt --skip llms,head --title dev --desc '{{ vars.site_desc }}' --csp \"$(cat site/fly/csp.txt)\"",
+]
+
+[tasks."site:fly:deploy"]
+description = "Put the site on Fly, from the working tree: no commit, no release"
+depends = ["site:fly:build"]
+run = ".bin/dev deploy site/fly"
+
+[tasks."site:fly:check"]
+description = "Run every SEO checker against the Fly deploy"
+depends = ["build"]
+run = ".bin/dev seo check {{ vars.site_fly_origin }}/ --record .reports/site-fly"
+
+
+[tasks."site:deploy"]
+description = "Deploy the same site to BOTH clouds and print both URLs"
+# Both, always, and that is the point rather than a convenience. This repo's
+# whole claim is that a command on this stack runs on either cloud, and a
+# claim only one of them is ever tested against is a claim nobody is
+# checking. Deploying both every time is what keeps it honest.
+depends = ["site:cf:deploy", "site:fly:deploy"]
+run = "mise run site:health"
+
+[tasks."site:health"]
+description = "What both deploys answer, and the headers they answer with"
+depends = ["build"]
+# One verb, both clouds, because what a deploy answers is a fact about an
+# HTTP address and the registry already knows how each cloud names its own.
+# Printed side by side because the interesting thing is whether they agree:
+# the two serve the same files from one _headers, and the only way to know
+# they still do is to ask both.
+run = [
+  ".bin/dev health site --deployed",
+  ".bin/dev health site/fly --deployed",
+]
+
+[tasks."site:undeploy"]
+description = "Take the site off both clouds"
+depends = ["build"]
+# The other half of deploy, and worth having for the reason every reconcile
+# has an establish beside it: a thing you cannot remove is a thing you will
+# hesitate to put up. --yes because a task is not a prompt.
+run = [
+  ".bin/dev delete site --yes",
+  ".bin/dev delete site/fly --yes",
+]

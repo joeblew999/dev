@@ -16,3 +16,6 @@
 # directory. 4.5MB of it reached a commit before this line existed, and the
 # large-file check did not stop it.
 /gen
+/site/fly/public/
+/site/fly/urls.txt
+/site/fly/csp.txt

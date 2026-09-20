@@ -38,7 +38,22 @@ func embedded(t *testing.T) []string {
 		}
 		for _, m := range directive.FindAllStringSubmatch(string(data), -1) {
 			for name := range strings.FieldsSeq(m[1]) {
-				out = append(out, filepath.Join(filepath.Dir(p), name))
+				// `all:` asks go:embed to include dotfiles and is not part
+				// of the path. Read as one, it named site/fly/all:public and
+				// asked for a build source that could never match.
+				name = strings.TrimPrefix(name, "all:")
+				dir := filepath.Dir(p)
+				// site/ is its own binary — the generator and the server that
+				// carries the pages into a Fly image. This test is about
+				// .bin/dev going stale while mise reports it fresh, and what
+				// site/ embeds is compiled into neither .bin/dev nor the
+				// manual it renders. Its output is generated and gitignored,
+				// so listing it as a build source would make the build depend
+				// on something the build writes.
+				if strings.HasPrefix(filepath.ToSlash(dir), "site/") {
+					continue
+				}
+				out = append(out, filepath.Join(dir, name))
 			}
 		}
 	}

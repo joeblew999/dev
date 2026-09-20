@@ -71,6 +71,21 @@ on, at the moment you pass one, and say why.
 you gave; otherwise it is the deployed address, because that is the only
 other address there is.
 
+`health DIR` asks that address and says what came back: the status, how long
+it took, and the response headers — `Content-Type`, `Cache-Control`, the
+CSP, HSTS, and the three a checker faults a site for missing. A header is
+the half of a response that decides how a browser and a crawler treat
+everything else, and it is the half nobody sees without asking. Running it
+against a directory on each cloud is how you find out whether two deploys of
+one thing really are serving it the same way, which until this verb existed
+meant curl and comparing two scrollbacks by eye. Nothing about it is
+per-cloud: it reads the same deployed address `url` prints, so a cloud added
+later gets it by declaring where its apps live and nothing more.
+
+`delete DIR` takes it down, and answering "there is nothing to delete" is a
+success rather than an error — a deploy you cannot remove is one you will
+hesitate to make.
+
 A developer's own copy of every app comes from DEPLOY_SUFFIX in gitignored
 mise.local.toml, so two people deploying the same repo never fight over one.
 
@@ -162,6 +177,8 @@ typo did the same.
   put Cloudflare in front of a host; says what it would do unless --apply
 - `dev fronting HOST [--fail-on error|warning|info] [--json] [--out PATH] [--quiet] [--record DIR]`
   what stands in front of a host on Cloudflare, and whether it will work
+- `dev health DIR [--deployed] [--env NAME] [--expect TEXT] [--json] [--local URL] [--out PATH] [--path PATH] [--refresh]`
+  what the deployed app answers, and the headers it answers with
 - `dev list DIR [--env NAME]`
   what is deployed on this directory's cloud, with this one marked
 - `dev logs DIR [--env NAME] [--json] [--limit MANY] [--out PATH] [--raw] [--since BACK]`

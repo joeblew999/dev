@@ -15,6 +15,21 @@ on, at the moment you pass one, and say why.
 you gave; otherwise it is the deployed address, because that is the only
 other address there is.
 
+`health DIR` asks that address and says what came back: the status, how long
+it took, and the response headers — `Content-Type`, `Cache-Control`, the
+CSP, HSTS, and the three a checker faults a site for missing. A header is
+the half of a response that decides how a browser and a crawler treat
+everything else, and it is the half nobody sees without asking. Running it
+against a directory on each cloud is how you find out whether two deploys of
+one thing really are serving it the same way, which until this verb existed
+meant curl and comparing two scrollbacks by eye. Nothing about it is
+per-cloud: it reads the same deployed address `url` prints, so a cloud added
+later gets it by declaring where its apps live and nothing more.
+
+`delete DIR` takes it down, and answering "there is nothing to delete" is a
+success rather than an error — a deploy you cannot remove is one you will
+hesitate to make.
+
 A developer's own copy of every app comes from DEPLOY_SUFFIX in gitignored
 mise.local.toml, so two people deploying the same repo never fight over one.
 

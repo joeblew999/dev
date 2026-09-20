@@ -61,6 +61,7 @@ var dev = cli.Command{
 		"url":      {Run: app.URLVerb, Args: "DIR", Flags: app.URLFlags, Desc: "print the address to talk to, deployed or local", Usage: app.Usage},
 		"logs":     {Run: app.LogsVerb, Args: "DIR", Flags: app.LogsFlags, Desc: "follow the deployed app's logs as they happen", Usage: app.Usage},
 		"smoke":    {Run: app.SmokeVerb, Args: "DIR", Flags: app.SmokeFlags, Desc: "start the Worker locally and make one request, to know a build is not broken", Usage: app.Usage},
+		"health":   {Run: app.HealthVerb, Args: "DIR", Flags: app.HealthFlags, Desc: "what the deployed app answers, and the headers it answers with", Usage: app.Usage},
 		"wait":     {Run: app.WaitVerb, Args: "URL", Flags: app.WaitFlags, Desc: "poll a URL until it answers steadily", Usage: app.Usage},
 		"seo":      {Subs: seo.Subs, Usage: seo.Usage},
 		"domains":  {Run: app.DomainsVerb, Flags: cli.ReportFlags, Desc: "every domain on the Cloudflare account, and what each one points at", Usage: app.Usage},

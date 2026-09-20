@@ -30,11 +30,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/cloudflare"
 	"github.com/joeblew999/dev/internal/fly"
+	"github.com/joeblew999/dev/internal/gitrepo"
 	"github.com/joeblew999/dev/internal/stage"
 )
 
@@ -416,6 +418,12 @@ func to(c cli.Call, verb string) error {
 		return c.EmitJSON(events)
 	case "delete":
 		return t.Delete(c)
+	case "health":
+		// Nothing per-cloud: what a deploy answers is a fact about an HTTP
+		// address, and every cloud in the registry already knows how to name
+		// its own. A third cloud gets this by declaring Deployed and nothing
+		// else, which is the test the registry is supposed to pass.
+		return health(c, t)
 	case "smoke":
 		if t.Smoke == nil {
 			return fmt.Errorf("%s", t.NoSmoke)
@@ -584,13 +592,62 @@ func scaffold(out io.Writer, dir, want string) error {
 	if to.Scaffold == nil {
 		return fmt.Errorf("--to %s: that target writes no config of its own; add %s by hand", want, to.ConfigFile)
 	}
-	name := filepath.Base(mustAbs(dir))
+	name := scaffoldName(dir)
 	path := filepath.Join(dir, to.ConfigFile)
 	if err := os.WriteFile(path, []byte(to.Scaffold(dir, name)), 0o644); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "wrote %s, so %s deploys to %s; read it and commit it\n", path, dir, want)
 	return nil
+}
+
+// scaffoldName is what to call an app that has not been named yet: the
+// repository, then the path to the command inside it.
+//
+// The directory's own name was the first answer and is wrong on the cloud
+// that matters most. Fly's app names are unique across the whole of Fly, not
+// within an account, so `site/fly` scaffolded `app = "fly"` — a name nobody
+// could have and everybody would want. Cloudflare is per-account and so only
+// ambiguous rather than impossible, but two repos each with a cmd/proxy both
+// got `proxy` there, and whichever deployed second took the first one's
+// Worker.
+//
+// The repository is what makes it unique and the path is what makes it
+// legible, so it is both: dev + site/fly is dev-site-fly. A command at the
+// repository root is just the repository, because that is what it is.
+//
+// Nothing about this file is permanent. The scaffold says so in its first
+// two lines — it is the convention, not a ceiling, and a repo that wants a
+// different name edits it and commits it.
+func scaffoldName(dir string) string {
+	abs := mustAbs(dir)
+	parts := []string{filepath.Base(abs)}
+	if slug, err := gitrepo.Slug(dir); err == nil {
+		// A slug is owner/repo and the owner is not part of the name: two
+		// people's forks of one repo want the same app, and the account they
+		// deploy to is what separates them.
+		_, repo, _ := strings.Cut(slug, "/")
+		if root, err := gitroot(dir); err == nil {
+			if rel, err := filepath.Rel(root, abs); err == nil && rel != "." {
+				parts = strings.Split(filepath.ToSlash(rel), "/")
+			} else if rel == "." {
+				parts = nil
+			}
+		}
+		parts = append([]string{repo}, parts...)
+	}
+	// Deduped and hyphenated: a cmd/dev inside the dev repo is dev-cmd-dev
+	// otherwise, which reads as a mistake because it looks like one.
+	return strings.Join(cli.Unique(cli.Filter(parts, func(p string) bool { return p != "" })), "-")
+}
+
+// gitroot is the top of the working tree dir sits in.
+func gitroot(dir string) (string, error) {
+	out, err := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // mustAbs is dir as an absolute path, falling back to dir when the working
