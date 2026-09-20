@@ -246,10 +246,7 @@ func selection(c cli.Call, names []string) (*picked, error) {
 				continue
 			}
 			if !cli.ToSet(names)[n] {
-				if near := cli.Nearest(n, names); near != "" {
-					return nil, c.Usagef("--%s: no checker %q — did you mean %q?", flag, n, near)
-				}
-				return nil, c.Usagef("--%s: no checker %q; they are: %s", flag, n, strings.Join(names, ", "))
+				return nil, c.Usagef("--%s: %v", flag, cli.Unknown("checker", n, names))
 			}
 			out[n] = true
 		}

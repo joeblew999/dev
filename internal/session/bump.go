@@ -30,8 +30,7 @@ func Bump(out io.Writer, sources []string) error {
 		for _, name := range sources {
 			src, known := p.Source[name]
 			if !known {
-				return fmt.Errorf("%s has no [source.%s]; it declares %s",
-					pins.File, name, cli.Or(english(p.Declared()), "no sources of its own"))
+				return fmt.Errorf("%s: %w", pins.File, cli.Unknown("source", name, p.Declared()))
 			}
 			if preset, fromPreset := src.FromPreset(); fromPreset {
 				return fmt.Errorf("%s comes from dev's %q preset, not from %s, so there is no ref here to move; it follows the dev you pin",

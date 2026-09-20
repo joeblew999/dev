@@ -35,8 +35,8 @@ func Remove(out io.Writer) error {
 		fmt.Fprintf(out, "no skills to take back: %s records none.\n", vendored.LockFile)
 		return nil
 	}
-	fmt.Fprintf(out, "took back %s from %s:\n", cli.Plural(len(went), "skill"), english(vendored.Dirs()))
-	fmt.Fprint(out, cli.Indent(joinLines(went)))
+	fmt.Fprintf(out, "took back %s from %s:\n", cli.Plural(len(went), "skill"), cli.English(vendored.Dirs()))
+	fmt.Fprint(out, cli.Indent(strings.Join(went, "\n")))
 	if _, err := os.Stat(pins.File); err == nil {
 		fmt.Fprintf(out, "\n%s still pins them, so the next sync brings them back; remove what you\ndo not want there first.\n", pins.File)
 	}
@@ -47,13 +47,4 @@ func Remove(out io.Writer) error {
 	// names that rather than a restart.
 	warnStaleSessions(out, time.Now())
 	return nil
-}
-
-// joinLines is a list as this package shows one, one per line.
-func joinLines(names []string) string {
-	var out strings.Builder
-	for _, name := range names {
-		out.WriteString(name + "\n")
-	}
-	return out.String()
 }

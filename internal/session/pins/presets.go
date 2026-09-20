@@ -2,7 +2,6 @@ package pins
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/joeblew999/dev/cli"
 )
@@ -62,8 +61,7 @@ func (p *Pins) expand() error {
 	for _, want := range p.Presets {
 		preset, ok := Presets[want]
 		if !ok {
-			return fmt.Errorf("%s: no preset named %q; dev ships %s",
-				File, want, cli.Or(english(cli.SortedKeys(Presets)), "none"))
+			return fmt.Errorf("%s: %w", File, cli.Unknown("preset", want, cli.SortedKeys(Presets)))
 		}
 		for _, name := range cli.SortedKeys(preset.Source) {
 			if _, taken := p.Source[name]; taken {
@@ -79,26 +77,4 @@ func (p *Pins) expand() error {
 		}
 	}
 	return nil
-}
-
-// english joins names the way a sentence does.
-func english(names []string) string {
-	switch len(names) {
-	case 0:
-		return ""
-	case 1:
-		return names[0]
-	}
-	return fmt.Sprintf("%s and %s", joinAll(names[:len(names)-1]), names[len(names)-1])
-}
-
-func joinAll(names []string) string {
-	var out strings.Builder
-	for i, n := range names {
-		if i > 0 {
-			out.WriteString(", ")
-		}
-		out.WriteString(n)
-	}
-	return out.String()
 }

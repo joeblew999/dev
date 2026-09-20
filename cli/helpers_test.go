@@ -152,3 +152,77 @@ func TestOr(t *testing.T) {
 		t.Errorf("Or(given, fallback) = %q", got)
 	}
 }
+
+// One situation, one voice. Six places answered "that is not one of the names
+// there are" in three different ways, and a reader meeting it in two commands
+// should not have to work out that they are the same.
+func TestUnknownSaysTheSameThingEverywhere(t *testing.T) {
+	have := []string{"kitsune", "scoutly", "muffet"}
+	// A typo has one answer, and reading a list to find it is work nobody
+	// needs to do.
+	if got := Unknown("checker", "kitsuen", have).Error(); !strings.Contains(got, `did you mean "kitsune"`) {
+		t.Errorf("a near miss was not offered the name it meant: %s", got)
+	}
+	// A name resembling nothing usually means the reader does not know what
+	// exists, so the list is the answer — as a sentence, sorted.
+	got := Unknown("preset", "quantum", have).Error()
+	if !strings.Contains(got, "kitsune, muffet and scoutly") {
+		t.Errorf("a wild miss was not told what exists: %s", got)
+	}
+	if !strings.Contains(got, `no preset named "quantum"`) {
+		t.Errorf("the error does not name what kind of thing was missing: %s", got)
+	}
+	// Nothing to offer is its own sentence: listing none reads as a bug.
+	if got := Unknown("preset", "x", nil).Error(); !strings.Contains(got, "there are none") {
+		t.Errorf("an empty registry said: %s", got)
+	}
+}
+
+// English is how a list reaches a sentence. Two packages had written it, one
+// of them twice, during the work that was meant to remove duplication.
+func TestEnglish(t *testing.T) {
+	for _, tc := range []struct {
+		in   []string
+		want string
+	}{
+		{nil, ""},
+		{[]string{"a"}, "a"},
+		{[]string{"a", "b"}, "a and b"},
+		{[]string{"a", "b", "c"}, "a, b and c"},
+		{[]string{"a", "b", "c", "d"}, "a, b, c and d"},
+	} {
+		if got := English(tc.in); got != tc.want {
+			t.Errorf("English(%q) = %q; want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+// Nearest has to catch the typo people actually make. Two adjacent letters
+// swapped is the commonest one, and plain Levenshtein counts it as two edits
+// while the bound admits one for a short name — so it was never caught. It
+// must still refuse a name that merely rhymes, which is why the bound did not
+// move.
+func TestNearestCatchesASwapButNotAStranger(t *testing.T) {
+	checkers := []string{"kitsune", "scoutly", "muffet", "scry"}
+	for typo, want := range map[string]string{
+		"kitsuen":  "kitsune", // two letters swapped
+		"kitsune":  "kitsune", // exact
+		"kitsun":   "kitsune", // one missing
+		"kitsunee": "kitsune", // one extra
+		"muffte":   "muffet",  // swapped, shorter name
+	} {
+		if got := Nearest(typo, checkers); got != want {
+			t.Errorf("Nearest(%q) = %q; want %q", typo, got, want)
+		}
+	}
+	for _, stranger := range []string{"quantum", "everything", "robots"} {
+		if got := Nearest(stranger, checkers); got != "" {
+			t.Errorf("Nearest(%q) offered %q; a name that resembles nothing gets no guess", stranger, got)
+		}
+	}
+	// The bound that made this necessary: a severity list, where "everything"
+	// was once offered "warning".
+	if got := Nearest("everything", []string{SevError, SevWarning, SevInfo}); got != "" {
+		t.Errorf("Nearest offered %q for a word that is not a severity", got)
+	}
+}

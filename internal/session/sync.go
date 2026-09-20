@@ -47,7 +47,7 @@ func Sync(out io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintf(out, "skills in %s:\n", english(vendored.Dirs()))
+	fmt.Fprintf(out, "skills in %s:\n", cli.Or(cli.English(vendored.Dirs()), "nowhere"))
 	fmt.Fprint(out, cli.Indent(string(want[vendored.LockFile])))
 	if len(existed) < len(vendored.Dirs()) {
 		fmt.Fprintf(out, "\nThese are new: an agent reads its own directory at startup.\n")
@@ -75,7 +75,7 @@ func Check(c cli.Call) error {
 		return err
 	}
 	started := time.Now()
-	rep := cli.NewReport("session", english(vendored.Dirs()))
+	rep := cli.NewReport("session", cli.Or(cli.English(vendored.Dirs()), "nowhere"))
 	for _, part := range []struct {
 		name, provides string
 		look           func() ([]cli.Finding, string, error)
@@ -145,20 +145,6 @@ func writeReport(c cli.Call, r *cli.Report) {
 		cli.Plural(r.BySeverity[cli.SevError], "problem"))
 }
 
-// english joins paths the way a sentence does, so a message names every
-// destination rather than the first one and an etcetera.
-func english(items []string) string {
-	switch len(items) {
-	case 0:
-		return "nowhere"
-	case 1:
-		return items[0]
-	case 2:
-		return items[0] + " and " + items[1]
-	}
-	return items[0] + ", " + english(items[1:])
-}
-
 // orphaned answers the one case where "fix session.toml" is the wrong advice:
 // the file is gone, and skills a previous sync wrote are still on disk. That
 // is what deleting it looks like, and telling someone to fix a file they just
@@ -175,6 +161,6 @@ func orphaned(err error) error {
 		return err
 	}
 	return fmt.Errorf("there is no %s, and %s from an earlier sync are still in %s — nothing pins them now and nothing will remove them; take them back with: %s",
-		pins.File, cli.Plural(len(went), "skill"), english(vendored.Dirs()),
+		pins.File, cli.Plural(len(went), "skill"), cli.English(vendored.Dirs()),
 		pins.SwapVerb(pins.SyncCommand(), "sync", "remove"))
 }

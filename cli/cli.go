@@ -379,9 +379,19 @@ func Nearest(s string, candidates []string) string {
 	return best
 }
 
-// editDistance is Levenshtein, two rows rather than a matrix.
+// editDistance counts the edits between two names, with two adjacent letters
+// swapped counting as one.
+//
+// Plain Levenshtein counts a swap as two — a delete and an insert — and the
+// bound above admits one edit for a short name, so "kitsuen" was never offered
+// "kitsune". Transposing two letters is the commonest typo there is, and the
+// answer is to count it as the single slip it is rather than to raise the
+// bound, which is what let "everything" be offered "warning".
+//
+// This is optimal string alignment: Levenshtein plus the swap, which needs the
+// row from two steps back and so three rows rather than two.
 func editDistance(a, b string) int {
-	prev, cur := make([]int, len(b)+1), make([]int, len(b)+1)
+	prev2, prev, cur := make([]int, len(b)+1), make([]int, len(b)+1), make([]int, len(b)+1)
 	for j := range prev {
 		prev[j] = j
 	}
@@ -393,7 +403,11 @@ func editDistance(a, b string) int {
 				cost = 0
 			}
 			cur[j] = min(cur[j-1]+1, prev[j]+1, prev[j-1]+cost)
+			if i > 1 && j > 1 && a[i-1] == b[j-2] && a[i-2] == b[j-1] {
+				cur[j] = min(cur[j], prev2[j-2]+1)
+			}
 		}
+		copy(prev2, prev)
 		copy(prev, cur)
 	}
 	return prev[len(b)]
@@ -429,6 +443,50 @@ func plural(word string) string {
 }
 
 func isVowel(b byte) bool { return strings.IndexByte("aeiouAEIOU", b) >= 0 }
+
+// English joins names the way a sentence does: "a", "a and b", "a, b and c".
+//
+// Messages list things constantly — the directories written, the sources a
+// preset draws from, the presets that exist — and a list printed with Join
+// reads as data where a sentence was meant. Two packages had written this,
+// one of them twice, during the work that was meant to remove duplication.
+func English(items []string) string {
+	switch len(items) {
+	case 0:
+		return ""
+	case 1:
+		return items[0]
+	case 2:
+		return items[0] + " and " + items[1]
+	}
+	return strings.Join(items[:len(items)-1], ", ") + " and " + items[len(items)-1]
+}
+
+// Unknown is what to say when a name is not one of the names there are.
+//
+// Six places asked this question and answered it in three voices: "did you
+// mean x?", "dev ships x and y", "it declares x". They are one situation, and
+// a reader meeting it in two commands should not have to work out that they
+// are the same.
+//
+// The nearest name comes first when there is one, because a typo has one
+// answer and reading a list to find it is work nobody needs to do. Failing
+// that the list is the answer, because a name that resembles nothing usually
+// means the reader does not know what exists.
+//
+// Turning a registry of anything into its names is Map's job, which is where
+// the generics in this already are: Unknown takes the names and supplies only
+// the sentence.
+func Unknown(what, name string, have []string) error {
+	switch {
+	case Nearest(name, have) != "":
+		return fmt.Errorf("no %s named %q; did you mean %q?", what, name, Nearest(name, have))
+	case len(have) == 0:
+		return fmt.Errorf("no %s named %q, and there are none", what, name)
+	default:
+		return fmt.Errorf("no %s named %q; there is %s", what, name, English(Sorted(have)))
+	}
+}
 
 // Lines is a text's lines with the blank tail every file ends with dropped.
 //
