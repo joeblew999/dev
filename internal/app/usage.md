@@ -20,6 +20,24 @@ either way. It also answers the question that comes before any experiment
 with fronting: which of these can be used without touching anything that
 matters.
 
+`front HOST ORIGIN` puts Cloudflare in front of an app, and `unfront HOST`
+takes it away. They say what would change and change nothing until `--apply`,
+and the zone is named with `--zone` rather than worked out from the hostname —
+a token here reaches every zone on an account, and this changes how Cloudflare
+serves every site on the one it touches.
+
+They drive opentofu with Cloudflare's own provider, and dev writes the
+configuration so nobody here writes Terraform by hand. Both are binaries the
+registry fetches, which is the point: the Cloudflare surface a project wants
+is vast — Access, WAF, load balancers, certificates — and forty hand-rolled
+lines per resource is a worse trade than a provider Cloudflare generates and
+tests. What comes with it is a plan that says exactly what would happen, state
+that records what dev made so removing it is exact, and a provider that knows
+a zone setting cannot be destroyed, only set to something else.
+
+Reading stays dev's own, because a read wants no state file, no plan and no
+provider: it wants an answer, and it has one in about a second.
+
 `fronting HOST` says what stands in front of a host and whether that
 arrangement can work. Both read and change nothing, deliberately: a token
 that can read a zone's settings can usually write them, and one that reaches

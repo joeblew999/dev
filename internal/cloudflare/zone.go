@@ -28,6 +28,7 @@ type Zone struct {
 
 // Record is one DNS entry, and whether Cloudflare stands in front of it.
 type Record struct {
+	ID      string `json:"id"`
 	Type    string `json:"type"`
 	Name    string `json:"name"`
 	Content string `json:"content"`

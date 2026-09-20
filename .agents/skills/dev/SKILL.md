@@ -76,6 +76,24 @@ either way. It also answers the question that comes before any experiment
 with fronting: which of these can be used without touching anything that
 matters.
 
+`front HOST ORIGIN` puts Cloudflare in front of an app, and `unfront HOST`
+takes it away. They say what would change and change nothing until `--apply`,
+and the zone is named with `--zone` rather than worked out from the hostname —
+a token here reaches every zone on an account, and this changes how Cloudflare
+serves every site on the one it touches.
+
+They drive opentofu with Cloudflare's own provider, and dev writes the
+configuration so nobody here writes Terraform by hand. Both are binaries the
+registry fetches, which is the point: the Cloudflare surface a project wants
+is vast — Access, WAF, load balancers, certificates — and forty hand-rolled
+lines per resource is a worse trade than a provider Cloudflare generates and
+tests. What comes with it is a plan that says exactly what would happen, state
+that records what dev made so removing it is exact, and a provider that knows
+a zone setting cannot be destroyed, only set to something else.
+
+Reading stays dev's own, because a read wants no state file, no plan and no
+provider: it wants an answer, and it has one in about a second.
+
 `fronting HOST` says what stands in front of a host and whether that
 arrangement can work. Both read and change nothing, deliberately: a token
 that can read a zone's settings can usually write them, and one that reaches
@@ -128,6 +146,8 @@ next time anybody looked. Read it — it is the convention, not a ceiling.
   remove a deployed app, and the storage created with it; asks first
 - `dev domains [--fail-on error|warning|info] [--json] [--out PATH] [--quiet] [--record DIR]`
   every domain on the Cloudflare account, and what each one points at
+- `dev front HOST ORIGIN [--apply] [--zone ZONE]`
+  put Cloudflare in front of a host; says what it would do unless --apply
 - `dev fronting HOST [--fail-on error|warning|info] [--json] [--out PATH] [--quiet] [--record DIR]`
   what stands in front of a host on Cloudflare, and whether it will work
 - `dev list DIR [--env NAME]`
@@ -136,6 +156,8 @@ next time anybody looked. Read it — it is the convention, not a ceiling.
   follow the deployed app's logs as they happen
 - `dev smoke DIR [--env NAME] [--expect TEXT] [--path P] [--timeout LONG]`
   start the Worker locally and make one request, to know a build is not broken
+- `dev unfront HOST [--yes] [--zone ZONE]`
+  remove the record that fronts a host
 - `dev url DIR [--deployed] [--env NAME] [--local URL] [--refresh]`
   print the address to talk to, deployed or local
 - `dev wait URL [--timeout LONG]`

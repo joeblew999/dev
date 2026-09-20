@@ -64,6 +64,8 @@ var dev = cli.Command{
 		"wait":     {Run: app.WaitVerb, Args: "URL", Flags: app.WaitFlags, Desc: "poll a URL until it answers steadily", Usage: app.Usage},
 		"seo":      {Subs: seo.Subs, Usage: seo.Usage},
 		"domains":  {Run: app.DomainsVerb, Flags: cli.ReportFlags, Desc: "every domain on the Cloudflare account, and what each one points at", Usage: app.Usage},
+		"front":    {Run: app.FrontVerb, Args: "HOST ORIGIN", Flags: app.FrontFlags, Desc: "put Cloudflare in front of a host; says what it would do unless --apply", Usage: app.Usage},
+		"unfront":  {Run: app.UnfrontVerb, Args: "HOST", Flags: app.UnfrontFlags, Desc: "remove the record that fronts a host", Usage: app.Usage},
 		"fronting": {Run: app.FrontingVerb, Args: "HOST", Flags: app.FrontingFlags, Desc: "what stands in front of a host on Cloudflare, and whether it will work", Usage: app.Usage},
 		"list":     {Run: app.ListVerb, Args: "DIR", Flags: app.EnvFlag, Desc: "what is deployed on this directory's cloud, with this one marked", Usage: app.Usage},
 		"delete":   {Run: app.DeleteVerb, Args: "DIR", Flags: app.DeleteFlags, Desc: "remove a deployed app, and the storage created with it; asks first", Usage: app.Usage},

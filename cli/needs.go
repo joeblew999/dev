@@ -51,6 +51,8 @@ var needs = map[string]Need{
 	"gh":         {Bin: "gh", Pin: `gh = "latest"`, For: "release: publishing it"},
 	"cloudflared": {Bin: "cloudflared", Pin: `cloudflared = "latest"`,
 		For: "fronting an app through a tunnel"},
+	"tofu": {Bin: "tofu", Pin: `opentofu = "latest"`,
+		For: "front and unfront: the Cloudflare zone changes, planned before they happen"},
 
 	// The three mise does not install.
 	"git": {Bin: "git", For: "which repository a directory is in",

@@ -145,6 +145,25 @@ func FrontingVerb(c cli.Call) error { return Fronting(c, c.Args[0]) }
 // or a name.
 func DomainsVerb(c cli.Call) error { return Domains(c) }
 
+// FrontVerb puts Cloudflare in front of a host, or says what it would do.
+func FrontVerb(c cli.Call) error { return Front(c, c.Args[0], c.Args[1]) }
+
+// UnfrontVerb takes it away again.
+func UnfrontVerb(c cli.Call) error { return Unfront(c, c.Args[0]) }
+
+// FrontFlags are what front takes. The zone is named rather than inferred,
+// and nothing happens without --apply.
+func FrontFlags(fs *flag.FlagSet) {
+	fs.String("zone", "", "the `ZONE` this is about, named rather than inferred from the host")
+	fs.Var(new(cli.Bool), "apply", "make the changes; without it, only say what they would be")
+}
+
+// UnfrontFlags are what unfront takes.
+func UnfrontFlags(fs *flag.FlagSet) {
+	fs.String("zone", "", "the `ZONE` this is about")
+	fs.Var(new(cli.Bool), "yes", "do not ask")
+}
+
 // FrontingFlags are what fronting takes.
 func FrontingFlags(fs *flag.FlagSet) { cli.ReportFlags(fs) }
 
