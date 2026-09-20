@@ -27,7 +27,7 @@ func (c Command) skills(call Call) error {
 	}
 	report := SkillsReport{Directories: map[string][]skillEntry{}}
 	seen := map[string][]string{}
-	for _, dir := range []string{ClaudeDir, AgentsDir} {
+	for _, dir := range AgentDirs() {
 		found := readSkills(filepath.Join(root, dir))
 		report.Directories[dir] = found
 		for _, s := range found {
@@ -44,7 +44,7 @@ func (c Command) skills(call Call) error {
 	if call.WantsJSON() {
 		return call.EmitJSON(report)
 	}
-	for _, dir := range []string{ClaudeDir, AgentsDir} {
+	for _, dir := range AgentDirs() {
 		fmt.Fprintf(call.Stdout, "%s\n", dir)
 		if len(report.Directories[dir]) == 0 {
 			fmt.Fprintf(call.Stdout, "  (none)\n")

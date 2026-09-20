@@ -27,6 +27,16 @@ const (
 	SkillFile  = "SKILL.md"
 )
 
+// AgentDirs are the directories an agent reads skills from, in the order a
+// message lists them. Every skill a repo has belongs in all of them: an agent
+// reads its own and no other, so a skill in one alone is one the rest cannot
+// see — which `<cmd> skills` reports and nothing was fixing for skills that
+// come from an upstream.
+//
+// ShippedDir is not one of them. Nothing reads it in place; it is what a
+// release carries, and only a command's own manual goes there.
+func AgentDirs() []string { return []string{ClaudeDir, AgentsDir} }
+
 // Command is a whole binary: its verbs, and the manual rendered from them.
 // Main runs it; CheckSkill holds its manual to its verbs from a test. Every
 // command gets skill and version without writing them: `<name> skill` writes

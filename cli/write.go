@@ -164,11 +164,11 @@ func (c Command) writeSkill(stdout io.Writer, name, body string, check bool) err
 // skillPaths are the three copies of a manual for name: the one the release
 // ships, and the ones each agent reads in this repo.
 func skillPaths(root, name string) []string {
-	return []string{
-		filepath.Join(root, ShippedDir, name, SkillFile),
-		filepath.Join(root, ClaudeDir, name, SkillFile),
-		filepath.Join(root, AgentsDir, name, SkillFile),
+	paths := []string{filepath.Join(root, ShippedDir, name, SkillFile)}
+	for _, dir := range AgentDirs() {
+		paths = append(paths, filepath.Join(root, dir, name, SkillFile))
 	}
+	return paths
 }
 
 // version is `<Name> version`, and with --pin the mise.toml line that
