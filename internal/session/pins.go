@@ -2,6 +2,8 @@ package session
 
 import (
 	"fmt"
+	"path"
+	"strings"
 
 	"github.com/joeblew999/dev/internal/conf"
 
@@ -31,14 +33,58 @@ type claudePins struct {
 	ApproveMCPServers  bool  `toml:"approve_mcp_servers"`
 }
 
-// sourcePins is one GitHub repo at one commit, and the skills taken from its
-// skills/ directory. A commit, not a tag: the one upstream this repo needs
-// (cloudflare/skills) ships no releases, and a tool that does ships a packslip
-// release, which mise pins and links without any help from here.
+// sourcePins is one GitHub repo at one commit, and the skills taken from it. A
+// commit, not a tag: an upstream that ships skills usually ships no releases,
+// and a tool that does ships a packslip release, which mise pins and links
+// without any help from here.
+//
+// Dir is where skills live in that repo, `skills` unless it says otherwise —
+// the convention, not a rule, and a repo that keeps them at its root or under
+// a category says so here rather than being unusable.
+//
+// A name in Skills may be a path within Dir, because upstreams file them by
+// category: `engineering/tdd` is taken from there and vendored as `tdd`, since
+// Claude Code reads `.claude/skills/<name>/SKILL.md` and looks no deeper.
 type sourcePins struct {
 	Repo   string   `toml:"repo"`
 	Ref    string   `toml:"ref"`
+	Dir    string   `toml:"dir"`
 	Skills []string `toml:"skills"`
+}
+
+// isCommit reports whether ref is a full git object name: forty hex digits.
+// Anything shorter is either a name that moves or an abbreviation that stops
+// being unique as upstream grows.
+func isCommit(ref string) bool {
+	if len(ref) != 40 {
+		return false
+	}
+	return strings.IndexFunc(ref, func(r rune) bool {
+		return !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f')
+	}) < 0
+}
+
+// dir is where this source keeps its skills, defaulting to the convention.
+// A leading or trailing slash is the same directory, so it is not an error.
+func (s sourcePins) dir() string { return strings.Trim(cli.Or(s.Dir, "skills"), "/") }
+
+// prefix is the path every one of this source's files starts with inside the
+// tarball GitHub serves: codeload names the top directory after the repo, not
+// after `skills` — which is what an upstream not called `skills` used to trip
+// over, silently, as "skill not found".
+func (s sourcePins) prefix() string {
+	top := s.Repo[strings.LastIndex(s.Repo, "/")+1:]
+	if d := s.dir(); d != "" {
+		return fmt.Sprintf("%s-%s/%s/", top, s.Ref, d)
+	}
+	return fmt.Sprintf("%s-%s/", top, s.Ref)
+}
+
+// vendored is the name a skill is written under: the last element of the name
+// it has upstream. `engineering/tdd` is `tdd` here, because an agent finds a
+// skill one level below .claude/skills and nowhere else.
+func vendored(name string) string {
+	return path.Base(strings.Trim(name, "/"))
 }
 
 // loadPins reads session.toml. Every error names the fix: the file is the only
@@ -57,6 +103,16 @@ func loadPins() (pins, error) {
 		s := p.Source[name]
 		if s.Repo == "" || s.Ref == "" {
 			return pins{}, fmt.Errorf("%s: [source.%s] needs repo and ref; fix the file, then: "+syncCmd, pinsFile, name)
+		}
+		if strings.Count(s.Repo, "/") != 1 {
+			return pins{}, fmt.Errorf("%s: [source.%s] repo is %q; it wants owner/name, which is what GitHub is asked for", pinsFile, name, s.Repo)
+		}
+		// A branch or a tag is not a pin: it is a name upstream may point
+		// anywhere tomorrow, and a repo that syncs from one gets a different
+		// session on a different day with the file unchanged. `bump` is how a
+		// pin moves, and it writes the commit it moved to.
+		if !isCommit(s.Ref) {
+			return pins{}, fmt.Errorf("%s: [source.%s] ref is %q, which is a name and not a commit, so it pins nothing; use the full commit sha — `dev session bump %s` writes upstream's", pinsFile, name, s.Ref, name)
 		}
 		if len(s.Skills) == 0 {
 			return pins{}, fmt.Errorf("%s: [source.%s] lists no skills", pinsFile, name)

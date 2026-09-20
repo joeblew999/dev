@@ -6,6 +6,16 @@ those skills need. `session.toml` is where that is written, and these verbs
 are the only things that act on it — one file decides, and every developer
 and every agent on the repo gets the same session from it.
 
+A `[source.<name>]` block is one GitHub repository at one commit and the
+skills taken from it. `dir` is where that repository keeps them, `skills`
+unless it says otherwise, and a name in `skills` may be a path within it —
+upstreams file skills by category, so `engineering/tdd` is taken from there
+and vendored as `tdd`, which is where an agent looks. Two pins that would
+land on the same name are refused rather than one quietly overwriting the
+other. `ref` is a full commit sha and nothing else: a branch or a tag is a
+name upstream can move, so a repo pinned to one gets a different session on a
+different day with the file unchanged.
+
 `sync` writes what the file implies and `check` refuses when what is on disk
 has drifted from it, so the pair is the usual gate: run the first, let CI run
 the second. `verify` goes further and holds a real Claude Code session against

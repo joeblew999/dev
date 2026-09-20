@@ -15,13 +15,16 @@ import (
 	"strings"
 )
 
-func copyTar(files skillFiles, archive []byte, prefix, name, repo, ref string) error {
+// copyTar takes every file under prefix out of archive and files it under as,
+// reporting whether the prefix matched anything at all. It does not say what a
+// miss means: only the caller knows which pin asked, and an error that names
+// the pin is the one a reader can act on.
+func copyTar(files skillFiles, archive []byte, prefix, as string) (found bool, err error) {
 	gz, err := gzip.NewReader(bytes.NewReader(archive))
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer gz.Close()
-	found := false
 	r := tar.NewReader(gz)
 	for {
 		header, err := r.Next()
@@ -29,22 +32,19 @@ func copyTar(files skillFiles, archive []byte, prefix, name, repo, ref string) e
 			break
 		}
 		if err != nil {
-			return err
+			return false, err
 		}
 		if header.Typeflag != tar.TypeReg || !strings.HasPrefix(header.Name, prefix) {
 			continue
 		}
 		data, err := io.ReadAll(r)
 		if err != nil {
-			return err
+			return false, err
 		}
-		files[path.Join(name, strings.TrimPrefix(header.Name, prefix))] = data
+		files[path.Join(as, strings.TrimPrefix(header.Name, prefix))] = data
 		found = true
 	}
-	if !found {
-		return fmt.Errorf("skill %q not found in %s@%s", name, repo, ref[:12])
-	}
-	return nil
+	return found, nil
 }
 
 func download(url string) ([]byte, error) {

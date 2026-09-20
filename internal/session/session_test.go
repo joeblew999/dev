@@ -70,7 +70,7 @@ func TestDiffFiles(t *testing.T) {
 
 func TestLoadPins(t *testing.T) {
 	t.Chdir(t.TempDir())
-	content := "[source.a]\nrepo = \"org/a\"\nref = \"def456\"\nskills = [\"x\", \"y\"]\n\n[source.b]\nrepo = \"org/repo\"\nref = \"abc123\"\nskills = [\"z\"]\n"
+	content := "[source.a]\nrepo = \"org/a\"\nref = \"dddddddddddddddddddddddddddddddddddddddd\"\nskills = [\"x\", \"y\"]\n\n[source.b]\nrepo = \"org/repo\"\nref = \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\nskills = [\"z\"]\n"
 	if err := writeFile("session.toml", content); err != nil {
 		t.Fatal(err)
 	}
@@ -82,18 +82,18 @@ func TestLoadPins(t *testing.T) {
 		t.Errorf("names = %v", got)
 	}
 	a := p.Source["a"]
-	if a.Repo != "org/a" || a.Ref != "def456" || len(a.Skills) != 2 {
+	if a.Repo != "org/a" || a.Ref != "dddddddddddddddddddddddddddddddddddddddd" || len(a.Skills) != 2 {
 		t.Errorf("source a = %+v", a)
 	}
 	b := p.Source["b"]
-	if b.Repo != "org/repo" || b.Ref != "abc123" || len(b.Skills) != 1 {
+	if b.Repo != "org/repo" || b.Ref != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" || len(b.Skills) != 1 {
 		t.Errorf("source b = %+v", b)
 	}
 }
 
 func TestLoadPinsRejectsUnknownKeys(t *testing.T) {
 	t.Chdir(t.TempDir())
-	if err := writeFile("session.toml", "[source.a]\nrepo = \"x/y\"\nref = \"abc\"\nskills = [\"z\"]\nbogus = 1\n"); err != nil {
+	if err := writeFile("session.toml", "[source.a]\nrepo = \"x/y\"\nref = \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\nskills = [\"z\"]\nbogus = 1\n"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := loadPins(); err == nil {
@@ -194,7 +194,7 @@ func TestSyncCommandComesFromPins(t *testing.T) {
 	t.Chdir(t.TempDir())
 	defer func(old string) { syncCmd = old }(syncCmd)
 	syncCmd = "dev session sync"
-	if err := writeFile("session.toml", "sync_command = \"just skills\"\n[source.a]\nrepo = \"o/r\"\nref = \"abc\"\nskills = [\"z\"]\n"); err != nil {
+	if err := writeFile("session.toml", "sync_command = \"just skills\"\n[source.a]\nrepo = \"o/r\"\nref = \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\nskills = [\"z\"]\n"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := loadPins(); err != nil {
@@ -319,5 +319,45 @@ func TestEmptyLockIsNoSkills(t *testing.T) {
 	files, err := lockedFiles()
 	if err != nil || len(files) != 0 {
 		t.Fatalf("lockedFiles() = %v, %v; want none and no error", files, err)
+	}
+}
+
+// A pin has to pin. `ref = "HEAD"` or a branch name reads as a version and is
+// not one: upstream moves it, two clones of this repo get different skills
+// from the same committed file, and nothing here would ever say so. It used to
+// be accepted and then panic much later, slicing four characters as twelve.
+func TestARefThatIsNotACommitIsRefused(t *testing.T) {
+	for _, ref := range []string{"HEAD", "main", "v1.2.0", "c55ee46", strings.Repeat("g", 40)} {
+		t.Run(ref, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			pin := "[source.a]\nrepo = \"o/r\"\nref = \"" + ref + "\"\nskills = [\"z\"]\n"
+			if err := writeFile("session.toml", pin); err != nil {
+				t.Fatal(err)
+			}
+			_, err := loadPins()
+			if err == nil {
+				t.Fatalf("ref %q was accepted, so this repo pins nothing", ref)
+			}
+			if !strings.Contains(err.Error(), ref) {
+				t.Errorf("the error does not quote the ref it rejected: %v", err)
+			}
+		})
+	}
+	if !isCommit(strings.Repeat("c5", 20)) {
+		t.Error("a real commit sha was called something else")
+	}
+}
+
+// The repo is asked of GitHub as owner/name, and it also names the directory
+// inside the tarball, so a half-written one has to be caught where it is read.
+func TestARepoWithoutAnOwnerIsRefused(t *testing.T) {
+	for _, repo := range []string{"skills", "github.com/o/r"} {
+		t.Chdir(t.TempDir())
+		if err := writeFile("session.toml", "[source.a]\nrepo = \""+repo+"\"\nref = \""+strings.Repeat("a", 40)+"\"\nskills = [\"z\"]\n"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := loadPins(); err == nil {
+			t.Errorf("repo %q was accepted", repo)
+		}
 	}
 }

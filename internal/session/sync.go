@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -160,6 +161,10 @@ func pinnedSkills() (skillFiles, error) {
 	}
 	files := skillFiles{}
 	var lock []string
+	// Which pin each vendored name came from, so two sources claiming one
+	// name is refused by saying both rather than by the second quietly
+	// overwriting the first.
+	from := map[string]string{}
 
 	for _, source := range p.names() {
 		s := p.Source[source]
@@ -167,12 +172,24 @@ func pinnedSkills() (skillFiles, error) {
 		if err != nil {
 			return nil, err
 		}
-		prefix := fmt.Sprintf("skills-%s/skills/", s.Ref)
+		at := fmt.Sprintf("github.com/%s@%s", s.Repo, shortRef(s.Ref))
 		for _, name := range s.Skills {
-			if err := copyTar(files, archive, prefix+name+"/", name, s.Repo, s.Ref); err != nil {
+			as := vendored(name)
+			if was, taken := from[as]; taken {
+				return nil, fmt.Errorf("%s: two skills would both be vendored as %q — %s and %s/%s; one of them needs a source that spells it differently",
+					pinsFile, as, was, source, name)
+			}
+			within := path.Join(s.dir(), strings.Trim(name, "/"))
+			found, err := copyTar(files, archive, s.prefix()+strings.Trim(name, "/")+"/", as)
+			if err != nil {
 				return nil, err
 			}
-			lock = append(lock, lockSkill(name, fmt.Sprintf("github.com/%s@%s", s.Repo, s.Ref[:12]), files))
+			if !found {
+				return nil, fmt.Errorf("%s: [source.%s] pins skill %q, and %s holds no %s/; check the name and this source's dir, then: "+syncCmd,
+					pinsFile, source, name, at, within)
+			}
+			from[as] = source + "/" + name
+			lock = append(lock, lockSkill(as, at, files))
 		}
 	}
 
