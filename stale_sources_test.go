@@ -31,31 +31,16 @@ func embedded(t *testing.T) []string {
 	t.Helper()
 	directive := regexp.MustCompile(`(?m)^//go:embed\s+(.+)$`)
 	var out []string
-	err := filepath.WalkDir(".", func(p string, d os.DirEntry, err error) error {
-		switch {
-		case err != nil:
-			return nil
-		case d.IsDir():
-			if name := d.Name(); name == ".git" || name == ".bin" || name == ".dist" {
-				return filepath.SkipDir
-			}
-			return nil
-		case filepath.Ext(p) != ".go" || strings.HasSuffix(p, "_test.go"):
-			return nil
-		}
+	for _, p := range goFiles(t) {
 		data, err := os.ReadFile(p)
 		if err != nil {
-			return nil
+			continue
 		}
 		for _, m := range directive.FindAllStringSubmatch(string(data), -1) {
 			for name := range strings.FieldsSeq(m[1]) {
 				out = append(out, filepath.Join(filepath.Dir(p), name))
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 	return out
 }

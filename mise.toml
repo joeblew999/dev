@@ -294,3 +294,32 @@ run = [
   ".bin/dev deploy site",
   ".bin/dev seo check {{ vars.site_origin }}/",
 ]
+
+[tasks."site:evolve:agent"]
+description = "Hand the findings mise cannot fix to Claude Code, which changes dev until it can"
+depends = ["build"]
+# The loop above closes what dev already knows how to close. What survives it
+# is, by construction, what no writer claims — and every one of those is a
+# question about dev itself: a writer that should exist, a validator that
+# could have caught it before the deploy, a Fixes prefix pointing nowhere.
+# Answering that is a code change, so the thing that answers it is an agent
+# with the repo in front of it.
+#
+# The brief is site/evolve.md, beside the code it is about, for the same
+# reason every other manual here is: a prompt kept in a task is a prompt
+# nobody reads and nobody edits.
+#
+# It refuses on a dirty tree, and that is the whole safety net. AGENTS.md's
+# first rule about refactoring is to commit green before starting, because
+# `git checkout --` is what has saved this repo every time a refactor went
+# wrong. An agent editing over uncommitted work takes that away, so it does
+# not get to start. It also never commits and never deploys a red tree; both
+# are in the brief, and the clean tree is what makes them recoverable if it
+# ignores them.
+run = [
+  # dev knows what installs Claude Code, and it is the one tool in the
+  # registry mise cannot fetch, so the answer is a sentence rather than a pin.
+  "command -v claude >/dev/null || { .bin/dev tools --missing | grep claude; exit 1; }",
+  "git diff --quiet && git diff --cached --quiet || { echo 'the tree is dirty; commit or stash first — a clean tree is the only way back from an agent that goes wrong' >&2; exit 1; }",
+  "claude -p \"$(cat site/evolve.md)\" --permission-mode acceptEdits --allowed-tools Bash Read Edit Write Glob Grep --model claude-opus-5",
+]

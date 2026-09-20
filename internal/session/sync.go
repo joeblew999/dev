@@ -16,6 +16,7 @@
 package session
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -61,6 +62,33 @@ func Sync(out io.Writer) error {
 	return nil
 }
 
+// fixers is what resolves what Check finds, which is one verb: sync writes
+// every agent's directory and every settings key the pins imply.
+//
+// Declared rather than described. Every finding's Fix used to end with the
+// sentence "fix with: dev session sync" — true, repeated on every finding,
+// and a string nothing could run. Naming the verb instead lets the report
+// route to it, `--fix` run it, and the sentence be written once.
+//
+// absolute-path is deliberately not claimed. A committed path naming this
+// machine's home directory is not drift from the pins; it is a thing
+// somebody wrote that sync would happily write again. Claiming it would be
+// promising a fix that does nothing.
+func fixers() []cli.Fixer {
+	return []cli.Fixer{{
+		Name:     "sync",
+		Produces: cli.English(vendored.Dirs()),
+		Fixes:    []string{"skill-drift", "settings-drift"},
+		Run:      func(c cli.Call, _ *cli.Report) error { return Sync(c.Stderr) },
+	}}
+}
+
+// CheckFlags are what `session check` takes.
+func CheckFlags(fs *flag.FlagSet) {
+	fs.Var(new(cli.Bool), "fix", "run what resolves what was found, rather than only naming it")
+	cli.ReportFlags(fs)
+}
+
 // Check fails when what is on disk differs from what the pins imply. It needs
 // no network: file contents are compared against the hashes sync recorded.
 func Check(c cli.Call) error {
@@ -71,15 +99,39 @@ func Check(c cli.Call) error {
 	if err != nil {
 		return err
 	}
-	return c.Reported("session", cli.Or(cli.English(vendored.Dirs()), "nowhere"), func(rep *cli.Report) error {
+	// Looked at twice when --fix is given, and the second look is the one
+	// reported. The first only decides what to run; reporting it would say
+	// "fail" about a state the same command had just put right, which is the
+	// report contradicting itself one more way.
+	look := func(rep *cli.Report) error {
 		cli.Parts(rep, 1, []cli.Part{
 			{Name: "skills", Provides: "every agent's directory holds what session.toml pins", Look: lockedSkills},
 			{Name: "settings", Provides: ".claude/settings.json holds what [claude] implies",
 				Look: func() ([]cli.Finding, string, error) { return settingsFindings(p.Claude) }},
 			{Name: "paths", Provides: "nothing committed names this machine's home directory", Look: portableFindings},
 		})
+		cli.Attribute(rep, fixers())
+		rep.Fail = "what agents read does not match " + pins.File
+		return nil
+	}
+	target := cli.Or(cli.English(vendored.Dirs()), "nowhere")
+	if c.Given("fix") {
+		first := cli.NewReport("session", target)
+		if err := look(first); err != nil {
+			return err
+		}
+		if err := c.Fix(first, fixers()); err != nil {
+			return err
+		}
+	}
+	return c.Reported("session", target, func(rep *cli.Report) error {
+		if err := look(rep); err != nil {
+			return err
+		}
 		warnStaleSessions(c.Stderr, time.Now())
-		rep.Fail = "what agents read does not match " + pins.File + "; fix with: " + pins.SyncCommand()
+		if !c.Given("fix") {
+			c.Fixable(rep, fixers(), pins.SyncCommand())
+		}
 		return nil
 	})
 }
@@ -103,8 +155,7 @@ func lockedSkills() ([]cli.Finding, string, error) {
 // sentence around the same list.
 func findings(id string, diff []string, what string) []cli.Finding {
 	return cli.Map(diff, func(line string) cli.Finding {
-		return cli.Finding{Severity: cli.SevError, ID: id, Message: line,
-			Fix: what + "; fix with: " + pins.SyncCommand()}
+		return cli.Finding{Severity: cli.SevError, ID: id, Message: line, Fix: what}
 	})
 }
 

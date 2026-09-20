@@ -111,11 +111,25 @@ func TestCheckSettingsCatchesHandEdits(t *testing.T) {
 	if len(found) == 0 {
 		t.Fatal("settings that do not match the pins passed the check")
 	}
-	// Every finding names the fix, which is what makes a report actionable.
+	// Every finding is claimed by the verb that resolves it, which is what
+	// makes a report actionable. It used to be asserted as a sentence — each
+	// finding's Fix ending in "fix with: dev session sync" — and a sentence
+	// is a fix a reader has to carry out by hand. Now the fixer is declared,
+	// so the report can route to it and --fix can run it, and what this holds
+	// is that every finding reaches one.
+	rep := cli.NewReport("session", "here")
 	for _, f := range found {
-		if !strings.Contains(f.Fix, pins.SyncCommand()) {
-			t.Errorf("%s does not name %q as the fix: %q", f.ID, pins.SyncCommand(), f.Fix)
+		rep.Add(f)
+	}
+	cli.Attribute(rep, fixers())
+	for _, f := range rep.Findings {
+		if f.FixedBy == "" {
+			t.Errorf("%s is claimed by no fixer, so nothing can put it right: %q", f.ID, f.Message)
 		}
+	}
+	// And the fixer that claims it is the one a reader would run.
+	if got := cli.Claimed(rep, fixers()); len(got) != 1 || got[0].Name != "sync" {
+		t.Errorf("settings drift routes to %v; sync is what writes those keys", got)
 	}
 }
 

@@ -111,8 +111,10 @@ func goFiles(t *testing.T) []string {
 		case err != nil:
 			return nil
 		case d.IsDir():
-			// The same skips stale_sources_test.go makes, for the same
-			// reason: build output and git's own objects are not source.
+			// Build output and git's own objects are not source. This is the
+			// one walk both root tests use: stale_sources_test.go wants each
+			// file's contents and this wants its path, and they had written
+			// the same three skips twice.
 			if name := d.Name(); name == ".git" || name == ".bin" || name == ".dist" {
 				return filepath.SkipDir
 			}

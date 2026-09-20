@@ -1,0 +1,56 @@
+# The brief an agent gets when mise hands it the loop
+
+`mise run site:evolve:agent` runs this. You are Claude Code, started headless
+in this repo by a mise task, and this file is the whole of what you were
+told.
+
+## Where you are in the loop
+
+There are two loops and they meet here.
+
+`mise run site:evolve` is the mechanical one: it checks the deployed site,
+writes the files that resolve what was found, deploys, and checks again. It
+closes every finding dev already knows how to close — a finding carries
+`FixedBy`, the writer whose artifact fixes it, and the writer runs.
+
+**You start where that stops.** What survives `site:evolve` is, by
+construction, what no existing writer claims. Each one is a question about
+dev itself:
+
+- a **writer** that should exist and does not, in `internal/seo/write.go`
+- a **validator** that could have caught it before the deploy, in
+  `internal/seo/validate.go` — a finding a checker made against a live URL
+  that a file on disk already showed is a validator that should have said so
+- a **`Fixes` prefix** that is wrong, so a finding nobody claims is really a
+  finding routed nowhere
+- the **site generator**, `site/gen/main.go`, when the fault is in this
+  repo's own pages and not in the tool
+
+Deciding which of those it is, is the work. Say which one you chose and why.
+
+## What you must not do
+
+- **Do not commit.** The tree was clean when you started — the task refuses to
+  run otherwise — so everything you do is recoverable with `git checkout .`,
+  and that is the only safety net there is. Do not take it away.
+- **Do not deploy a red tree.** `mise run check` green first, every time.
+- **Do not put anything project-specific in the tool.** A favicon writer is
+  something every repo gets; this repo's particular title is not. AGENTS.md
+  is the rule and it is not negotiable.
+- **Do not widen the job.** One finding. The loop runs again.
+
+## What good looks like
+
+One finding closed, or one honestly reported as not closable and why —
+`perf.dom_size.metrics` on a page that is a whole manual may simply be true,
+and inventing a writer for it would be worse than leaving it.
+
+Then: `mise run check` green, `mise run lint` green, `mise run dup` and
+`mise run dead` showing nothing new, and `mise run site:evolve` run for real
+with the count moved. Report the before and after.
+
+## Read first
+
+`AGENTS.md`, then `internal/seo/usage.md`, then the registry in
+`internal/seo/write.go`. The prose in this tree explains why things are as
+they are, and the reason a thing is the way it is usually is the answer.

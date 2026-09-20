@@ -36,7 +36,7 @@ var Usage string
 // once, when a message first needs it — and the wrapper is gone.
 var Subs = map[string]cli.Verb{
 	"sync":   {Run: func(c cli.Call) error { return Sync(c.Stdout) }, Desc: "write every agent's skills directory and the .claude/settings.json keys session.toml implies"},
-	"check":  {Run: Check, Flags: cli.ReportFlags, Desc: "fail when either has drifted from session.toml"},
+	"check":  {Run: Check, Flags: CheckFlags, Desc: "fail when either has drifted from session.toml, and with --fix put it back"},
 	"verify": {Run: runVerify, Flags: VerifyFlags, Desc: "hold a fresh Claude Code session against SESSION.lock"},
 	"bump":   {Run: runBump, Args: "[SOURCE...]", Desc: "move a pin in session.toml to upstream HEAD"},
 	"remove": {Run: func(c cli.Call) error { return Remove(c.Stdout) }, Desc: "take back every skill sync put here, leaving this repo's own alone"},
