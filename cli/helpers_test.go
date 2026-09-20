@@ -267,3 +267,26 @@ func TestSetKnowsWhatWasActuallyGiven(t *testing.T) {
 		t.Error("Set is true for a flag that is not registered")
 	}
 }
+
+// A list of alternatives is not a list of things. "has no wrangler.toml and
+// fly.toml" reads as needing both, which is the opposite of what it means.
+func TestEitherOr(t *testing.T) {
+	for _, tc := range []struct {
+		in   []string
+		want string
+	}{
+		{nil, ""},
+		{[]string{"a"}, "a"},
+		{[]string{"a", "b"}, "a or b"},
+		{[]string{"a", "b", "c"}, "a, b or c"},
+	} {
+		if got := EitherOr(tc.in); got != tc.want {
+			t.Errorf("EitherOr(%q) = %q; want %q", tc.in, got, tc.want)
+		}
+	}
+	// And English still says and, because a set of destinations written to is
+	// a list of things.
+	if got := English([]string{"a", "b"}); got != "a and b" {
+		t.Errorf("English = %q", got)
+	}
+}

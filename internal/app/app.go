@@ -25,6 +25,7 @@ import (
 	_ "embed"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -79,7 +80,15 @@ func URLFlags(fs *flag.FlagSet) {
 }
 
 // DeployFlags are what `deploy` takes.
+// toFlag names the cloud for a directory that has none, so `deploy --to fly`
+// writes the config and goes. It is only on deploy: every other verb acts on
+// something already deployed, and there is nothing to choose.
+func toFlag(fs *flag.FlagSet) {
+	fs.String("to", "", "the `CLOUD` to deploy to, writing its config when the directory has none")
+}
+
 func DeployFlags(fs *flag.FlagSet) {
+	toFlag(fs)
 	EnvFlag(fs)
 	fs.String("wait", "", "the `PATH` to wait for a 200 on after deploying, e.g. /health")
 }
@@ -128,6 +137,17 @@ func WaitVerb(c cli.Call) error {
 // said the same thing in two wordings: print the URL, deploy then wait, hand
 // the rest straight on. A verb's meaning now lives where the verb does.
 type cloud struct {
+	// Scaffold is a conventional config for a directory that has none, named
+	// after the directory. goreleaser's is the precedent: a config is made at
+	// the moment it is needed rather than by an init verb, so a repo that
+	// wants its own writes one and nobody else has to.
+	//
+	// Unlike goreleaser's, this one is written into the repo and committed.
+	// It has to be: the file's presence is what names the target, so a
+	// temporary one would mean the directory deployed nowhere the next time
+	// anybody looked.
+	Scaffold func(dir, name string) string
+
 	// ConfigFile is the file whose presence in a directory names this target.
 	// It is here rather than read straight from the two packages because
 	// Target used to name both of them in one expression, so a third cloud
@@ -163,6 +183,7 @@ type cloud struct {
 var clouds = map[string]cloud{
 	"cloudflare": {
 		ConfigFile: cloudflare.ConfigFile,
+		Scaffold:   cloudflare.Scaffold,
 		URL: func(c cli.Call) (string, error) {
 			return cloudflare.URL(c.Dir, c.Value("env"), c.Given("deployed"), c.Value("local"), c.Given("refresh"))
 		},
@@ -183,6 +204,7 @@ var clouds = map[string]cloud{
 	},
 	"fly": {
 		ConfigFile: fly.ConfigFile,
+		Scaffold:   fly.Scaffold,
 		Ignores: map[string]string{
 			"env":     "a Fly app has no environments: fly.toml deploys one app, and a second app is a second directory",
 			"refresh": "--refresh re-asks the Workers API for a workers.dev name; a Fly app's address is its app name and is already exact",
@@ -217,6 +239,16 @@ var clouds = map[string]cloud{
 // to sends a verb to whichever cloud the directory deploys to, and does the
 // part that is the same wherever it went.
 func to(c cli.Call, verb string) error {
+	// A directory with no config and a --to gets one and carries on, which is
+	// the whole of "make it if it is not there": the config is written at the
+	// moment something needs it, not by a separate verb nobody remembers.
+	if want := c.Value("to"); want != "" && verb == "deploy" {
+		if _, err := Target(c.Dir); err != nil {
+			if err := scaffold(c.Stdout, c.Dir, want); err != nil {
+				return err
+			}
+		}
+	}
 	t, err := cloudFor(c.Dir)
 	if err != nil {
 		return err
@@ -288,8 +320,8 @@ func Target(dir string) (string, error) {
 		if st, err := os.Stat(dir); err != nil || !st.IsDir() {
 			return "", fmt.Errorf("%s is not a directory", dir)
 		}
-		return "", fmt.Errorf("%s has no %s, so nothing deploys it; add one beside its main.go",
-			dir, cli.English(configFiles()))
+		return "", fmt.Errorf("%s has no %s, so nothing deploys it; add one beside its main.go, or let deploy write one: --to %s",
+			dir, cli.EitherOr(configFiles()), cli.EitherOr(cli.SortedKeys(clouds)))
 	}
 	return "", fmt.Errorf("%s has %s; a directory deploys to one cloud, so split it in two",
 		dir, cli.English(cli.Map(found, func(name string) string { return clouds[name].ConfigFile })))
@@ -320,6 +352,42 @@ func PutSecret(dir, env, name, value string) error {
 		return err
 	}
 	return to.PutSecret(dir, env, name, value)
+}
+
+// scaffold writes a cloud's conventional config into a directory that has
+// none, and reports the target it just became. The file is named after the
+// directory, as every other name on this stack is.
+//
+// It is written here rather than by an init verb because that is the pattern
+// already: dev makes goreleaser's config at the moment a release needs one, so
+// a repo that wants its own writes it and nobody else thinks about it. The one
+// difference is that this file stays — the presence of it is what names the
+// target, so a temporary one would deploy nowhere the next time anyone looked.
+func scaffold(out io.Writer, dir, want string) error {
+	to, ok := clouds[want]
+	if !ok {
+		return cli.Usagef("--to: %v", cli.Unknown("cloud", want, cli.SortedKeys(clouds)))
+	}
+	if to.Scaffold == nil {
+		return fmt.Errorf("--to %s: that target writes no config of its own; add %s by hand", want, to.ConfigFile)
+	}
+	name := filepath.Base(mustAbs(dir))
+	path := filepath.Join(dir, to.ConfigFile)
+	if err := os.WriteFile(path, []byte(to.Scaffold(dir, name)), 0o644); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "wrote %s, so %s deploys to %s; read it and commit it\n", path, dir, want)
+	return nil
+}
+
+// mustAbs is dir as an absolute path, falling back to dir when the working
+// directory cannot be read — a name is better than a failure here.
+func mustAbs(dir string) string {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return dir
+	}
+	return abs
 }
 
 // cloudFor is the target a directory deploys to, as the thing that can act on

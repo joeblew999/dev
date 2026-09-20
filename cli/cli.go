@@ -469,16 +469,23 @@ func isVowel(b byte) bool { return strings.IndexByte("aeiouAEIOU", b) >= 0 }
 // preset draws from, the presets that exist — and a list printed with Join
 // reads as data where a sentence was meant. Two packages had written this,
 // one of them twice, during the work that was meant to remove duplication.
-func English(items []string) string {
+func English(items []string) string { return joined(items, "and") }
+
+// EitherOr is English for a list of alternatives rather than a list of
+// things: "wrangler.toml or fly.toml". A directory has no wrangler.toml and
+// fly.toml reads as needing both, which is the opposite of what it means.
+func EitherOr(items []string) string { return joined(items, "or") }
+
+func joined(items []string, conj string) string {
 	switch len(items) {
 	case 0:
 		return ""
 	case 1:
 		return items[0]
 	case 2:
-		return items[0] + " and " + items[1]
+		return items[0] + " " + conj + " " + items[1]
 	}
-	return strings.Join(items[:len(items)-1], ", ") + " and " + items[len(items)-1]
+	return strings.Join(items[:len(items)-1], ", ") + " " + conj + " " + items[len(items)-1]
 }
 
 // Unknown is what to say when a name is not one of the names there are.

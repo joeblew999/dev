@@ -12,6 +12,8 @@ import (
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/fnox"
 	"github.com/joeblew999/dev/internal/suffix"
+	"strconv"
+	"time"
 )
 
 // deployCopy is what wrangler actually deploys from. wrangler writes the ids
@@ -142,4 +144,22 @@ func entriesOf(v any) []map[string]any {
 		})
 	}
 	return nil
+}
+
+// Scaffold is a conventional wrangler.toml for a directory that has none.
+//
+// compatibility_date is the one field with no safe default: wrangler pins the
+// runtime's behaviour to it, and a date that drifts is a Worker that changes
+// under you. It is written as the day the file was made, which is what
+// wrangler itself does when it scaffolds.
+//
+// main names the wasm entry dev builds, so the file agrees with `dev wasm`
+// without anybody having to know what that produces.
+func Scaffold(dir, name string) string {
+	return "# Written by `dev deploy --to cloudflare` because " + dir + " had no " + ConfigFile + ".\n" +
+		"# It is the convention, not a ceiling: edit it, commit it, it is yours.\n" +
+		"name = " + strconv.Quote(name) + "\n" +
+		"main = \"./main.mjs\"\n" +
+		"compatibility_date = " + strconv.Quote(time.Now().Format("2006-01-02")) + "\n" +
+		"compatibility_flags = [\"nodejs_compat\"]\n"
 }

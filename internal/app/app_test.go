@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/joeblew999/dev/cli"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -160,5 +161,52 @@ func TestTargetChoosesByTheRegistrysConfigFiles(t *testing.T) {
 	}
 	if _, err := Target(both); err == nil || !strings.Contains(err.Error(), "one cloud") {
 		t.Errorf("a directory holding every config gave %v", err)
+	}
+}
+
+// A directory with no config gets one when told which cloud, and the file it
+// gets is the one whose presence names that target — so the next verb, and
+// the next person, find a directory that deploys somewhere.
+func TestScaffoldWritesTheFileThatNamesTheTarget(t *testing.T) {
+	for name, c := range clouds {
+		if c.Scaffold == nil {
+			t.Errorf("cloud %q writes no config, so --to %s cannot work", name, name)
+			continue
+		}
+		dir := t.TempDir()
+		if _, err := Target(dir); err == nil {
+			t.Fatal("an empty directory already resolved to a cloud")
+		}
+		var out strings.Builder
+		if err := scaffold(&out, dir, name); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		// The point of writing it: the directory now deploys there.
+		got, err := Target(dir)
+		if err != nil || got != name {
+			t.Errorf("after scaffolding %s the directory resolves to %q (%v)", name, got, err)
+		}
+		// Named after the directory, as everything on this stack is.
+		written, err := os.ReadFile(filepath.Join(dir, c.ConfigFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(written), filepath.Base(dir)) {
+			t.Errorf("%s does not name the directory it is for:\n%s", c.ConfigFile, written)
+		}
+		// It says what wrote it, because a generated file that does not is a
+		// file someone edits without knowing what will happen.
+		if !strings.Contains(string(written), "dev deploy --to") {
+			t.Errorf("%s does not say what wrote it:\n%s", c.ConfigFile, written)
+		}
+		if !strings.Contains(out.String(), c.ConfigFile) {
+			t.Errorf("scaffolding said %q; it should name the file it wrote", out.String())
+		}
+	}
+	// A cloud nobody has heard of is a typo, answered with the ones there are.
+	if err := scaffold(io.Discard, t.TempDir(), "clowdflare"); err == nil {
+		t.Error("--to accepted a cloud that does not exist")
+	} else if !strings.Contains(err.Error(), "cloudflare") {
+		t.Errorf("the error does not offer the name that was meant: %v", err)
 	}
 }

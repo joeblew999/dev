@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/joeblew999/dev/cli"
@@ -221,3 +222,24 @@ func installed() error {
 var (
 	lookPath = exec.LookPath
 )
+
+// Scaffold is a conventional fly.toml for a directory that has none: the
+// smallest file that deploys, with the two settings that are wrong by default
+// for anything this stack builds.
+//
+// auto_stop_machines keeps a demo from billing while nobody is looking, and
+// min_machines_running = 0 is what makes that mean anything. The port is the
+// one a Go main on this stack listens on, because the Dockerfile sets PORT and
+// the code reads it.
+func Scaffold(dir, name string) string {
+	return "# Written by `dev deploy --to fly` because " + dir + " had no " + ConfigFile + ".\n" +
+		"# It is the convention, not a ceiling: edit it, commit it, it is yours.\n" +
+		"app = " + strconv.Quote(name) + "\n\n" +
+		"[build]\n\n" +
+		"[http_service]\n" +
+		"  internal_port = 8080\n" +
+		"  force_https = true\n" +
+		"  auto_stop_machines = \"stop\"\n" +
+		"  auto_start_machines = true\n" +
+		"  min_machines_running = 0\n"
+}
