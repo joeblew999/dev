@@ -23,11 +23,12 @@ confirmed here — treat it as a lead, not a fact.
 
 ---
 
-## Part 0 — The three halves
+## Part 0 — What it does
 
 `dev seo write DIR` produces the files a site needs, `dev seo validate DIR`
-checks them with no network at all, and `dev seo check URL` runs the external
-checkers against a deployed page. Writing and validating share one
+checks them with no network at all, `dev seo check URL` runs the external
+checkers against a deployed page, and `dev seo can` says what it is able to do
+without doing any of it. Writing and validating share one
 declaration — each writer names the check that proves its own output good, and
 `validate` runs that same check — so an artifact cannot pass when it is
 written and fail when it is checked.
@@ -42,7 +43,20 @@ tool has two dependencies. A sitemap is XML and robots.txt is four lines.
 |---|---|
 | `sitemap.xml` | absolute `<loc>` on the site's own host, priority in range, the 50,000-URL and 50MB caps Google enforces |
 | `robots.txt` | not blocking Googlebot, an absolute `Sitemap:` directive, the 500 KiB Google reads to |
+| `_headers` | the four response headers it sets are there, and a path rule applies them |
 | `head.html` | one `<title>` under 60 characters, a meta description, an **absolute** canonical, the four Open Graph tags, a JSON-LD block |
+
+`_headers` exists because running the checkers said so. Of 39 findings on a
+real site, 22 named no file that would fix them — and eight of those were
+response headers, reported independently by kitsune as `security.*` and by
+scry as `security/*`, and answerable only with a shrug. Cloudflare Pages and
+Netlify both read `_headers`, so it is a writer like any other, and 26 of the
+39 now name a file.
+
+Four of the five headers are written. The Content-Security-Policy is not, and
+the file says why where whoever edits it will read it: a policy describes one
+site's own sources, so a default either allows everything and means nothing,
+or breaks the page in a browser where no check here would see it.
 
 Each finding names its fix and the Google page that explains why — the same
 rule the live checkers follow, because a code and a severity say what is wrong
@@ -313,7 +327,18 @@ Rules that hold for every checker:
 
 ---
 
-## Part 6 — The route out
+## Part 6 — What it can do, without doing any of it
+
+`dev seo can` lists every writer and every checker: what each needs, what it
+gives, what it costs, and whether its binary is installed. It runs nothing and
+touches no network, so an agent reads it before starting to work out what to
+ask for, and `--json` is the shape to read it in.
+
+It is derived from the two registries rather than written beside them, so a
+checker added today appears in it today, and one cannot be added without
+saying what it provides.
+
+## Part 7 — The route out
 
 A report that only lists faults leaves the reader to work out what to do. Each
 writer declares the finding ids its file resolves — matched by prefix, so
@@ -336,7 +361,7 @@ it is worth as much as saying which one will.
 `TestWritersOnlyClaimWhatTheyCanFix` holds the claims to the routing, so a
 writer cannot promise a fix the report will not send to it.
 
-## Part 7 — Invariants
+## Part 8 — Invariants
 
 - **stdout carries the report** and nothing else. Progress, per-tool timing and
   warnings go to stderr, so `dev seo <url> --json | jq` works.
@@ -373,7 +398,7 @@ writer cannot promise a fix the report will not send to it.
 
 ---
 
-## Part 8 — The toolchain, as this repo runs it
+## Part 9 — The toolchain, as this repo runs it
 
 `mise run check` (tests plus a signed snapshot release), `mise run lint` (the
 hk list: gofmt, go vet, gomod tidy, staticcheck, trailing whitespace, private
@@ -399,7 +424,7 @@ Re-read a region after running it before patching that region.
 
 ---
 
-## Part 9 — The honest finding on generics
+## Part 10 — The honest finding on generics
 
 The source catalogue measured eight refactors on a comparable codebase and
 reports that **every one increased the line count**. This repo measured the
@@ -427,7 +452,7 @@ diff size** — and report the line count honestly either way.
 
 ---
 
-## Part 10 — Method
+## Part 11 — Method
 
 How this was assembled, so it can be extended the same way.
 

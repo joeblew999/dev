@@ -272,3 +272,25 @@ func TestWritersOnlyClaimWhatTheyCanFix(t *testing.T) {
 		}
 	}
 }
+
+// The catalogue is the inventory a person reads before touching this, and
+// prose drifts: the headers writer existed for a day before the document
+// knew. Nothing can check that what it says is true, but it can be held to
+// naming everything that exists — which is the drift that actually happened.
+func TestCatalogueNamesEveryToolAndWriter(t *testing.T) {
+	doc, err := os.ReadFile("catalogue.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range append(checkerNames(), writerNames()...) {
+		if !strings.Contains(string(doc), name) {
+			t.Errorf("catalogue.md does not name %q; a tool nobody wrote down is one nobody knows is there", name)
+		}
+	}
+	// And every file a writer produces, since that is what a reader looks for.
+	for _, w := range writers {
+		if !strings.Contains(string(doc), w.Produces.Name) {
+			t.Errorf("catalogue.md does not name %q, which %s writes", w.Produces.Name, w.Name)
+		}
+	}
+}
