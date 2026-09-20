@@ -84,7 +84,7 @@ func Check(c cli.Call) error {
 	})
 	warnStaleSessions(c.Stderr, time.Now())
 	rep.Fail = "what agents read does not match " + pins.File + "; fix with: " + pins.SyncCommand()
-	return c.Finish(rep, started, func(r *cli.Report) { writeReport(c, r) })
+	return c.Finish(rep, started, c.Write)
 }
 
 // lockedSkills is every agent's directory against what the lock records.
@@ -109,22 +109,6 @@ func findings(id string, diff []string, what string) []cli.Finding {
 		return cli.Finding{Severity: cli.SevError, ID: id, Message: line,
 			Fix: what + "; fix with: " + pins.SyncCommand()}
 	})
-}
-
-// writeReport is the human answer: what was checked, then what is wrong.
-func writeReport(c cli.Call, r *cli.Report) {
-	for _, s := range r.Steps {
-		fmt.Fprintf(c.Stdout, "  %-10s %7s  %-34s %s\n", s.Name, s.Took,
-			cli.Or(s.Covered, s.Note), cli.Plural(s.Findings, "problem"))
-	}
-	if len(r.Findings) > 0 {
-		fmt.Fprintln(c.Stdout)
-	}
-	for _, f := range r.Findings {
-		fmt.Fprintf(c.Stdout, "%-8s %s (%s)\n  %s\n  fix: %s\n\n", f.Severity, f.ID, f.Tool, f.Message, f.Fix)
-	}
-	fmt.Fprintf(c.Stdout, "%s in %s: %s\n", r.Outcome, r.Took,
-		cli.Plural(r.BySeverity[cli.SevError], "problem"))
 }
 
 // orphaned answers the one case where "fix session.toml" is the wrong advice:

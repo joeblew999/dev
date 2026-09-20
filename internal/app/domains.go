@@ -47,7 +47,7 @@ func Domains(c cli.Call) error {
 			})
 		})
 	rep.Fail = "some domains on this account point at nothing"
-	return c.Finish(rep, started, func(r *cli.Report) { writeDomains(c, r) })
+	return c.Finish(rep, started, c.Write)
 }
 
 // unmapped is what is worth saying about one zone.
@@ -67,18 +67,4 @@ func unmapped(z cloudflare.Zone, serving, apex []cloudflare.Record) []cli.Findin
 		}}
 	}
 	return nil
-}
-
-// writeDomains is the human answer: every domain, and what it serves.
-func writeDomains(c cli.Call, r *cli.Report) {
-	for _, s := range r.Steps {
-		mark := " "
-		if s.Findings > 0 {
-			mark = "!"
-		}
-		fmt.Fprintf(c.Stdout, "%s %-24s %s\n", mark, s.Name, cli.Or(s.Covered, s.Note))
-	}
-	for _, f := range r.Findings {
-		fmt.Fprintf(c.Stdout, "\n%-8s %s\n  %s\n  %s\n", f.Severity, f.ID, f.Message, f.Fix)
-	}
 }

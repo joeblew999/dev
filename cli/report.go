@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -463,4 +464,50 @@ func Gather[T any](r *Report, jobs int, parts []T, name func(T) string, run func
 	}) {
 		r.Record(m)
 	}
+}
+
+// Write prints a report the way every command on this stack prints one: what
+// was looked at, then what was found, then the verdict.
+//
+// Four commands wrote this themselves and no two agreed. One showed the tool
+// that found a thing and another did not; one printed the fix and another
+// dropped it; the column widths differed by a character each time. None of
+// that was a decision — it was four people writing the same paragraph from
+// memory, and a reader moving between two of them had to notice that the
+// shapes were nearly but not quite the same.
+//
+// A command that genuinely needs a different shape still writes its own; what
+// this removes is having to.
+func (c Call) Write(r *Report) {
+	// Sized to what is actually there. A fixed width is right until a report
+	// is about domains rather than about three checks with short names, and
+	// then every line is a character out from its neighbour.
+	wide := Widest(r.Steps, func(s Step) string { return s.Name })
+	for _, s := range r.Steps {
+		mark := " "
+		if s.Status == StatusSkipped {
+			mark = "!"
+		}
+		fmt.Fprintf(c.Stdout, "%s %-*s %7s  %-34s %s\n",
+			mark, wide, s.Name, s.Took, Or(s.Covered, s.Note), Plural(s.Findings, "note"))
+	}
+	if len(r.Findings) > 0 {
+		fmt.Fprintln(c.Stdout)
+	}
+	for _, f := range r.Findings {
+		// The tool is in brackets when it is not already the step's name:
+		// saying "missing-canonical (kitsune)" is worth a reader's attention
+		// and "serves-nothing (amplifycms.com)" repeats the line above it.
+		who := ""
+		if f.Tool != "" && !strings.Contains(f.Message, f.Tool) {
+			who = " (" + f.Tool + ")"
+		}
+		fmt.Fprintf(c.Stdout, "%-8s %s%s\n  %s\n", f.Severity, f.ID, who, f.Message)
+		if f.Fix != "" {
+			fmt.Fprintf(c.Stdout, "  fix: %s\n", f.Fix)
+		}
+		fmt.Fprintln(c.Stdout)
+	}
+	fmt.Fprintf(c.Stdout, "%s in %s: %s\n", r.Outcome, r.Took,
+		Plural(r.BySeverity[SevError], "problem"))
 }

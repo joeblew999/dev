@@ -549,3 +549,19 @@ func TestAPanickingPartIsNamedAndTheRestSurvive(t *testing.T) {
 		}
 	}
 }
+
+// A column that fits what is in it. A fixed width is right until a report is
+// about domains rather than three checks with short names, and then every
+// line sits a character out from its neighbour.
+func TestWidest(t *testing.T) {
+	type row struct{ name string }
+	rows := []row{{"dns"}, {"arrangement"}, {"ssl"}}
+	if got := Widest(rows, func(r row) string { return r.name }); got != len("arrangement") {
+		t.Errorf("Widest = %d; want %d", got, len("arrangement"))
+	}
+	// An empty list is zero, which every format verb accepts as "no padding"
+	// rather than as an error.
+	if got := Widest(nil, func(r row) string { return r.name }); got != 0 {
+		t.Errorf("Widest(nil) = %d; want 0", got)
+	}
+}

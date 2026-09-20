@@ -45,7 +45,6 @@
 package app
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -74,7 +73,7 @@ func Fronting(c cli.Call, host string) error {
 	}
 	started := time.Now()
 	rep := cli.NewReport("fronting", host)
-	done := func() error { return c.Finish(rep, started, func(r *cli.Report) { writeFronting(c, r) }) }
+	done := func() error { return c.Finish(rep, started, c.Write) }
 
 	// The zone decides whether there is anything else to ask, so it is asked
 	// first and alone. Everything after it is a question about that zone.
@@ -176,14 +175,4 @@ func sslFindings(mode string, records []cloudflare.Record) []cli.Finding {
 		}}
 	}
 	return nil
-}
-
-// writeFronting is the human answer.
-func writeFronting(c cli.Call, r *cli.Report) {
-	for _, s := range r.Steps {
-		fmt.Fprintf(c.Stdout, "  %-12s %-28s %s\n", s.Name, cli.Or(s.Covered, s.Note), cli.Plural(s.Findings, "note"))
-	}
-	for _, f := range r.Findings {
-		fmt.Fprintf(c.Stdout, "\n%-8s %s\n  %s\n  %s\n", f.Severity, f.ID, f.Message, f.Fix)
-	}
 }

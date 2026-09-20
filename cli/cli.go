@@ -634,3 +634,18 @@ func Indent(s string) string {
 	}
 	return b.String()
 }
+
+// Widest is the longest of what show says about each item, for a column that
+// fits what is in it. Zero for an empty list, which no format verb minds.
+//
+// Generic because the shape is the same wherever a table is printed and the
+// items never are: steps in a report, tools in a list, verbs in a manual.
+func Widest[T any](items []T, show func(T) string) int {
+	wide := 0
+	for _, item := range items {
+		if n := len(show(item)); n > wide {
+			wide = n
+		}
+	}
+	return wide
+}
