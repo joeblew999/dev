@@ -46,21 +46,18 @@ func Delete(stdin io.Reader, out io.Writer, dir, env, name string, yes bool) err
 	if !yes && !cli.Confirm(stdin, out, "delete? [y/N] ") {
 		return fmt.Errorf("not deleted (pass --yes to skip the question)")
 	}
-	// Asked with both streams so wrangler's own words reach the reader.
-	// Without them a Worker that is not there failed as a bare exit status,
-	// which says nothing about whether it was missing, not yours, or a
-	// credentials problem.
-	//
-	// Fly's side of this goes further: it asks whether the app exists first,
-	// so destroying what is already gone says so and succeeds, which is what
-	// a cleanup run needs the second time. The same is not done here because
-	// it would mean matching wrangler's wording for an absent Worker, and
-	// there is no wrangler.toml and no Cloudflare account on this machine to
-	// find out what that wording is. Guessing it is how the Fly version came
-	// to read an empty list as proof of absence.
+	// Asked with both streams so wrangler's own words reach the reader, and
+	// so an absent Worker can be told from a real failure. Without that, a
+	// Worker that was not there failed as a bare exit status saying nothing
+	// about whether it was missing, not yours, or a credentials problem — and
+	// a cleanup run failed the second time for having worked the first.
 	said, err := fnox.Ask(dir, "wrangler", "delete", "--name", name, "--force")
 	fmt.Fprint(out, said)
 	if err != nil {
+		if strings.Contains(said, noSuchWorker) {
+			fmt.Fprintf(out, "there is no Worker %s on this account; nothing to delete\n", name)
+			return nil
+		}
 		return fmt.Errorf("wrangler delete %s failed: %w\n%s", name, err, cli.Indent(said))
 	}
 	for _, ns := range doomed {
@@ -71,6 +68,14 @@ func Delete(stdin io.Reader, out io.Writer, dir, env, name string, yes bool) err
 	fmt.Fprintf(out, "deleted %s\n", name)
 	return nil
 }
+
+// noSuchWorker is Cloudflare's code for a Worker this account does not have.
+//
+// The code rather than the sentence beside it ("This Worker does not exist on
+// this account"), because a numeric API code is a contract and prose is not:
+// upstream may reword the sentence in any release, and this tree has already
+// been wrong once for depending on a tool's wording.
+const noSuchWorker = "code: 10090"
 
 // provisionedTitles is what wrangler calls the namespace it provisions for
 // each binding of a Worker: the Worker's name, a dash, the binding in
