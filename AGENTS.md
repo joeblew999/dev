@@ -108,12 +108,20 @@ This file says only what is about developing the tool itself.
   wrong: for those six there is no binary to duplicate, and hand-rolled HTTP
   is a Go client too, only one nobody generated.
 
-  So for the API half the question is open and the threshold is writes. Reads
-  are cheap to hand-roll and a wrong field name returns nothing; a wrong field
-  name on a write does something. `cloudflare-go/v7` is four modules, not the
-  hundreds this rule once implied. Read-only, as now, hand-rolled is fine.
-  When dev starts writing to a cloud's API, weigh it again with that number
-  rather than with a slogan.
+  For that half, the thing that decides is what kind of dependency it is. A
+  CLI is a binary: the registry fetches it, it runs as its own process, and it
+  costs `go.mod` nothing. `cloudflare-go` and `fly-go` are libraries — no
+  `cmd/`, no executable, nothing to install — so they are compiled into dev
+  and they do add modules. That is not a size argument and does not turn on
+  how many modules: it is the difference between a tool dev runs and code dev
+  becomes.
+
+  So the API half stays hand-rolled. It is 256 lines and one generic sender
+  for six endpoints, and the cost of that is naming fields correctly — which
+  is a real cost, paid twice already in one day, and still cheaper than moving
+  a cloud's SDK inside the binary. If that ever stops being true the argument
+  has to be about the hand-rolled code being unsafe, not about the SDK being
+  convenient.
 
   The cost of a CLI is parsing output, so prefer `--json` and decide from what
   parsed. Never decide from a tool's prose: this tree has been wrong twice
