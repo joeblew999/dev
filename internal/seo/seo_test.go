@@ -294,3 +294,27 @@ func TestCatalogueNamesEveryToolAndWriter(t *testing.T) {
 		}
 	}
 }
+
+// A checker declares the mise.toml line that installs it, and this repo is
+// one of the repos that runs it — so that line has to be in this repo's
+// mise.toml. Without this, a checker added without its pin works for whoever
+// added it, because they installed the binary by hand, and fails for
+// everyone else with a message about a line nobody wrote.
+func TestEveryCheckerIsPinnedHere(t *testing.T) {
+	mise, err := os.ReadFile("../../mise.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ch := range checkers.All {
+		if ch.Pin == "" {
+			t.Errorf("%s declares no pin, so a missing binary cannot say what to add", ch.Name)
+			continue
+		}
+		// The module path, which is the half that cannot be wrong; the
+		// version may legitimately differ from what is pinned today.
+		path, _, _ := strings.Cut(ch.Pin, "=")
+		if !strings.Contains(string(mise), strings.TrimSpace(path)) {
+			t.Errorf("%s is in the registry but not in mise.toml [tools]: %s", ch.Name, ch.Pin)
+		}
+	}
+}
