@@ -36,7 +36,7 @@ func TestParseInterleavedPassesEverythingAfterDoubleDash(t *testing.T) {
 func TestParseTakesTheDirectoryFirst(t *testing.T) {
 	v := Verb{Args: "DIR EXTRA", Flags: func(fs *flag.FlagSet) { fs.String("env", "", "an `ENV`") }}
 
-	c, err := v.parse("deploy", []string{"cmd/x", "--env", "prod", "extra"}, io.Discard, io.Discard)
+	c, err := v.parse("t", "deploy", []string{"cmd/x", "--env", "prod", "extra"}, io.Discard, io.Discard)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestParseTakesTheDirectoryFirst(t *testing.T) {
 		t.Errorf("Args = %v, want [extra]", c.Args)
 	}
 
-	if _, err := v.parse("deploy", []string{"--env", "prod"}, io.Discard, io.Discard); err == nil ||
+	if _, err := v.parse("t", "deploy", []string{"--env", "prod"}, io.Discard, io.Discard); err == nil ||
 		!strings.Contains(err.Error(), "the directory comes first") {
 		t.Errorf("flags before DIR should say so, got %v", err)
 	}
@@ -79,12 +79,56 @@ func TestArgsIsTheRule(t *testing.T) {
 		{"DIR [-- ARGS]", []string{"cmd/x", "anything", "at", "all"}, ""},
 	} {
 		v := Verb{Args: tc.args}
-		_, err := v.parse("tool verb", tc.given, io.Discard, io.Discard)
+		_, err := v.parse("t", "tool verb", tc.given, io.Discard, io.Discard)
 		switch {
 		case tc.wantErr == "" && err != nil:
 			t.Errorf("Args %q given %q: %v; want it accepted", tc.args, tc.given, err)
 		case tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)):
 			t.Errorf("Args %q given %q: err %v; want it to say %q", tc.args, tc.given, err, tc.wantErr)
 		}
+	}
+}
+
+// A flag falls back to the environment, which is how mise passes a repo's
+// own settings without every task spelling them out — and how eight flags on
+// two tasks became none.
+func TestAFlagFallsBackToTheEnvironment(t *testing.T) {
+	t.Setenv("T_TITLE", "from the environment")
+	t.Setenv("T_MAX_PAGES", "9")
+	v := Verb{Flags: func(fs *flag.FlagSet) {
+		fs.String("title", "", "")
+		fs.String("max-pages", "", "")
+	}}
+	c, err := v.parse("t", "verb", []string{"--max-pages", "3"}, io.Discard, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.Value("title"); got != "from the environment" {
+		t.Errorf("title = %q; an unset flag reads T_TITLE", got)
+	}
+	// A hyphen in a flag is an underscore in the environment, because a
+	// hyphen cannot be in a variable's name.
+	if got := EnvName("t", "max-pages"); got != "T_MAX_PAGES" {
+		t.Errorf("env name = %q; want T_MAX_PAGES", got)
+	}
+	// And what was given wins, so a task can say something different without
+	// moving the declaration.
+	if got := c.Value("max-pages"); got != "3" {
+		t.Errorf("max-pages = %q; the flag was given and must win", got)
+	}
+}
+
+// A Call built by hand reads no environment at all.
+//
+// This is what keeps the two halves apart: mise's [env] is how a repo
+// configures the live site, and a unit test must get what it passed and
+// nothing else — otherwise running the suite from a task that sets DEV_URL
+// would quietly test a different site than the fixtures describe.
+func TestACallBuiltByHandReadsNoEnvironment(t *testing.T) {
+	t.Setenv("DEV_TITLE", "the live site's title")
+	fs := Flags("t", io.Discard)
+	fs.String("title", "", "")
+	if got := (Call{Flags: fs}).Value("title"); got != "" {
+		t.Errorf("title = %q; a Call with no Command name reads nothing from the environment", got)
 	}
 }

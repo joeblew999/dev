@@ -92,12 +92,12 @@ func placeholder(f *flag.Flag) string {
 // A verb that wants none of this still gets it: with no Args and no Flags the
 // arguments arrive untouched, which is what a subcommand like `secrets ci`
 // needs.
-func (v Verb) parse(verb string, args []string, stdout, stderr io.Writer) (Call, error) {
+func (v Verb) parse(command, verb string, args []string, stdout, stderr io.Writer) (Call, error) {
 	fs := Flags(verb, stderr)
 	if v.Flags != nil {
 		v.Flags(fs)
 	}
-	c := Call{Verb: verb, Flags: fs, Stdin: Stdin, Stdout: stdout, Stderr: stderr}
+	c := Call{Verb: verb, Command: command, Flags: fs, Stdin: Stdin, Stdout: stdout, Stderr: stderr}
 	if strings.HasPrefix(v.Args, "DIR") {
 		dir, rest, err := DirAnd(fs, args, -1)
 		if err != nil {

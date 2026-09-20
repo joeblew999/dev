@@ -145,7 +145,7 @@ func (c Command) Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "error: %s\n\n%s", what, Flatten(c.sectionFor(verb)))
 		return 2
 	}
-	call, err := spec.parse(path, rest, stdout, stderr)
+	call, err := spec.parse(c.Name, path, rest, stdout, stderr)
 	if err == nil {
 		// Every run is timed. A person wants to know a crawl took nine
 		// seconds and a build two, and nobody adds that per verb — so cli
@@ -170,6 +170,13 @@ func (c Command) Run(args []string, stdout, stderr io.Writer) int {
 			usage = prose + "\n\n" + usage
 		}
 		fmt.Fprintf(stdout, "\n%s", Flatten(usage))
+		// Said here rather than in prose somebody keeps in step, and derived
+		// from the command's own name so it cannot be wrong. Every flag falls
+		// back to the environment, which is how a repo says what it wants
+		// once in mise.toml's [env] instead of spelling it into every task
+		// that calls this command.
+		fmt.Fprintf(stdout, "Any flag may be given in the environment instead, as %s: mise's\n[env] is where a repo declares what it wants once.\n\n",
+			EnvName(c.Name, "<FLAG>"))
 		return 0
 	}
 	if _, ok := errors.AsType[*UsageError](err); ok {

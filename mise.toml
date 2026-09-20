@@ -50,6 +50,10 @@ site_fly_origin = "https://dev-site-fly.fly.dev"
 # writes it to site/csp.txt and the tasks read that. A hash kept in a task
 # file is wrong the first time a colour changes, silently, in the browser.
 site_desc = "The developer tool of the mise + fnox + hk + packslip stack."
+site_title = "dev"
+# llms.txt comes from the command's own verbs, which only the command knows,
+# and head.html is a fragment this site's generator writes itself.
+site_skip = "llms,head"
 
 [hooks]
 postinstall = { task = "bootstrap" }
@@ -248,15 +252,6 @@ description = "Build and sign the release, publishing nothing (check runs this)"
 depends = ["build"]
 run = ".bin/dev release . --snapshot"
 
-# ------------------------------------------------------------------------------
-# The site dev serves about itself: this repo dogfooding its own verbs.
-#
-# Nothing here is a new capability. Every page is a manual `dev skill` already
-# renders from the verbs, every SEO file is one `dev seo write` already writes,
-# and the deploy is the same `dev deploy` any repo on this stack runs. If a
-# verb is wrong, this is where it shows.
-# ------------------------------------------------------------------------------
-
 [tasks."site:build"]
 description = "Render the manuals to HTML and write every file Google and a model ask for"
 depends = ["build"]
@@ -270,8 +265,12 @@ outputs = ["site/public/index.html", "site/public/sitemap.xml", "site/public/llm
 run = [
   "go run ./site/gen --out site/public --origin {{ vars.site_origin }}",
   ".bin/dev llms site/public --origin {{ vars.site_origin }}",
-  ".bin/dev seo write site/public --url {{ vars.site_origin }}/ --urls site/urls.txt --skip llms,head --title dev --desc '{{ vars.site_desc }}' --csp \"$(cat site/csp.txt)\"",
+  ".bin/dev seo write site/public",
 ]
+# A task's env replaces [env] rather than adding to it, so everything dev
+# reads is named here — the values come from [vars], which is the one place
+# any of them is written.
+env = { DEV_URL = "{{ vars.site_origin }}/", DEV_URLS = "site/urls.txt", DEV_CSP = "{{ exec(command='cat site/csp.txt 2>/dev/null || true') }}", DEV_TITLE = "{{ vars.site_title }}", DEV_DESC = "{{ vars.site_desc }}", DEV_SKIP = "{{ vars.site_skip }}" }
 
 [tasks."site:run"]
 description = "Serve the site here, the way Cloudflare will: the same files, no deploy"
@@ -303,7 +302,7 @@ depends = ["build"]
 # It ends with a second check rather than a claim, because "fixed" is a thing
 # the site says, not a thing this says about the site.
 run = [
-  ".bin/dev seo check {{ vars.site_origin }}/ --fix site/public --urls site/urls.txt --title dev --desc '{{ vars.site_desc }}' --csp \"$(cat site/csp.txt)\" --record .reports/site",
+  ".bin/dev seo check {{ vars.site_origin }}/ --fix site/public",
   ".bin/dev deploy site",
   ".bin/dev seo check {{ vars.site_origin }}/ --record .reports/site",
 ]
@@ -403,8 +402,9 @@ outputs = ["site/fly/public/index.html", "site/fly/public/sitemap.xml", "site/fl
 run = [
   "go run ./site/gen --out site/fly/public --origin {{ vars.site_fly_origin }} --urls site/fly/urls.txt --csp site/fly/csp.txt",
   ".bin/dev llms site/fly/public --origin {{ vars.site_fly_origin }}",
-  ".bin/dev seo write site/fly/public --url {{ vars.site_fly_origin }}/ --urls site/fly/urls.txt --skip llms,head --title dev --desc '{{ vars.site_desc }}' --csp \"$(cat site/fly/csp.txt)\"",
+  ".bin/dev seo write site/fly/public",
 ]
+env = { DEV_URL = "{{ vars.site_fly_origin }}/", DEV_URLS = "site/fly/urls.txt", DEV_CSP = "{{ exec(command='cat site/fly/csp.txt 2>/dev/null || true') }}", DEV_TITLE = "{{ vars.site_title }}", DEV_DESC = "{{ vars.site_desc }}", DEV_SKIP = "{{ vars.site_skip }}" }
 
 [tasks."site:fly:deploy"]
 description = "Put the site on Fly, from the working tree: no commit, no release"

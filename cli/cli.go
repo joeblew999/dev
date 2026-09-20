@@ -37,6 +37,11 @@ type Call struct {
 	Dir   string        // the directory it acts on, when its Args begin with DIR
 	Args  []string      // what is left: positionals, then anything after a bare --
 	Flags *flag.FlagSet // parsed, so Value and Given read from it
+	// Command is the binary's name, for the environment variables a flag
+	// falls back to: `dev seo write --title` reads DEV_TITLE when no --title
+	// was given. Empty in a Call built by hand, which then reads no
+	// environment at all — a test gets what it passed and nothing else.
+	Command string
 
 	Stdin          io.Reader
 	Stdout, Stderr io.Writer
@@ -72,7 +77,42 @@ func Took(d time.Duration) string {
 }
 
 // Value is a parsed flag's value by name.
-func (c Call) Value(name string) string { return Value(c.Flags, name) }
+func (c Call) Value(name string) string {
+	if v := Value(c.Flags, name); v != "" {
+		return v
+	}
+	return fromEnv(c.Command, name)
+}
+
+// EnvName is what a flag is called in the environment: the command, then the
+// flag, upper-cased with hyphens as underscores. `dev seo write --title` is
+// DEV_TITLE.
+//
+// Named by the flag rather than by the verb because a flag name on this stack
+// already means one thing wherever it appears — --url is the site, --title is
+// what Search shows — which is why pageFlags exists at all. A second spelling
+// per verb would be DEV_SEO_WRITE_TITLE and DEV_SEO_CHECK_TITLE for one fact.
+func EnvName(command, flag string) string {
+	return strings.ToUpper(command + "_" + strings.ReplaceAll(flag, "-", "_"))
+}
+
+// fromEnv is a flag's value when nobody passed it.
+//
+// mise is how a repo on this stack says what it wants, and a task that spells
+// out eight flags is a repo saying it in the wrong place: the facts end up in
+// two tasks, drift between them, and the task grows until nobody reads it.
+// Under [env] in mise.toml they are declared once and every task that calls
+// the command gets them — including the ones the tests run, which is what
+// stops a test asserting against a different site than the one deployed.
+//
+// The flag still wins when it is given, so a task can say something different
+// without the declaration moving.
+func fromEnv(command, flag string) string {
+	if command == "" {
+		return ""
+	}
+	return os.Getenv(EnvName(command, flag))
+}
 
 // Given reports whether a bool flag is set.
 func (c Call) Given(name string) bool { return Given(c.Flags, name) }

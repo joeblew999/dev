@@ -257,6 +257,25 @@ site documents a command. The two answer different questions — what the
 command does, against what pages exist — and only the command can answer the
 first about itself.
 
+### Flags and the environment
+
+Every flag falls back to the environment when it is not given: `--title` on a
+command called `dev` reads `DEV_TITLE`, and a hyphen becomes an underscore.
+That is how a repo says what it wants once, under `[env]` in its `mise.toml`,
+instead of spelling the same flags into every task that calls the command —
+which is what happened here, and `--csp` reached one of two tasks and not the
+other for a day before anybody noticed.
+
+The flag wins when it is given. A `Call` built by hand in a test has no
+command name and so reads no environment at all, which is what keeps the two
+apart: a unit test gets what it passed, and running the suite from a task
+that sets `DEV_URL` does not quietly test a different site than the fixtures
+describe.
+
+mise's task-level `env` replaces the top-level `[env]` rather than adding
+to it, so a task that sets any of its own has to name all of them. Keep the
+values in `[vars]` and map them per task.
+
 ### Tools
 
 `tools` is every program this command may run, what each is for, and whether
