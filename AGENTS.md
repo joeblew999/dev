@@ -159,7 +159,25 @@ This file says only what is about developing the tool itself.
   fronting an app through a tunnel arrives, it is a pinned binary and neither
   a library nor hand-rolled HTTP.
 
-  Which means dev is that binary. It already ships through packslip and other
+  For writing, there is a binary after all, and it is the obvious one once
+  somebody says it: opentofu with cloudflare's own provider. Both are fetched
+  by the registry — aqua:opentofu/opentofu, and the provider by tofu itself —
+  so neither costs go.mod anything, and the token reaches them through fnox
+  exec like every other tool here.
+
+  It is the right shape for writes in a way hand-rolled POSTs are not. `tofu
+  plan` says exactly what would change before anything does; a plan against a
+  real zone here read "2 to add, 0 to change, 0 to destroy", which is the
+  guarantee that matters — Terraform manages the resources declared and
+  nothing else, so it is not the whole-zone sync that makes dnscontrol
+  dangerous here. State records what dev created, so removing it is exact.
+
+  It also surfaces what a hand-rolled PATCH would not: cloudflare_zone_setting
+  cannot be destroyed by Terraform, so changing a zone's SSL mode is one-way
+  through that path. Knowing that before running it is the argument for plan.
+
+  Reading stays dev's own, because a read wants no state file, no plan and no
+  provider — it wants an answer. Which means dev is that binary for reads. It already ships through packslip and other
   repos on the stack install it from the registry, so when one of them wants a
   zone checked it runs `dev fronting`, exactly as it runs flyctl — a binary,
   costing their go.mod nothing. The 256 lines are not a workaround for a
