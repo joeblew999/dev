@@ -138,8 +138,20 @@ This file says only what is about developing the tool itself.
   including the whole Prometheus client stack, OpenTelemetry and protobuf — to
   replace a flyctl that already does everything and costs go.mod nothing.
 
-  And there is no third door, which was worth an hour to establish rather than
-  assume. Cloudflare did ship a general-purpose CLI — `flarectl`, inside
+  And there is no third door. A binary would have settled everything — the
+  registry fetches binaries and they cost go.mod nothing — so it was worth
+  looking properly rather than assuming. Three checks, all agreeing:
+  Cloudflare dropped flarectl in January 2025 (present through v0.115.0, gone
+  from v4.0.0); mise's registry knows 1050 tools and has only cloudflared,
+  wrangler, workerd and cfssl; and GitHub has no maintained general-purpose
+  Cloudflare CLI in any language.
+
+  Which means dev is that binary. It already ships through packslip and other
+  repos on the stack install it from the registry, so when one of them wants a
+  zone checked it runs `dev fronting`, exactly as it runs flyctl — a binary,
+  costing their go.mod nothing. The 256 lines are not a workaround for a
+  missing CLI; they are the CLI, in the tool that needed one. A separate `cf`
+  binary would be the same code plus its own release machinery. Cloudflare did ship a general-purpose CLI — `flarectl`, inside
   cloudflare-go at `cmd/flarectl` — and dropped it in January 2025 when the
   package became a generated SDK: present through v0.115.0, gone from v4.0.0
   on. Nothing replaced it. `wrangler` is Workers only, `cloudflared` is
