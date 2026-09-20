@@ -2,6 +2,7 @@ package fly
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,14 +13,25 @@ import (
 	"github.com/joeblew999/dev/internal/suffix"
 )
 
-// capture replaces fnox.Exec and records the command it would have run.
+// capture replaces every way into fnox and records the command it would have
+// run. Both doors, not one: stubbing Exec alone meant that the moment the code
+// asked a question through Ask instead, these tests ran the real fnox against
+// the real Fly account and passed while doing it.
 func capture(t *testing.T) *[]string {
 	t.Helper()
 	var got []string
-	old := fnox.Exec
+	// A question about an app answers that it is there, so a test about
+	// deploying is about deploying and not about creating.
+	answer := func(args []string) (string, bool) {
+		if strings.Contains(strings.Join(args, " "), "status") {
+			return `{"Name":"acme-site"}`, true
+		}
+		return "", false
+	}
+	oldExec, oldAsk := fnox.Exec, fnox.Ask
 	fnox.Exec = func(dir string, stdin io.Reader, stdout io.Writer, args ...string) error {
-		if strings.Join(args, " ") == "flyctl apps list --json" {
-			io.WriteString(stdout, `[{"Name":"acme-site"}]`)
+		if out, handled := answer(args); handled {
+			io.WriteString(stdout, out)
 			return nil
 		}
 		got = append([]string{"in:" + dir}, args...)
@@ -29,7 +41,14 @@ func capture(t *testing.T) *[]string {
 		}
 		return nil
 	}
-	t.Cleanup(func() { fnox.Exec = old })
+	fnox.Ask = func(dir string, args ...string) (string, error) {
+		if out, handled := answer(args); handled {
+			return out, nil
+		}
+		got = append([]string{"in:" + dir}, args...)
+		return "", nil
+	}
+	t.Cleanup(func() { fnox.Exec, fnox.Ask = oldExec, oldAsk })
 	oldLook := lookPath
 	lookPath = func(string) (string, error) { return "/x/flyctl", nil }
 	t.Cleanup(func() { lookPath = oldLook })
@@ -126,29 +145,95 @@ func TestDestroyAsksThenRunsFlyctl(t *testing.T) {
 	}
 }
 
-// An app the account lacks is created before the deploy; one it has is not.
-func TestDeployCreatesAMissingApp(t *testing.T) {
-	dir := appDir(t)
-	var ran []string
-	old := fnox.Exec
-	fnox.Exec = func(_ string, _ io.Reader, stdout io.Writer, args ...string) error {
-		ran = append(ran, strings.Join(args, " "))
-		if strings.HasPrefix(strings.Join(args, " "), "flyctl apps list") {
-			io.WriteString(stdout, "[]")
-		}
-		return nil
-	}
-	t.Cleanup(func() { fnox.Exec = old })
-	oldLook := lookPath
-	lookPath = func(string) (string, error) { return "/x/flyctl", nil }
-	t.Cleanup(func() { lookPath = oldLook })
-	t.Setenv(suffix.Env, "probe")
-	t.Setenv("FLY_ORG", "acme")
-	if err := Deploy(io.Discard, dir, nil); err != nil {
-		t.Fatal(err)
-	}
-	want := "flyctl apps list --json; flyctl apps create acme-site-probe --org acme; flyctl deploy --config cmd/site/fly.toml --app acme-site-probe ."
-	if got := strings.Join(ran, "; "); got != want {
-		t.Errorf("ran %q\nwant %q", got, want)
+// Whether an app is there has three answers, not two, and the third is the
+// one that sent a live deploy into `apps create`.
+//
+// It used to be inferred from `flyctl apps list`: not in the list meant not
+// there. A token scoped with `flyctl tokens create org` — which this package
+// recommended — returns an empty list while still resolving an org and
+// validating a name, so a deployed app read as missing, creating it failed on
+// Fly's global name check, and the developer got a validation error with
+// nothing to do about it.
+func TestDeployAsksAboutTheAppAndHandlesEachAnswer(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		status  string // what `flyctl status` says; "" means it succeeds
+		create  string // what `flyctl apps create` says; "" means it succeeds
+		want    []string
+		wantErr string
+	}{
+		{
+			name:   "the app is there, so it is deployed and not created",
+			status: "",
+			want: []string{
+				"flyctl status --app acme-site-probe --json",
+				"flyctl deploy --config cmd/site/fly.toml --app acme-site-probe .",
+			},
+		},
+		{
+			name:   "no such app, so it is created first",
+			status: `Could not find App "acme-site-probe"`,
+			want: []string{
+				"flyctl status --app acme-site-probe --json",
+				"flyctl apps create acme-site-probe --org acme",
+				"flyctl deploy --config cmd/site/fly.toml --app acme-site-probe .",
+			},
+		},
+		{
+			name:   "the name is taken by an app these credentials cannot see",
+			status: `Could not find App "acme-site-probe"`,
+			create: "Validation failed: Name has already been taken",
+			want: []string{
+				"flyctl status --app acme-site-probe --json",
+				"flyctl apps create acme-site-probe --org acme",
+			},
+			wantErr: "cannot see it",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := appDir(t)
+			var ran []string
+			// Both doors into fnox are stubbed, into one recorder. Stubbing
+			// only Exec let this test run the real fnox the moment the code
+			// moved a call to Ask, and pass while doing it.
+			say := func(line string) (string, error) {
+				ran = append(ran, line)
+				switch {
+				case strings.Contains(line, "status") && tc.status != "":
+					return tc.status, fmt.Errorf("exit status 1")
+				case strings.Contains(line, "apps create") && tc.create != "":
+					return tc.create, fmt.Errorf("exit status 1")
+				}
+				return "", nil
+			}
+			oldExec, oldAsk := fnox.Exec, fnox.Ask
+			fnox.Exec = func(_ string, _ io.Reader, stdout io.Writer, args ...string) error {
+				out, err := say(strings.Join(args, " "))
+				io.WriteString(stdout, out)
+				return err
+			}
+			fnox.Ask = func(_ string, args ...string) (string, error) {
+				return say(strings.Join(args, " "))
+			}
+			t.Cleanup(func() { fnox.Exec, fnox.Ask = oldExec, oldAsk })
+			oldLook := lookPath
+			lookPath = func(string) (string, error) { return "/x/flyctl", nil }
+			t.Cleanup(func() { lookPath = oldLook })
+			t.Setenv(suffix.Env, "probe")
+			t.Setenv("FLY_ORG", "acme")
+
+			err := Deploy(io.Discard, dir, nil)
+			switch {
+			case tc.wantErr == "" && err != nil:
+				t.Fatalf("deploy failed: %v", err)
+			case tc.wantErr != "" && err == nil:
+				t.Fatal("deploy succeeded; want it to refuse")
+			case tc.wantErr != "" && !strings.Contains(err.Error(), tc.wantErr):
+				t.Errorf("error is %q; want it to say %q", err, tc.wantErr)
+			}
+			if got := strings.Join(ran, "; "); got != strings.Join(tc.want, "; ") {
+				t.Errorf("ran %q\nwant %q", got, strings.Join(tc.want, "; "))
+			}
+		})
 	}
 }

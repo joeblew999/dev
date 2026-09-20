@@ -6,13 +6,12 @@
 package fly
 
 import (
-	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/joeblew999/dev/cli"
@@ -110,34 +109,63 @@ func Destroy(stdin io.Reader, out io.Writer, dir, name string, yes bool) error {
 	return nil
 }
 
-// ensureApp creates the app when the account does not have it, since
-// flyctl deploy will not: a developer's suffixed copy, or a fork whose
-// upstream owns the committed name (Fly app names are global). The org is
-// FLY_ORG when set, otherwise flyctl's default, the personal one.
+// ensureApp creates the app when there is none, since flyctl deploy will not:
+// a developer's suffixed copy, or a fork whose upstream owns the committed
+// name — Fly app names are global. The org is FLY_ORG when set, otherwise
+// flyctl's default, the personal one.
+//
+// It asks about this one app rather than listing them all. Listing answers a
+// different question: `flyctl apps list` returned an empty array here for a
+// token that could none the less resolve an org and validate a name, so "not
+// in the list" was read as "does not exist", and deploying a live app tried to
+// create it. A token scoped with `flyctl tokens create org` — which this very
+// function used to recommend — is one that can deploy and cannot enumerate.
+//
+// Three answers, not two. The app is there; the app is nowhere, so make it;
+// or the name is taken and these credentials cannot see it, which is the case
+// that used to arrive as a validation error from Fly with no explanation of
+// what to do.
 func ensureApp(out io.Writer, app string) error {
-	var list bytes.Buffer
-	if err := fnox.Exec(".", nil, &list, FlyctlBin, "apps", "list", "--json"); err != nil {
-		return fmt.Errorf("flyctl apps list failed: %w. It needs FLY_API_TOKEN in fnox (a token from: flyctl tokens create org), or a login from: flyctl auth login", err)
-	}
-	type flyApp struct {
-		Name string `json:"Name"`
-	}
-	apps, err := cli.DecodeJSON[[]flyApp]("flyctl's app list", list.String())
-	if err != nil {
-		return err
-	}
-	if slices.ContainsFunc(apps, func(a flyApp) bool { return a.Name == app }) {
+	switch err := appStatus(app); {
+	case err == nil:
 		return nil
+	case !errors.Is(err, errNoSuchApp):
+		return err
 	}
 	args := []string{FlyctlBin, "apps", "create", app}
 	if org := os.Getenv(OrgEnv); org != "" {
 		args = append(args, "--org", org)
 	}
-	fmt.Fprintf(out, "creating the Fly app %s, which the account does not have yet\n", app)
-	if err := fnox.Exec(".", nil, out, args...); err != nil {
+	fmt.Fprintf(out, "creating the Fly app %s, which these credentials do not have\n", app)
+	said, err := fnox.Ask(".", args...)
+	fmt.Fprint(out, said)
+	if err != nil {
+		if strings.Contains(said, "already been taken") {
+			return fmt.Errorf("the Fly app %s exists and these credentials cannot see it, so it can be neither deployed to nor created: check FLY_API_TOKEN in fnox is for the account that owns it (flyctl auth whoami), or give this copy its own name with DEPLOY_SUFFIX", app)
+		}
 		return fmt.Errorf("flyctl apps create %s failed: %w (a name is global across Fly; DEPLOY_SUFFIX gives this copy its own, FLY_ORG the org)", app, err)
 	}
 	return nil
+}
+
+// errNoSuchApp is Fly saying this account has no app of that name, which is
+// the one answer that means "create it".
+var errNoSuchApp = errors.New("no such app")
+
+// appStatus asks Fly about one app. A missing app is errNoSuchApp; anything
+// else is a real failure and says what to do about it.
+func appStatus(app string) error {
+	said, err := fnox.Ask(".", FlyctlBin, "status", "--app", app, "--json")
+	if err == nil {
+		return nil
+	}
+	// Fly says this on stderr, which is why the answer has to be asked for
+	// with both streams: reading stdout alone saw an empty string and called
+	// a plain missing app an unrecognised failure.
+	if strings.Contains(said, "Could not find App") {
+		return errNoSuchApp
+	}
+	return fmt.Errorf("flyctl status --app %s failed: %w. It needs FLY_API_TOKEN in fnox (a token from: flyctl tokens create org), or a login from: flyctl auth login", app, err)
 }
 
 // Logs streams the deployed app's logs in the foreground until interrupted.

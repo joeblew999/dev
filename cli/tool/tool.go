@@ -16,6 +16,7 @@ package tool
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -48,7 +49,21 @@ type Result struct {
 	Bin  string        `json:"bin"`
 	Out  string        `json:"-"`
 	Took time.Duration `json:"took"`
+
+	// Code is the program's exit status, and -1 when it never ran. Capture
+	// returns no error for a program that failed but printed something —
+	// which is right for a checker, whose non-zero exit is its answer, and
+	// wrong for every caller asking a question. Twice in one session a caller
+	// read that nil as success: a wasm check, and `flyctl status`, which
+	// answers "Could not find App" and exits 1 and was taken for "the app is
+	// there". The status was discarded, so each caller had to re-derive it by
+	// matching the output text. It is here now.
+	Code int `json:"code"`
 }
+
+// OK reports whether the program exited zero, which is the question a caller
+// asking a question wants answered.
+func (r Result) OK() bool { return r.Code == 0 }
 
 // JSON is what this run printed, decoded into T.
 //
@@ -75,7 +90,7 @@ func (c Cmd) Capture() (Result, error) {
 	}
 	started := time.Now()
 	runErr := cmd.Run()
-	res := Result{Bin: c.Bin, Out: out.String(), Took: time.Since(started)}
+	res := Result{Bin: c.Bin, Out: out.String(), Took: time.Since(started), Code: exitCode(cmd, runErr)}
 	report(res, c.Quiet)
 	// A checker exits non-zero because it found something, which is its
 	// answer and not a failure to run: hand back what it printed and let the
@@ -212,4 +227,18 @@ var Run = func(bin, pin string, args ...string) (Result, error) {
 // Attached runs bin wired to the terminal, in dir.
 func Attached(dir, bin string, args ...string) error {
 	return Cmd{Bin: bin, Dir: dir, Args: args}.Attached()
+}
+
+// exitCode is what the program exited with: 0 when it succeeded, its status
+// when it failed, and -1 when it never ran at all — a missing binary, a
+// directory that is not there — which is not an exit status and must not be
+// mistaken for one.
+func exitCode(cmd *exec.Cmd, runErr error) int {
+	if runErr == nil {
+		return 0
+	}
+	if exit, ok := errors.AsType[*exec.ExitError](runErr); ok {
+		return exit.ExitCode()
+	}
+	return -1
 }
