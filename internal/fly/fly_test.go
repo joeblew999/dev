@@ -2,6 +2,7 @@ package fly
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -227,6 +228,63 @@ func TestDeployAsksAboutTheAppAndHandlesEachAnswer(t *testing.T) {
 			}
 			if got := strings.Join(ran, "; "); got != strings.Join(tc.want, "; ") {
 				t.Errorf("ran %q\nwant %q", got, strings.Join(tc.want, "; "))
+			}
+		})
+	}
+}
+
+// What flyctl printed decides whether an app is there, not whether it exited
+// zero and not what its prose says. This file has been wrong twice about
+// flyctl — about which stream it answers on, and about an empty list meaning
+// absence — so "the app is there" is taken only from an object naming itself.
+func TestExistenceIsDecidedByTheJSONNotTheProse(t *testing.T) {
+	for name, tc := range map[string]struct {
+		said     string
+		exitedOK bool
+		want     string // "exists", "absent" or "error"
+	}{
+		"an object naming the app": {
+			said: `{"Name":"acme-site","Hostname":"acme-site.fly.dev"}`, exitedOK: true, want: "exists",
+		},
+		// flyctl has exited non-zero while still printing the app before now;
+		// the object is the evidence, so this is still yes.
+		"the object, but a non-zero exit": {
+			said: `{"Name":"acme-site"}`, exitedOK: false, want: "exists",
+		},
+		"the sentence for a missing app": {
+			said: `Error: failed to get app: Could not find App "acme-site"`, exitedOK: false, want: "absent",
+		},
+		// Not absence: this is a credentials problem wearing a failure, and
+		// treating it as absence is what tried to create a live app.
+		"unauthorized": {
+			said: "Error: unauthorized", exitedOK: false, want: "error",
+		},
+		// An empty array is what a scoped token returns for a list. It is not
+		// an app, so it is not evidence of one.
+		"an empty list": {
+			said: "[]", exitedOK: false, want: "error",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			old := fnox.Run
+			fnox.Run = func(fnox.Under) (string, error) {
+				if tc.exitedOK {
+					return tc.said, nil
+				}
+				return tc.said, fmt.Errorf("exit status 1")
+			}
+			t.Cleanup(func() { fnox.Run = old })
+
+			err := appStatus("acme-site")
+			got := "error"
+			switch {
+			case err == nil:
+				got = "exists"
+			case errors.Is(err, errNoSuchApp):
+				got = "absent"
+			}
+			if got != tc.want {
+				t.Errorf("appStatus said %q (%v); want %q", got, err, tc.want)
 			}
 		})
 	}

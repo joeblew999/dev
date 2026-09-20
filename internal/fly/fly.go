@@ -169,12 +169,23 @@ var errNoSuchApp = errors.New("no such app")
 // else is a real failure and says what to do about it.
 func appStatus(app string) error {
 	said, err := fnox.Ask(".", FlyctlBin, "status", "--app", app, "--json")
+	// What flyctl printed decides, not whether it exited zero and not what
+	// its prose says. --json means an app that is there comes back as an
+	// object naming itself, and that is the only evidence taken for yes:
+	// matching a sentence is a dependency on wording that upstream is free to
+	// change in a patch release, and this file has already been wrong twice
+	// about what flyctl says and where it says it.
+	if status, jsonErr := cli.DecodeJSON[struct {
+		Name string `json:"Name"`
+	}]("flyctl status", said); jsonErr == nil && status.Name != "" {
+		return nil
+	}
 	if err == nil {
 		return nil
 	}
-	// Fly says this on stderr, which is why the answer has to be asked for
-	// with both streams: reading stdout alone saw an empty string and called
-	// a plain missing app an unrecognised failure.
+	// The sentence is still read, but only to tell a plain missing app from a
+	// real failure — never to decide that one is there. Fly says it on
+	// stderr, which is why the answer is asked for with both streams.
 	if strings.Contains(said, "Could not find App") {
 		return errNoSuchApp
 	}
