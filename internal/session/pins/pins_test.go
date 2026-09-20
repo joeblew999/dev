@@ -38,23 +38,24 @@ func TestLoadPins(t *testing.T) {
 	}
 }
 
-func TestLoadPinsRejectsUnknownKeys(t *testing.T) {
-	t.Chdir(t.TempDir())
-	if err := writeFile("session.toml", "[source.a]\nrepo = \"x/y\"\nref = \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\nskills = [\"z\"]\nbogus = 1\n"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := Load(); err == nil {
-		t.Error("loadPins succeeded with an unknown key, want an error naming the fix")
-	}
-}
-
-func TestLoadPinsRejectsBadSource(t *testing.T) {
-	t.Chdir(t.TempDir())
-	if err := writeFile("session.toml", "[source.a]\nskills = [\"z\"]\n"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := Load(); err == nil {
-		t.Error("loadPins succeeded with no repo or ref, want an error naming the fix")
+// A pin that is not one is refused where it is read, and the error names the
+// file — because session.toml is the only place a source is named, so it is
+// the only place to go and fix it.
+func TestLoadRefusesAFileThatIsNotPins(t *testing.T) {
+	good := strings.Repeat("b", 40)
+	for name, content := range map[string]string{
+		"an unknown key, which is a typo that would silently drop a source": "[source.a]\nrepo = \"x/y\"\nref = \"" + good + "\"\nskills = [\"z\"]\nbogus = 1\n",
+		"a source with no repo or ref":                                      "[source.a]\nskills = [\"z\"]\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			if err := writeFile(File, content); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Load(); err == nil {
+				t.Error("it was accepted; want an error naming the fix")
+			}
+		})
 	}
 }
 

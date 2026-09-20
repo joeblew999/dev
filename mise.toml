@@ -11,6 +11,7 @@ packslip = "latest"
 gh = "latest"
 fnox = "latest"   # the one way to a secret; dev release reads the signing key from it
 "go:golang.org/x/tools/cmd/deadcode" = "latest"   # what `mise run dead` reports
+"go:github.com/mibk/dupl" = "latest"   # what `mise run dup` reports: the same code written twice
 "go:honnef.co/go/tools/cmd/staticcheck" = "latest"   # an hk step: every commit, and lint
 "go:github.com/nelsonlaidev/scoutly/cmd/scoutly" = "v0.5.0"   # what `dev seo` runs: crawl and on-page
 "go:github.com/raviqqe/muffet/v2" = "v2.11.5"   # dev seo: the link layer
@@ -88,6 +89,17 @@ description = "Code nothing reaches, so a refactor can see what it left behind"
 #
 # -test counts a test as a caller, so a helper only tests use is not reported.
 run = "deadcode -test ./..."
+
+[tasks.dup]
+description = "the same code written twice, as a report"
+# A report, not a gate, for the reason dead is: some repetition is the clearest
+# way to say a thing, and a threshold that fails a build teaches people to
+# write around the detector rather than to stop repeating themselves. What it
+# is for is seeing what a change left behind.
+#
+# 40 tokens is about a small function; below that it finds every error check
+# in the tree and says nothing.
+run = "dupl -threshold 40 -plumbing $(git ls-files '*.go') || true"
 
 [tasks.lint]
 description = "hk checks: gofmt, vet, tidy, staticcheck, whitespace, secrets"

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -19,7 +18,7 @@ import (
 // expect when one is given. It is the round trip a Worker must make before
 // anything is built on it, and it costs one wrangler dev start.
 func Smoke(out io.Writer, dir, env, path, expect string, timeout time.Duration) error {
-	port, err := freePort()
+	port, err := tool.FreePort()
 	if err != nil {
 		return err
 	}
@@ -94,13 +93,4 @@ func waitReady(log string, timeout time.Duration) error {
 		}
 		sleep(2 * time.Second)
 	}
-}
-
-func freePort() (int, error) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0, err
-	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port, nil
 }

@@ -325,20 +325,8 @@ func write(c cli.Call, r *cli.Report) {
 		}
 		fmt.Fprintln(c.Stdout)
 	}
-	fmt.Fprintln(c.Stdout)
-	// One line per finding, each naming the checker that found it. Several
-	// checkers reporting the same fault is fine and worth seeing: they phrase
-	// it differently, and where they agree the problem is not in doubt.
-	for _, f := range r.Findings {
-		fmt.Fprintf(c.Stdout, "%-8s %s (%s)\n  %s\n", f.Severity, f.ID, f.Tool, f.Message)
-		if f.Fix != "" {
-			fmt.Fprintf(c.Stdout, "  fix: %s\n", f.Fix)
-		}
-		if f.Where != "" {
-			fmt.Fprintf(c.Stdout, "  on: %s\n", f.Where)
-		}
-		fmt.Fprintln(c.Stdout)
-	}
+	// The findings the way every report here shows them.
+	c.Findings(r)
 	notRun(c, r)
 	fixable(c, r)
 	fmt.Fprintf(c.Stdout, "%s in %s: %s, %s\n", r.Outcome, r.Took,

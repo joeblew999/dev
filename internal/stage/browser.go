@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -84,7 +83,7 @@ func probe(out io.Writer, server, probe, path string) error {
 		return fmt.Errorf("node is not on PATH; run this through mise, which pins it")
 	}
 
-	appPort, err := freePort()
+	appPort, err := tool.FreePort()
 	if err != nil {
 		return err
 	}
@@ -99,7 +98,7 @@ func probe(out io.Writer, server, probe, path string) error {
 		return fmt.Errorf("%s never answered: %w", server, err)
 	}
 
-	debugPort, err := freePort()
+	debugPort, err := tool.FreePort()
 	if err != nil {
 		return err
 	}
@@ -129,17 +128,6 @@ func probe(out io.Writer, server, probe, path string) error {
 
 	fmt.Fprintf(out, "%s driving %s\n\n", filepath.Base(chrome), url)
 	return tool.Cmd{Bin: NodeBin, Args: []string{probe, endpoint, url}}.Stream(out)
-}
-
-// freePort asks the kernel for a port nobody is using, so two developers (or
-// two tasks) can run this at the same time.
-func freePort() (int, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0, err
-	}
-	defer listener.Close()
-	return listener.Addr().(*net.TCPAddr).Port, nil
 }
 
 func waitFor(url string, timeout time.Duration) error {

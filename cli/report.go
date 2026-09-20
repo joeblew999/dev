@@ -491,13 +491,26 @@ func (c Call) Write(r *Report) {
 		fmt.Fprintf(c.Stdout, "%s %-*s %7s  %-34s %s\n",
 			mark, wide, s.Name, s.Took, Or(s.Covered, s.Note), Plural(s.Findings, "note"))
 	}
-	if len(r.Findings) > 0 {
-		fmt.Fprintln(c.Stdout)
+	c.Findings(r)
+	fmt.Fprintf(c.Stdout, "%s in %s: %s\n", r.Outcome, r.Took,
+		Plural(r.BySeverity[SevError], "problem"))
+}
+
+// Findings prints what a report found, which is the half every command shows
+// the same way even when the steps above it differ.
+//
+// seo lists a sub-report per checker and fronting does not; both list a fault
+// the same way, and did so in two places that had drifted — one dropped the
+// fix, another dropped where it was found.
+func (c Call) Findings(r *Report) {
+	if len(r.Findings) == 0 {
+		return
 	}
+	fmt.Fprintln(c.Stdout)
 	for _, f := range r.Findings {
-		// The tool is in brackets when it is not already the step's name:
-		// saying "missing-canonical (kitsune)" is worth a reader's attention
-		// and "serves-nothing (amplifycms.com)" repeats the line above it.
+		// The tool is named when it is not already obvious from the message:
+		// "missing-canonical (kitsune)" is worth a reader's attention and
+		// "serves-nothing (amplifycms.com)" repeats the line above it.
 		who := ""
 		if f.Tool != "" && !strings.Contains(f.Message, f.Tool) {
 			who = " (" + f.Tool + ")"
@@ -506,8 +519,27 @@ func (c Call) Write(r *Report) {
 		if f.Fix != "" {
 			fmt.Fprintf(c.Stdout, "  fix: %s\n", f.Fix)
 		}
+		if f.Where != "" {
+			fmt.Fprintf(c.Stdout, "  on: %s\n", f.Where)
+		}
 		fmt.Fprintln(c.Stdout)
 	}
-	fmt.Fprintf(c.Stdout, "%s in %s: %s\n", r.Outcome, r.Took,
-		Plural(r.BySeverity[SevError], "problem"))
+}
+
+// Reported opens a report, runs body against it and finishes it: the flags
+// checked, the clock started, the verdict decided and the file written.
+//
+// Four verbs wrote those five lines themselves, which is four chances to
+// forget one — and CheckReportFlags is the one that matters, because without
+// it --fail-on takes a severity nobody spells and the gate silently passes.
+func (c Call) Reported(name, target string, body func(*Report) error) error {
+	if err := c.CheckReportFlags(); err != nil {
+		return err
+	}
+	started := time.Now()
+	r := NewReport(name, target)
+	if err := body(r); err != nil {
+		return err
+	}
+	return c.Finish(r, started, c.Write)
 }

@@ -168,33 +168,26 @@ func TestCheckUsageCatchesBareAngleBracketsInProse(t *testing.T) {
 	}
 }
 
-// Frontmatter is YAML the renderer never sees, and its --- would otherwise
-// read as a setext heading.
-func TestFrontmatterIsNotChecked(t *testing.T) {
-	c := Command{
-		Name:  "x",
-		Verbs: map[string]Verb{"go": {Usage: "- `x go`\n  fine\n"}},
-		Skill: "---\nname: x\ndescription: a <thing> in metadata\n---\n\n# x\n\n<!-- verbs -->\n",
-	}
-	var f fakeTB
-	CheckUsage(&f, c)
-	if len(f.errs) != 0 {
-		t.Errorf("frontmatter should not be checked, got %v", f.errs)
-	}
-}
-
-// Head and Tail only ever reach the manual, never a terminal, so markdown
-// Flatten cannot read is still correct there.
-func TestProseMayUseMarkdownFlattenCannotRead(t *testing.T) {
-	c := Command{
-		Name:  "x",
-		Verbs: map[string]Verb{"go": {Usage: "- `x go`\n  fine\n"}},
-		Skill: "# x\n\n| a | b |\n|---|---|\n\nsee [docs](http://x), *emphasised*\n\n<!-- verbs -->\n> a note\n\n1. a numbered list\n",
-	}
-	var f fakeTB
-	CheckUsage(&f, c)
-	if len(f.errs) != 0 {
-		t.Errorf("prose is markdown-only and may use all of it, got %v", f.errs)
+// CheckUsage holds a verb's usage to the markdown a terminal can render, and
+// holds nothing else to it: the prose around the verbs only ever reaches the
+// manual, and frontmatter is metadata. Both were tested by writing the same
+// test twice with a different Skill.
+func TestWhatCheckUsageDoesNotCheck(t *testing.T) {
+	for name, skill := range map[string]string{
+		"frontmatter is metadata, not prose": "---\nname: x\ndescription: a <thing> in metadata\n---\n\n# x\n\n<!-- verbs -->\n",
+		"prose may use all of markdown":      "# x\n\n| a | b |\n|---|---|\n\nsee [docs](http://x), *emphasised*\n\n<!-- verbs -->\n> a note\n\n1. a numbered list\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			var f fakeTB
+			CheckUsage(&f, Command{
+				Name:  "x",
+				Verbs: map[string]Verb{"go": {Usage: "- `x go`\n  fine\n"}},
+				Skill: skill,
+			})
+			if len(f.errs) != 0 {
+				t.Errorf("got %v", f.errs)
+			}
+		})
 	}
 }
 

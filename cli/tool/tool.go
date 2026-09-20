@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -288,4 +289,21 @@ func unpinned(bin, said string) error {
 		return fmt.Errorf("%s is on PATH as a mise shim and this repo pins no version of it; add to mise.toml [tools] and run mise install:\n  %s", bin, pin)
 	}
 	return fmt.Errorf("%s is on PATH as a mise shim and this repo pins no version of it", bin)
+}
+
+// FreePort asks the kernel for a port nobody is using, so two developers — or
+// two tasks on one machine — can run a local server at the same time without
+// agreeing on a number first.
+//
+// Written twice before this, once in the Workers target and once in stage,
+// identically and with different variable names. Neither author knew about
+// the other, which is what a duplicate detector is for: the second copy was
+// not a decision, it was a thing nobody could see.
+func FreePort() (int, error) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
 }

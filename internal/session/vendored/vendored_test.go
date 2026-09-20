@@ -11,6 +11,23 @@ import (
 	"testing"
 )
 
+// ourOwn puts a skill this repo wrote into every agent's directory — the
+// thing sync must leave alone, since `dev skill` writes one per command and
+// the lock has never heard of it.
+func ourOwn(t *testing.T, names ...string) {
+	t.Helper()
+	for _, dir := range Dirs() {
+		for _, name := range names {
+			if err := os.MkdirAll(filepath.Join(dir, name), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := writeFile(filepath.Join(dir, name, "SKILL.md"), "# "+name); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
 func writeFile(name, content string) error {
 	return os.WriteFile(name, []byte(content), 0o644)
 }
@@ -83,14 +100,7 @@ func TestWriteRemovesOnlyWhatItOwned(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A skill the repo wrote itself, which no sync owns.
-	for _, dir := range Dirs() {
-		if err := os.MkdirAll(filepath.Join(dir, "ours"), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := writeFile(filepath.Join(dir, "ours", "SKILL.md"), "# ours"); err != nil {
-			t.Fatal(err)
-		}
-	}
+	ourOwn(t, "ours")
 	second := Set{"tdd/SKILL.md": []byte("# tdd"), LockFile: []byte("tdd\tx\n")}
 	if err := Write(second); err != nil {
 		t.Fatal(err)
@@ -124,16 +134,7 @@ func TestRemoveTakesBackOnlyWhatSyncOwns(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The repo's own, written by `dev skill`, in the very same directory.
-	for _, dir := range Dirs() {
-		for _, own := range []string{"dev", "cli"} {
-			if err := os.MkdirAll(filepath.Join(dir, own), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			if err := writeFile(filepath.Join(dir, own, "SKILL.md"), "# "+own); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
+	ourOwn(t, "dev", "cli")
 
 	went, err := Remove()
 	if err != nil {
@@ -188,14 +189,7 @@ func TestCheckIgnoresWhatSyncDoesNotOwn(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The repo's own, written by `dev skill`, beside the vendored one.
-	for _, dir := range Dirs() {
-		if err := os.MkdirAll(filepath.Join(dir, "dev"), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := writeFile(filepath.Join(dir, "dev", "SKILL.md"), "# dev"); err != nil {
-			t.Fatal(err)
-		}
-	}
+	ourOwn(t, "dev")
 	want, err := Locked()
 	if err != nil {
 		t.Fatal(err)
