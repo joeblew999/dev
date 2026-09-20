@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "url": "https://ui.gsxhq.dev",
+  "timestamp": "2026-09-20T01:41:09.107591Z",
+  "score": 85,
+  "pages_crawled": 3,
+  "checks": [
+    {
+      "check_id": "CANONICAL",
+      "name": "Canonical link present",
+      "severity": "warning",
+      "pages_failed": 3,
+      "pages_total": 3
+    },
+    {
+      "check_id": "IMAGE_ALT",
+      "name": "Images have alt attributes",
+      "severity": "pass",
+      "pages_failed": 0,
+      "pages_total": 3
+    },
+    {
+      "check_id": "META_DESCRIPTION",
+      "name": "Meta description present and well-sized",
+      "severity": "warning",
+      "pages_failed": 3,
+      "pages_total": 3
+    },
+    {
+      "check_id": "SINGLE_H1",
+      "name": "Exactly one H1",
+      "severity": "pass",
+      "pages_failed": 0,
+      "pages_total": 3
+    },
+    {
+      "check_id": "TITLE_EXISTS",
+      "name": "Title tag exists",
+      "severity": "pass",
+      "pages_failed": 0,
+      "pages_total": 3
+    },
+    {
+      "check_id": "TITLE_LENGTH",
+      "name": "Title length within range",
+      "severity": "warning",
+      "pages_failed": 3,
+      "pages_total": 3
+    },
+    {
+      "check_id": "VIEWPORT",
+      "name": "Responsive viewport meta tag",
+      "severity": "pass",
+      "pages_failed": 0,
+      "pages_total": 3
+    }
+  ],
+  "pages": [
+    {
+      "url": "https://ui.gsxhq.dev",
+      "score": 85,
+      "results": [
+        {
+          "check_id": "TITLE_EXISTS",
+          "severity": "pass",
+          "message": "",
+          "deduction": 0
+        },
+        {
+          "check_id": "TITLE_LENGTH",
+          "severity": "warning",
+          "message": "Title is 13 characters (recommended: 30-60)",
+          "deduction": 5
+        },
+        {
+          "check_id": "META_DESCRIPTION",
+          "severity": "warning",
+          "message": "Missing meta description",
+          "deduction": 5
+        },
+        {
+          "check_id": "SINGLE_H1",
+          "severity": "pass",
+          "message": "",
+          "deduction": 0
+        },
+        {
+          "check_id": "IMAGE_ALT",
+          "severity": "pass",
+          "message": "",
+          "deduction": 0
+        },
+        {
+          "check_id": "CANONICAL",
+          "severity": "warning",
+          "message": "Missing <link rel=\"canonical\">",
+          "deduction": 5
+        },
+        {
+          "check_id": "VIEWPORT",
+          "severity": "pass",
+          "message": "",
+          "deduction": 0
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/",
+      "score": 85,
+      "results": [
+        {
+          "check_id": "TITLE_EXISTS",
+          "severity": "pass",
+          "message": "",
+          "deduction": 0
+        },
+        {
+          "check_id": "TITLE_LENGTH",
+          "severity": "warning",
+          "message": "Title is 13 characters (recommended: 30-60)",
+          "deduction": 5
+        },
+        {
+          "check_id": "META_DESCRIPTION",
+          "severity": "warning",
+          "message": "Missing meta description",
+          "deduction": 5
+        },
+        {
+          "check_id": "SINGLE_H1",
+          "severity": "pass",
+          "message": "",
+          "deduction": 0
+        },
+        {
+          "check_id": "IMAGE_ALT",
+          "severity": "pass",
+          "message": "",
+          "deduction": 0
+        },
+        {
+          "check_id": "CANONICAL",
+          "severity": "warning",
+          "message": "Missing <link rel=\"canonical\">",
+          "deduction": 5
+        },
+        {
+          "check_id": "VIEWPORT",
+          "severity": "pass",
+          "message": "",
+          "deduction": 0
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/docs/getting-started",
+      "score": 85,
+      "results": [
+        {
+          "check_id": "TITLE_EXISTS",
+          "severity": "pass",
+          "message": "",
+          "deduction": 0
+        },
+        {
+          "check_id": "TITLE_LENGTH",
+          "severity": "warning",
+          "message": "Title is 23 characters (recommended: 30-60)",
+          "deduction": 5
+        },
+        {
+          "check_id": "META_DESCRIPTION",
+          "severity": "warning",
+          "message": "Missing meta description",
+          "deduction": 5
+        },
+        {
+          "check_id": "SINGLE_H1",
+          "severity": "pass",
+          "message": "",
+          "deduction": 0
+        },
+        {
+          "check_id": "IMAGE_ALT",
+          "severity": "pass",
+          "message": "No images found",
+          "deduction": 0
+        },
+        {
+          "check_id": "CANONICAL",
+          "severity": "warning",
+          "message": "Missing <link rel=\"canonical\">",
+          "deduction": 5
+        },
+        {
+          "check_id": "VIEWPORT",
+          "severity": "pass",
+          "message": "",
+          "deduction": 0
+        }
+      ]
+    }
+  ],
+  "site_issues": {
+    "duplicate_titles": {
+      "gsxui · gsxui": [
+        "https://ui.gsxhq.dev",
+        "https://ui.gsxhq.dev/"
+      ]
+    },
+    "broken_links": []
+  },
+  "summary": {
+    "pages_crawled": 3,
+    "pages_with_errors": 0,
+    "broken_links": 0,
+    "duplicate_titles": 1,
+    "average_score": 85
+  }
+}
+

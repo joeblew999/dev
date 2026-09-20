@@ -1,0 +1,66 @@
+[
+  {
+    "url": "https://ui.gsxhq.dev/docs/rtl",
+    "links": [
+      {
+        "url": "https://ui.gsxhq.dev/cdn-cgi/l/email-protection",
+        "error": "404"
+      }
+    ]
+  },
+  {
+    "url": "https://ui.gsxhq.dev/theme/preview",
+    "links": [
+      {
+        "url": "https://ui.gsxhq.dev/cdn-cgi/l/email-protection",
+        "error": "404"
+      }
+    ]
+  },
+  {
+    "url": "https://ui.gsxhq.dev/components/input",
+    "links": [
+      {
+        "url": "https://ui.gsxhq.dev/cdn-cgi/l/email-protection",
+        "error": "404"
+      }
+    ]
+  },
+  {
+    "url": "https://ui.gsxhq.dev/components/toaster",
+    "links": [
+      {
+        "url": "https://ui.shadcn.com/docs/components/toaster",
+        "error": "404"
+      }
+    ]
+  },
+  {
+    "url": "https://ui.gsxhq.dev/components/label",
+    "links": [
+      {
+        "url": "https://ui.gsxhq.dev/cdn-cgi/l/email-protection",
+        "error": "404"
+      }
+    ]
+  },
+  {
+    "url": "https://ui.gsxhq.dev/components/card",
+    "links": [
+      {
+        "url": "https://ui.gsxhq.dev/cdn-cgi/l/email-protection",
+        "error": "404"
+      }
+    ]
+  },
+  {
+    "url": "https://ui.gsxhq.dev/components/item",
+    "links": [
+      {
+        "url": "https://ui.gsxhq.dev/cdn-cgi/l/email-protection",
+        "error": "404"
+      }
+    ]
+  }
+]
+

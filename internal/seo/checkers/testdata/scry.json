@@ -1,0 +1,232 @@
+{
+  "seed_url": "https://ui.gsxhq.dev",
+  "pages": [
+    {
+      "url": "https://ui.gsxhq.dev",
+      "status_code": 200,
+      "content_type": "text/html",
+      "headers": {
+        "Age": [
+          "0"
+        ],
+        "Alt-Svc": [
+          "h3=\":443\"; ma=86400"
+        ],
+        "Cache-Control": [
+          "public, max-age=14400, s-maxage=300"
+        ],
+        "Cf-Cache-Status": [
+          "HIT"
+        ],
+        "Cf-Ray": [
+          "a3dd203f3b057b38-BKK"
+        ],
+        "Content-Encoding": [
+          "gzip"
+        ],
+        "Content-Type": [
+          "text/html; charset=utf-8"
+        ],
+        "Date": [
+          "Sun, 20 Sep 2026 01:41:08 GMT"
+        ],
+        "Fly-Request-Id": [
+          "01M2Y7JRY0C0ZCPCEC971SRGCY-sin"
+        ],
+        "Last-Modified": [
+          "Sun, 20 Sep 2026 01:41:08 GMT"
+        ],
+        "Nel": [
+          "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}"
+        ],
+        "Report-To": [
+          "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=gBJLpwxQ9e2PtHzAczgVTrqpZwqQxUB1LWNVVF7FSMk6bMj56hCIOyfiD1Z5uNxA1uipfB72iav5qeJRW3ATWDFuQHlo%2FciQeJV%2Biifs8Ldxod%2BBPoFTSiIRqRii47%2BajtTpfiqeyYsPwYY%3D\"}]}"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Server-Timing": [
+          "cfCacheStatus;desc=\"HIT\"",
+          "cfEdge;dur=1433,cfOrigin;dur=0"
+        ],
+        "Vary": [
+          "accept-encoding"
+        ],
+        "Via": [
+          "1.1 fly.io, 1.1 fly.io"
+        ]
+      },
+      "depth": 0,
+      "fetched_at": "2026-09-20T08:41:06.984491+07:00",
+      "fetch_duration": 1640864166,
+      "in_sitemap": false
+    }
+  ],
+  "issues": [
+    {
+      "check_name": "accessibility/missing-form-label",
+      "severity": "warning",
+      "message": "input element is missing an associated label",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "health/missing-charset",
+      "severity": "warning",
+      "message": "Content-Type header is missing charset: text/html",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "images/missing-dimensions",
+      "severity": "warning",
+      "message": "image is missing width and height attributes: data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc2NCcgaGVpZ2h0PSc2NCc+PHJlY3Qgd2lkdGg9JzY0JyBoZWlnaHQ9JzY0JyBmaWxsPScjNmQyOGQ5Jy8+PHRleHQgeD0nMzInIHk9JzM0JyB0ZXh0LWFuY2hvcj0nbWlkZGxlJyBkb21pbmFudC1iYXNlbGluZT0nY2VudHJhbCcgZm9udC1mYW1pbHk9J3NhbnMtc2VyaWYnIGZvbnQtd2VpZ2h0PSc2MDAnIGZvbnQtc2l6ZT0nMjYnIGZpbGw9JyNmZmYnPkFMPC90ZXh0Pjwvc3ZnPg==",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "performance/render-blocking-css",
+      "severity": "warning",
+      "message": "render-blocking stylesheet in \u003chead\u003e: /static/assets/preview-C4R8KdvC.css",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "performance/render-blocking-script",
+      "severity": "warning",
+      "message": "render-blocking script in \u003chead\u003e: /static/assets/main-B1GUBBn8.js",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "security/missing-content-security-policy",
+      "severity": "warning",
+      "message": "page is missing the Content-Security-Policy header",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "security/missing-strict-transport-security",
+      "severity": "warning",
+      "message": "HTTPS page is missing the Strict-Transport-Security header",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "security/missing-x-content-type-options",
+      "severity": "warning",
+      "message": "page is missing X-Content-Type-Options: nosniff",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "seo/missing-canonical",
+      "severity": "warning",
+      "message": "page is missing a canonical link",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "seo/missing-meta-description",
+      "severity": "warning",
+      "message": "page is missing a meta description",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "seo/title-length",
+      "severity": "warning",
+      "message": "title length is 14 characters, expected 30-60",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "accessibility/missing-skip-nav",
+      "severity": "info",
+      "message": "page is missing a skip navigation link",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "performance/missing-resource-hints",
+      "severity": "info",
+      "message": "page has no \u003clink rel=\"preconnect\"\u003e or \u003clink rel=\"dns-prefetch\"\u003e resource hints",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "performance/unminified-resources",
+      "severity": "info",
+      "message": "inline \u003cscript\u003e appears to contain unminified code",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "security/missing-permissions-policy",
+      "severity": "info",
+      "message": "page is missing the Permissions-Policy header",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "security/missing-referrer-policy",
+      "severity": "info",
+      "message": "page is missing the Referrer-Policy header",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "security/missing-security-txt",
+      "severity": "info",
+      "message": "site does not have a /.well-known/security.txt file",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "security/missing-x-frame-options",
+      "severity": "info",
+      "message": "page is missing X-Frame-Options (expected DENY or SAMEORIGIN)",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "seo/missing-og-description",
+      "severity": "info",
+      "message": "page is missing an og:description meta tag",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "seo/missing-og-image",
+      "severity": "info",
+      "message": "page is missing an og:image meta tag",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "seo/missing-og-title",
+      "severity": "info",
+      "message": "page is missing an og:title meta tag",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "seo/missing-twitter-card",
+      "severity": "info",
+      "message": "page is missing a twitter:card meta tag",
+      "url": "https://ui.gsxhq.dev"
+    },
+    {
+      "check_name": "structured-data/missing-json-ld",
+      "severity": "info",
+      "message": "page has no JSON-LD structured data",
+      "url": "https://ui.gsxhq.dev"
+    }
+  ],
+  "crawled_at": "2026-09-20T08:41:06.984476+07:00",
+  "duration": 1640912125,
+  "summary": {
+    "total_issues": 23,
+    "by_severity": {
+      "critical": 0,
+      "info": 12,
+      "warning": 11
+    },
+    "by_category": {
+      "accessibility": 2,
+      "health": 1,
+      "images": 1,
+      "performance": 4,
+      "security": 7,
+      "seo": 7,
+      "structured-data": 1
+    },
+    "top_urls": [
+      {
+        "url": "https://ui.gsxhq.dev",
+        "count": 23
+      }
+    ],
+    "pages_scanned": 1
+  }
+}
+

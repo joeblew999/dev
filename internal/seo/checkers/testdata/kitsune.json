@@ -1,0 +1,404 @@
+{
+  "schema_version": "1",
+  "tool": "kitsune",
+  "tool_version": "dev",
+  "url": "https://ui.gsxhq.dev",
+  "final_url": "https://ui.gsxhq.dev",
+  "status_code": 200,
+  "fetched_at": "2026-09-20T01:41:09.772595Z",
+  "results": [
+    {
+      "id": "seo.status.code",
+      "category": "seo",
+      "severity": "info",
+      "title": "HTTP 200 (final URL: https://ui.gsxhq.dev)"
+    },
+    {
+      "id": "seo.https.ok",
+      "category": "seo",
+      "severity": "info",
+      "title": "Page served over HTTPS with no mixed content detected",
+      "guideline_url": "https://developers.google.com/search/docs/crawling-indexing/site-move-with-url-changes"
+    },
+    {
+      "id": "seo.title.present",
+      "category": "seo",
+      "severity": "info",
+      "title": "Title: \"gsxui · gsxui\" (13 chars)",
+      "guideline_url": "https://developers.google.com/search/docs/appearance/title-link"
+    },
+    {
+      "id": "seo.title.short",
+      "category": "seo",
+      "severity": "warning",
+      "title": "Title is shorter than recommended",
+      "detail": "Title is 13 characters; aim for 30–60.",
+      "recommendation": "Expand the title with descriptive, keyword-relevant terms.",
+      "guideline_url": "https://developers.google.com/search/docs/appearance/title-link"
+    },
+    {
+      "id": "seo.description.missing",
+      "category": "seo",
+      "severity": "warning",
+      "title": "Missing meta description",
+      "detail": "No \u003cmeta name=\"description\"\u003e tag found.",
+      "recommendation": "Add a 70–160 character meta description summarizing the page.",
+      "guideline_url": "https://developers.google.com/search/docs/appearance/snippet"
+    },
+    {
+      "id": "seo.canonical.missing",
+      "category": "seo",
+      "severity": "warning",
+      "title": "Missing canonical link",
+      "detail": "No \u003clink rel=\"canonical\"\u003e found in the document head.",
+      "recommendation": "Add a self-referential canonical to prevent duplicate-content ambiguity.",
+      "guideline_url": "https://developers.google.com/search/docs/crawling-indexing/canonicalization"
+    },
+    {
+      "id": "seo.robots_meta.absent",
+      "category": "seo",
+      "severity": "info",
+      "title": "No robots meta or X-Robots-Tag (defaults to index, follow)",
+      "guideline_url": "https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag"
+    },
+    {
+      "id": "seo.lang.present",
+      "category": "seo",
+      "severity": "info",
+      "title": "Document language: en",
+      "guideline_url": "https://www.w3.org/International/questions/qa-html-language-declarations"
+    },
+    {
+      "id": "seo.viewport.present",
+      "category": "seo",
+      "severity": "info",
+      "title": "Viewport: width=device-width, initial-scale=1.0",
+      "guideline_url": "https://developers.google.com/search/docs/crawling-indexing/mobile/mobile-sites-mobile-first-indexing"
+    },
+    {
+      "id": "seo.open_graph.absent",
+      "category": "seo",
+      "severity": "warning",
+      "title": "No Open Graph tags found",
+      "recommendation": "Add og:title, og:description, og:image, og:url, og:type for richer social previews.",
+      "guideline_url": "https://ogp.me/"
+    },
+    {
+      "id": "seo.twitter_card.absent",
+      "category": "seo",
+      "severity": "info",
+      "title": "No Twitter Card tags found",
+      "recommendation": "Add \u003cmeta name=\"twitter:card\" content=\"summary_large_image\"\u003e plus title/description/image.",
+      "guideline_url": "https://developer.x.com/en/docs/twitter-for-websites/cards/overview/abouts-cards"
+    },
+    {
+      "id": "seo.headings.h1_present",
+      "category": "seo",
+      "severity": "info",
+      "title": "H1: \"Components for modern web frontends in Go.\"",
+      "guideline_url": "https://www.w3.org/WAI/tutorials/page-structure/headings/"
+    },
+    {
+      "id": "seo.image_alt.ok",
+      "category": "seo",
+      "severity": "info",
+      "title": "All 1 image(s) have an alt attribute",
+      "guideline_url": "https://www.w3.org/WAI/tutorials/images/"
+    },
+    {
+      "id": "seo.links.summary",
+      "category": "seo",
+      "severity": "info",
+      "title": "Links: 6 internal, 4 external, 0 nofollow",
+      "guideline_url": "https://developers.google.com/search/docs/crawling-indexing/links-crawlable"
+    },
+    {
+      "id": "seo.doctype.html5",
+      "category": "seo",
+      "severity": "info",
+      "title": "HTML5 DOCTYPE present",
+      "guideline_url": "https://developer.mozilla.org/en-US/docs/Glossary/Doctype"
+    },
+    {
+      "id": "seo.charset.ok",
+      "category": "seo",
+      "severity": "info",
+      "title": "Charset declared (utf-8)",
+      "guideline_url": "https://html.spec.whatwg.org/multipage/semantics.html#charset"
+    },
+    {
+      "id": "seo.duplicate_meta.title",
+      "category": "seo",
+      "severity": "warning",
+      "title": "2 \u003ctitle\u003e elements (expected 1)",
+      "recommendation": "Keep exactly one — crawlers and social cards pick unpredictably when there are multiple."
+    },
+    {
+      "id": "seo.icons.no_theme_color",
+      "category": "seo",
+      "severity": "info",
+      "title": "No \u003cmeta name=\"theme-color\"\u003e declared",
+      "recommendation": "Add `\u003cmeta name=\"theme-color\" content=\"#…\"\u003e` to colour the mobile browser UI chrome."
+    },
+    {
+      "id": "seo.robots_txt.allowed",
+      "category": "seo",
+      "severity": "info",
+      "title": "robots.txt allows Googlebot for this URL",
+      "guideline_url": "https://developers.google.com/search/docs/crawling-indexing/robots/intro"
+    },
+    {
+      "id": "seo.sitemap.unreferenced",
+      "category": "seo",
+      "severity": "warning",
+      "title": "No Sitemap directive in robots.txt",
+      "recommendation": "Add `Sitemap: https://example.com/sitemap.xml` to robots.txt.",
+      "guideline_url": "https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview"
+    },
+    {
+      "id": "seo.sitemap.bad_status",
+      "category": "seo",
+      "severity": "warning",
+      "title": "Sitemap returned HTTP 404: https://ui.gsxhq.dev/sitemap.xml",
+      "guideline_url": "https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview"
+    },
+    {
+      "id": "geo.llms_txt.absent",
+      "category": "geo",
+      "severity": "info",
+      "title": "/llms.txt not found",
+      "detail": "An /llms.txt file gives LLMs a curated entry point to your site's most important content.",
+      "recommendation": "Consider adding /llms.txt per the llmstxt.org spec to improve discoverability for AI assistants.",
+      "guideline_url": "https://llmstxt.org/"
+    },
+    {
+      "id": "geo.ai_bots.unspecified",
+      "category": "geo",
+      "severity": "info",
+      "title": "No explicit rules for known AI crawlers in robots.txt",
+      "detail": "Without rules, most AI crawlers will fall back to the wildcard user-agent block (or none).",
+      "recommendation": "Decide explicitly whether you want to be cited by AI search; add rules for GPTBot, ClaudeBot, PerplexityBot, Google-Extended, OAI-SearchBot.",
+      "guideline_url": "https://platform.openai.com/docs/bots"
+    },
+    {
+      "id": "geo.jsonld.absent",
+      "category": "geo",
+      "severity": "warning",
+      "title": "No JSON-LD structured data found",
+      "recommendation": "Add schema.org JSON-LD (Article, FAQPage, HowTo, Organization, etc.). AI search engines heavily favor structured content.",
+      "guideline_url": "https://schema.org/docs/gs.html"
+    },
+    {
+      "id": "geo.author.missing",
+      "category": "geo",
+      "severity": "info",
+      "title": "No author signal in metadata",
+      "recommendation": "Add \u003cmeta name=\"author\"\u003e or schema.org \"author\" — strengthens E-E-A-T for AI citations.",
+      "guideline_url": "https://developers.google.com/search/docs/fundamentals/creating-helpful-content"
+    },
+    {
+      "id": "geo.date.missing",
+      "category": "geo",
+      "severity": "info",
+      "title": "No published/modified date metadata",
+      "recommendation": "Add article:published_time and article:modified_time meta tags; freshness affects AI citation rates.",
+      "guideline_url": "https://developers.google.com/search/docs/appearance/publication-dates"
+    },
+    {
+      "id": "geo.content_depth.words",
+      "category": "geo",
+      "severity": "info",
+      "title": "Body word count: 125",
+      "guideline_url": "https://arxiv.org/abs/2311.09735"
+    },
+    {
+      "id": "geo.content_depth.thin",
+      "category": "geo",
+      "severity": "warning",
+      "title": "Page content looks thin",
+      "detail": "AI search engines tend to cite substantive, in-depth pages.",
+      "guideline_url": "https://arxiv.org/abs/2311.09735"
+    },
+    {
+      "id": "geo.content_depth.stats",
+      "category": "geo",
+      "severity": "info",
+      "title": "Numeric/statistical mentions: 1",
+      "detail": "GEO research finds statistics + citations significantly boost AI citation rates.",
+      "guideline_url": "https://arxiv.org/abs/2311.09735"
+    },
+    {
+      "id": "geo.content_depth.qa_headings",
+      "category": "geo",
+      "severity": "info",
+      "title": "Question-style headings: 0 of 2",
+      "detail": "Question-shaped headings improve match against natural-language AI queries.",
+      "guideline_url": "https://arxiv.org/abs/2311.09735"
+    },
+    {
+      "id": "geo.readability.metrics",
+      "category": "geo",
+      "severity": "info",
+      "title": "Readability: 62.5 avg words/sentence, F-K grade 43.1",
+      "recommendation": "Long sentences (\u003e25 words) and grade level \u003e14 reduce comprehension and AI extraction quality. Shorter prose helps both.",
+      "guideline_url": "https://arxiv.org/abs/2311.09735"
+    },
+    {
+      "id": "geo.citation_density.summary",
+      "category": "geo",
+      "severity": "info",
+      "title": "Authoritative citations: 0 of 4 external link(s)",
+      "detail": "Princeton GEO research finds citations to primary sources boost AI citation rates.",
+      "guideline_url": "https://arxiv.org/abs/2311.09735"
+    },
+    {
+      "id": "perf.cache_control.present",
+      "category": "perf",
+      "severity": "info",
+      "title": "Cache-Control: public, max-age=14400, s-maxage=300",
+      "guideline_url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control"
+    },
+    {
+      "id": "perf.compression.present",
+      "category": "perf",
+      "severity": "info",
+      "title": "Content-Encoding: gzip",
+      "recommendation": "Brotli (`br`) typically saves ~15-25% over gzip; consider enabling it if your CDN supports it.",
+      "guideline_url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Encoding"
+    },
+    {
+      "id": "perf.http_protocol",
+      "category": "perf",
+      "severity": "info",
+      "title": "Protocol: HTTP/2.0",
+      "guideline_url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Protocol_upgrade_mechanism"
+    },
+    {
+      "id": "perf.render_blocking.styles",
+      "category": "perf",
+      "severity": "warning",
+      "title": "1 render-blocking stylesheet(s) in \u003chead\u003e",
+      "detail": "/static/assets/preview-C4R8KdvC.css",
+      "recommendation": "Inline critical CSS or load non-critical sheets with `media=\"print\" onload=\"this.media='all'\"`.",
+      "guideline_url": "https://web.dev/articles/render-blocking-resources"
+    },
+    {
+      "id": "perf.resource_hints.lcp_preload",
+      "category": "perf",
+      "severity": "info",
+      "title": "Likely LCP image not preloaded",
+      "detail": "First body \u003cimg\u003e: data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc2NCcgaGVpZ2h0PSc2NCc+PHJlY3Qgd2lkdGg9JzY0JyBoZWlnaHQ9JzY0JyBmaWxsPScjNmQyOGQ5Jy8+PHRleHQgeD0nMzInIHk9JzM0JyB0ZXh0LWFuY2hvcj0nbWlkZGxlJyBkb21pbmFudC1iYXNlbGluZT0nY2VudHJhbCcgZm9udC1mYW1pbHk9J3NhbnMtc2VyaWYnIGZvbnQtd2VpZ2h0PSc2MDAnIGZvbnQtc2l6ZT0nMjYnIGZpbGw9JyNmZmYnPkFMPC90ZXh0Pjwvc3ZnPg==",
+      "recommendation": "Consider `\u003clink rel=\"preload\" as=\"image\" href=\"…\" fetchpriority=\"high\"\u003e` for above-the-fold hero images.",
+      "guideline_url": "https://web.dev/articles/preload-critical-assets"
+    },
+    {
+      "id": "perf.responsive_images.missing_srcset",
+      "category": "perf",
+      "severity": "info",
+      "title": "1 \u003cimg\u003e without srcset/\u003cpicture\u003e",
+      "recommendation": "Use `srcset`/`sizes` (or a `\u003cpicture\u003e` element) so browsers can pick an appropriately-sized variant.",
+      "guideline_url": "https://web.dev/articles/serve-responsive-images"
+    },
+    {
+      "id": "perf.fetchpriority.lcp_missing",
+      "category": "perf",
+      "severity": "info",
+      "title": "Likely LCP image lacks fetchpriority=\"high\"",
+      "detail": "src: data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc2NCcgaGVpZ2h0PSc2NCc+PHJlY3Qgd2lkdGg9JzY0JyBoZWlnaHQ9JzY0JyBmaWxsPScjNmQyOGQ5Jy8+PHRleHQgeD0nMzInIHk9JzM0JyB0ZXh0LWFuY2hvcj0nbWlkZGxlJyBkb21pbmFudC1iYXNlbGluZT0nY2VudHJhbCcgZm9udC1mYW1pbHk9J3NhbnMtc2VyaWYnIGZvbnQtd2VpZ2h0PSc2MDAnIGZvbnQtc2l6ZT0nMjYnIGZpbGw9JyNmZmYnPkFMPC90ZXh0Pjwvc3ZnPg==",
+      "recommendation": "Add `fetchpriority=\"high\"` to the LCP image so the browser prioritizes its download.",
+      "guideline_url": "https://web.dev/articles/fetch-priority"
+    },
+    {
+      "id": "perf.media_dimensions.img",
+      "category": "perf",
+      "severity": "warning",
+      "title": "1 \u003cimg\u003e missing width/height (CLS risk)",
+      "recommendation": "Set explicit `width` and `height` so the browser reserves layout space (prevents shift).",
+      "guideline_url": "https://web.dev/articles/optimize-cls"
+    },
+    {
+      "id": "perf.dom_size.metrics",
+      "category": "perf",
+      "severity": "info",
+      "title": "DOM: 348 nodes, depth 15, max 57 children",
+      "guideline_url": "https://web.dev/articles/dom-size-and-interactivity"
+    },
+    {
+      "id": "a11y.form_label.unlabeled",
+      "category": "a11y",
+      "severity": "warning",
+      "title": "1 form control(s) without a label",
+      "recommendation": "Wire `\u003clabel for\u003e` to the input id, wrap the input in a `\u003clabel\u003e`, or set `aria-label`.",
+      "guideline_url": "https://www.w3.org/WAI/tutorials/forms/labels/"
+    },
+    {
+      "id": "a11y.skip_link.missing",
+      "category": "a11y",
+      "severity": "info",
+      "title": "No skip-link as the first focusable link in body",
+      "recommendation": "Add a `\u003ca href=\"#main\"\u003eSkip to content\u003c/a\u003e` as the first focusable element so keyboard users can bypass nav.",
+      "guideline_url": "https://www.w3.org/WAI/WCAG21/Techniques/general/G1"
+    },
+    {
+      "id": "security.hsts.missing",
+      "category": "security",
+      "severity": "warning",
+      "title": "Missing Strict-Transport-Security header",
+      "recommendation": "Add `Strict-Transport-Security: max-age=31536000; includeSubDomains` to force HTTPS for repeat visitors.",
+      "guideline_url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security"
+    },
+    {
+      "id": "security.csp.missing",
+      "category": "security",
+      "severity": "warning",
+      "title": "No Content-Security-Policy set",
+      "recommendation": "Add a CSP header to mitigate XSS and data-injection attacks.",
+      "guideline_url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy"
+    },
+    {
+      "id": "security.nosniff.missing",
+      "category": "security",
+      "severity": "warning",
+      "title": "Missing X-Content-Type-Options header",
+      "recommendation": "Add `X-Content-Type-Options: nosniff` to block MIME-type sniffing.",
+      "guideline_url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Content-Type-Options"
+    },
+    {
+      "id": "security.referrer_policy.missing",
+      "category": "security",
+      "severity": "warning",
+      "title": "Missing Referrer-Policy",
+      "recommendation": "Set a Referrer-Policy header (e.g. `strict-origin-when-cross-origin`) to control referer leakage.",
+      "guideline_url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy"
+    },
+    {
+      "id": "security.permissions_policy.missing",
+      "category": "security",
+      "severity": "info",
+      "title": "No Permissions-Policy header set",
+      "recommendation": "Consider a `Permissions-Policy` to lock down powerful features (camera, geolocation, microphone) you don't use.",
+      "guideline_url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy"
+    },
+    {
+      "id": "security.clickjacking.missing",
+      "category": "security",
+      "severity": "warning",
+      "title": "No clickjacking protection (X-Frame-Options or CSP frame-ancestors)",
+      "recommendation": "Set `X-Frame-Options: DENY` or a CSP `frame-ancestors` directive.",
+      "guideline_url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options"
+    },
+    {
+      "id": "security.server_disclosure.server",
+      "category": "security",
+      "severity": "info",
+      "title": "Server: cloudflare",
+      "guideline_url": "https://owasp.org/www-project-secure-headers/"
+    }
+  ],
+  "summary": {
+    "info": 33,
+    "warning": 17,
+    "error": 0
+  }
+}
+

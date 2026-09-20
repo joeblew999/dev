@@ -1,0 +1,1725 @@
+{
+  "url": "https://ui.gsxhq.dev/",
+  "audited_at": "2026-09-20T01:41:10.204593Z",
+  "summary": {
+    "pages": 3,
+    "links": {
+      "total": 67,
+      "checked": 67,
+      "broken": 0,
+      "blocked": 0,
+      "redirected": 0
+    },
+    "images": {
+      "total": 1,
+      "checked": 0,
+      "broken": 0,
+      "blocked": 0,
+      "redirected": 0,
+      "invalid": 0
+    },
+    "issues": {
+      "total": 3,
+      "error": 3,
+      "warning": 0,
+      "info": 0
+    }
+  },
+  "issues": [
+    {
+      "code": "missing-meta-description",
+      "severity": "error",
+      "message": "Page is missing a meta description",
+      "target": {
+        "type": "page",
+        "url": "https://ui.gsxhq.dev/"
+      }
+    },
+    {
+      "code": "missing-meta-description",
+      "severity": "error",
+      "message": "Page is missing a meta description",
+      "target": {
+        "type": "page",
+        "url": "https://ui.gsxhq.dev/docs/getting-started"
+      }
+    },
+    {
+      "code": "missing-meta-description",
+      "severity": "error",
+      "message": "Page is missing a meta description",
+      "target": {
+        "type": "page",
+        "url": "https://ui.gsxhq.dev/theme"
+      }
+    }
+  ],
+  "pages": [
+    {
+      "url": "https://ui.gsxhq.dev/",
+      "depth": 0,
+      "status_code": 200,
+      "content_type": "text/html; charset=utf-8",
+      "title": "gsxui · gsxui",
+      "description": null,
+      "headings": {
+        "h1": [
+          "Components for modern web frontends in Go."
+        ]
+      },
+      "images": [
+        {
+          "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc2NCcgaGVpZ2h0PSc2NCc+PHJlY3Qgd2lkdGg9JzY0JyBoZWlnaHQ9JzY0JyBmaWxsPScjNmQyOGQ5Jy8+PHRleHQgeD0nMzInIHk9JzM0JyB0ZXh0LWFuY2hvcj0nbWlkZGxlJyBkb21pbmFudC1iYXNlbGluZT0nY2VudHJhbCcgZm9udC1mYW1pbHk9J3NhbnMtc2VyaWYnIGZvbnQtd2VpZ2h0PSc2MDAnIGZvbnQtc2l6ZT0nMjYnIGZpbGw9JyNmZmYnPkFMPC90ZXh0Pjwvc3ZnPg==",
+          "alt": "Ada Lovelace"
+        }
+      ],
+      "open_graph": {
+        "title": null,
+        "description": null,
+        "image": null,
+        "url": null,
+        "type": null,
+        "site_name": null,
+        "locale": null
+      }
+    },
+    {
+      "url": "https://ui.gsxhq.dev/docs/getting-started",
+      "depth": 1,
+      "status_code": 200,
+      "content_type": "text/html; charset=utf-8",
+      "title": "Getting Started · gsxui",
+      "description": null,
+      "headings": {
+        "h1": [
+          "Getting Started"
+        ]
+      },
+      "images": [],
+      "open_graph": {
+        "title": null,
+        "description": null,
+        "image": null,
+        "url": null,
+        "type": null,
+        "site_name": null,
+        "locale": null
+      }
+    },
+    {
+      "url": "https://ui.gsxhq.dev/theme",
+      "depth": 1,
+      "status_code": 200,
+      "content_type": "text/html; charset=utf-8",
+      "title": "Theme · gsxui",
+      "description": null,
+      "headings": {
+        "h1": [
+          "Theme editor"
+        ]
+      },
+      "images": [],
+      "open_graph": {
+        "title": null,
+        "description": null,
+        "image": null,
+        "url": null,
+        "type": null,
+        "site_name": null,
+        "locale": null
+      }
+    }
+  ],
+  "links": [
+    {
+      "url": "https://ui.gsxhq.dev/",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/",
+          "original_url": "/",
+          "element": "a",
+          "text": "gsxui"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/",
+          "original_url": "#",
+          "element": "a",
+          "text": "Forgot password?"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/",
+          "element": "a",
+          "text": "gsxui"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/theme",
+          "original_url": "/",
+          "element": "a",
+          "text": "gsxui"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/docs/getting-started",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/docs/getting-started"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/",
+          "original_url": "/docs/getting-started",
+          "element": "a",
+          "text": "Docs"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/",
+          "original_url": "/docs/getting-started",
+          "element": "a",
+          "text": "Get Started"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/getting-started",
+          "element": "a",
+          "text": "Getting Started"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/getting-started",
+          "element": "a",
+          "text": "Docs"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/getting-started",
+          "element": "a",
+          "text": "Getting Started"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "#install-cli",
+          "element": "a",
+          "text": "1. Install the CLIs"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "#initialize-project",
+          "element": "a",
+          "text": "2. Initialize your project"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "#manual-integration",
+          "element": "a",
+          "text": "Manual integration"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "#add-components",
+          "element": "a",
+          "text": "3. Add components"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "#first-page",
+          "element": "a",
+          "text": "4. Your first page"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/theme",
+          "original_url": "/docs/getting-started",
+          "element": "a",
+          "text": "Docs"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/theme",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/theme"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/",
+          "original_url": "/theme",
+          "element": "a",
+          "text": "Theme"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/",
+          "original_url": "/theme",
+          "element": "a",
+          "text": "Create"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/theme",
+          "element": "a",
+          "text": "Theme"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/theme",
+          "original_url": "/theme",
+          "element": "a",
+          "text": "Theme"
+        }
+      ]
+    },
+    {
+      "url": "https://github.com/gsxhq/gsxui",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://github.com/gsxhq/gsxui"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/",
+          "original_url": "https://github.com/gsxhq/gsxui",
+          "element": "a",
+          "text": "GitHub"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/",
+          "original_url": "https://github.com/gsxhq/gsxui",
+          "element": "a",
+          "text": "View on GitHub"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "https://github.com/gsxhq/gsxui",
+          "element": "a",
+          "text": "GitHub"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/theme",
+          "original_url": "https://github.com/gsxhq/gsxui",
+          "element": "a",
+          "text": "GitHub"
+        }
+      ]
+    },
+    {
+      "url": "https://gsxhq.github.io/",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://gsxhq.github.io/"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/",
+          "original_url": "https://gsxhq.github.io/",
+          "element": "a",
+          "text": "gsx"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/",
+          "original_url": "https://gsxhq.github.io/",
+          "element": "a",
+          "text": "gsx documentation ↗"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/",
+          "original_url": "/components/",
+          "element": "a",
+          "text": "Browse all components →"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/docs/theming",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/docs/theming"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/theming",
+          "element": "a",
+          "text": "Theming"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/theming",
+          "element": "a",
+          "text": "Theming"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/theming",
+          "element": "a",
+          "text": "Theming"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/theming",
+          "element": "a",
+          "text": "restyle it"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/docs/rtl",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/docs/rtl"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/rtl",
+          "element": "a",
+          "text": "RTL"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/rtl",
+          "element": "a",
+          "text": "RTL"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/docs/i18n",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/docs/i18n"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/i18n",
+          "element": "a",
+          "text": "Internationalization"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/i18n",
+          "element": "a",
+          "text": "Internationalization"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/docs/npm-free",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/docs/npm-free"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/npm-free",
+          "element": "a",
+          "text": "npm-free"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/npm-free",
+          "element": "a",
+          "text": "npm-free"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/docs/npm-free",
+          "element": "a",
+          "text": "npm-free"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/accordion",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/accordion"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/accordion",
+          "element": "a",
+          "text": "accordion"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/accordion",
+          "element": "a",
+          "text": "accordion"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/alert",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/alert"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/alert",
+          "element": "a",
+          "text": "alert"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/alert",
+          "element": "a",
+          "text": "alert"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/alert-dialog",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/alert-dialog"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/alert-dialog",
+          "element": "a",
+          "text": "alert-dialog"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/alert-dialog",
+          "element": "a",
+          "text": "alert-dialog"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/aspect-ratio",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/aspect-ratio"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/aspect-ratio",
+          "element": "a",
+          "text": "aspect-ratio"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/aspect-ratio",
+          "element": "a",
+          "text": "aspect-ratio"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/avatar",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/avatar"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/avatar",
+          "element": "a",
+          "text": "avatar"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/avatar",
+          "element": "a",
+          "text": "avatar"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/badge",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/badge"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/badge",
+          "element": "a",
+          "text": "badge"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/badge",
+          "element": "a",
+          "text": "badge"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/breadcrumb",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/breadcrumb"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/breadcrumb",
+          "element": "a",
+          "text": "breadcrumb"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/breadcrumb",
+          "element": "a",
+          "text": "breadcrumb"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/button",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/button"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/button",
+          "element": "a",
+          "text": "button"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/button",
+          "element": "a",
+          "text": "button"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/button-group",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/button-group"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/button-group",
+          "element": "a",
+          "text": "button-group"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/button-group",
+          "element": "a",
+          "text": "button-group"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/calendar",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/calendar"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/calendar",
+          "element": "a",
+          "text": "calendar"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/calendar",
+          "element": "a",
+          "text": "calendar"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/card",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/card"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/card",
+          "element": "a",
+          "text": "card"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/card",
+          "element": "a",
+          "text": "card"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/carousel",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/carousel"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/carousel",
+          "element": "a",
+          "text": "carousel"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/carousel",
+          "element": "a",
+          "text": "carousel"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/chart",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/chart"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/chart",
+          "element": "a",
+          "text": "chart"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/chart",
+          "element": "a",
+          "text": "chart"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/checkbox",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/checkbox"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/checkbox",
+          "element": "a",
+          "text": "checkbox"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/checkbox",
+          "element": "a",
+          "text": "checkbox"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/collapsible",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/collapsible"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/collapsible",
+          "element": "a",
+          "text": "collapsible"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/collapsible",
+          "element": "a",
+          "text": "collapsible"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/combobox",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/combobox"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/combobox",
+          "element": "a",
+          "text": "combobox"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/combobox",
+          "element": "a",
+          "text": "combobox"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/command",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/command"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/command",
+          "element": "a",
+          "text": "command"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/command",
+          "element": "a",
+          "text": "command"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/context-menu",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/context-menu"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/context-menu",
+          "element": "a",
+          "text": "context-menu"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/context-menu",
+          "element": "a",
+          "text": "context-menu"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/dialog",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/dialog"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/dialog",
+          "element": "a",
+          "text": "dialog"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/dialog",
+          "element": "a",
+          "text": "dialog"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/drawer",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/drawer"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/drawer",
+          "element": "a",
+          "text": "drawer"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/drawer",
+          "element": "a",
+          "text": "drawer"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/dropdown-menu",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/dropdown-menu"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/dropdown-menu",
+          "element": "a",
+          "text": "dropdown-menu"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/dropdown-menu",
+          "element": "a",
+          "text": "dropdown-menu"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/empty",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/empty"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/empty",
+          "element": "a",
+          "text": "empty"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/empty",
+          "element": "a",
+          "text": "empty"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/field",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/field"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/field",
+          "element": "a",
+          "text": "field"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/field",
+          "element": "a",
+          "text": "field"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/hover-card",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/hover-card"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/hover-card",
+          "element": "a",
+          "text": "hover-card"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/hover-card",
+          "element": "a",
+          "text": "hover-card"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/icon",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/icon"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/icon",
+          "element": "a",
+          "text": "icon"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/icon",
+          "element": "a",
+          "text": "icon"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/input",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/input"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/input",
+          "element": "a",
+          "text": "input"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/input",
+          "element": "a",
+          "text": "input"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/input-group",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/input-group"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/input-group",
+          "element": "a",
+          "text": "input-group"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/input-group",
+          "element": "a",
+          "text": "input-group"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/input-otp",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/input-otp"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/input-otp",
+          "element": "a",
+          "text": "input-otp"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/input-otp",
+          "element": "a",
+          "text": "input-otp"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/item",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/item"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/item",
+          "element": "a",
+          "text": "item"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/item",
+          "element": "a",
+          "text": "item"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/kbd",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/kbd"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/kbd",
+          "element": "a",
+          "text": "kbd"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/kbd",
+          "element": "a",
+          "text": "kbd"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/label",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/label"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/label",
+          "element": "a",
+          "text": "label"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/label",
+          "element": "a",
+          "text": "label"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/menubar",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/menubar"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/menubar",
+          "element": "a",
+          "text": "menubar"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/menubar",
+          "element": "a",
+          "text": "menubar"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/native-select",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/native-select"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/native-select",
+          "element": "a",
+          "text": "native-select"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/native-select",
+          "element": "a",
+          "text": "native-select"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/navigation-menu",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/navigation-menu"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/navigation-menu",
+          "element": "a",
+          "text": "navigation-menu"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/navigation-menu",
+          "element": "a",
+          "text": "navigation-menu"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/pagination",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/pagination"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/pagination",
+          "element": "a",
+          "text": "pagination"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/pagination",
+          "element": "a",
+          "text": "pagination"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/popover",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/popover"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/popover",
+          "element": "a",
+          "text": "popover"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/popover",
+          "element": "a",
+          "text": "popover"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/progress",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/progress"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/progress",
+          "element": "a",
+          "text": "progress"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/progress",
+          "element": "a",
+          "text": "progress"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/radio",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/radio"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/radio",
+          "element": "a",
+          "text": "radio"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/radio",
+          "element": "a",
+          "text": "radio"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/resizable",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/resizable"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/resizable",
+          "element": "a",
+          "text": "resizable"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/resizable",
+          "element": "a",
+          "text": "resizable"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/scroll-area",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/scroll-area"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/scroll-area",
+          "element": "a",
+          "text": "scroll-area"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/scroll-area",
+          "element": "a",
+          "text": "scroll-area"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/select",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/select"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/select",
+          "element": "a",
+          "text": "select"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/select",
+          "element": "a",
+          "text": "select"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/separator",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/separator"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/separator",
+          "element": "a",
+          "text": "separator"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/separator",
+          "element": "a",
+          "text": "separator"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/sheet",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/sheet"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/sheet",
+          "element": "a",
+          "text": "sheet"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/sheet",
+          "element": "a",
+          "text": "sheet"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/sidebar",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/sidebar"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/sidebar",
+          "element": "a",
+          "text": "sidebar"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/sidebar",
+          "element": "a",
+          "text": "sidebar"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/skeleton",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/skeleton"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/skeleton",
+          "element": "a",
+          "text": "skeleton"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/skeleton",
+          "element": "a",
+          "text": "skeleton"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/slider",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/slider"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/slider",
+          "element": "a",
+          "text": "slider"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/slider",
+          "element": "a",
+          "text": "slider"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/spinner",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/spinner"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/spinner",
+          "element": "a",
+          "text": "spinner"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/spinner",
+          "element": "a",
+          "text": "spinner"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/switch",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/switch"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/switch",
+          "element": "a",
+          "text": "switch"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/switch",
+          "element": "a",
+          "text": "switch"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/table",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/table"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/table",
+          "element": "a",
+          "text": "table"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/table",
+          "element": "a",
+          "text": "table"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/tabs",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/tabs"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/tabs",
+          "element": "a",
+          "text": "tabs"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/tabs",
+          "element": "a",
+          "text": "tabs"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/textarea",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/textarea"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/textarea",
+          "element": "a",
+          "text": "textarea"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/textarea",
+          "element": "a",
+          "text": "textarea"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/toast",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/toast"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/toast",
+          "element": "a",
+          "text": "toast"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/toast",
+          "element": "a",
+          "text": "toast"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/toaster",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/toaster"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/toaster",
+          "element": "a",
+          "text": "toaster"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/toaster",
+          "element": "a",
+          "text": "toaster"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/toggle",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/toggle"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/toggle",
+          "element": "a",
+          "text": "toggle"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/toggle",
+          "element": "a",
+          "text": "toggle"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/toggle-group",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/toggle-group"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/toggle-group",
+          "element": "a",
+          "text": "toggle-group"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/toggle-group",
+          "element": "a",
+          "text": "toggle-group"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/components/tooltip",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/components/tooltip"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/tooltip",
+          "element": "a",
+          "text": "tooltip"
+        },
+        {
+          "page_url": "https://ui.gsxhq.dev/docs/getting-started",
+          "original_url": "/components/tooltip",
+          "element": "a",
+          "text": "tooltip"
+        }
+      ]
+    },
+    {
+      "url": "https://ui.gsxhq.dev/theme/preview",
+      "result": {
+        "kind": "response",
+        "status_code": 200,
+        "final_url": "https://ui.gsxhq.dev/theme/preview"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/theme",
+          "original_url": "/theme/preview",
+          "element": "iframe",
+          "text": "[iframe] Theme preview"
+        }
+      ]
+    }
+  ],
+  "images": [
+    {
+      "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc2NCcgaGVpZ2h0PSc2NCc+PHJlY3Qgd2lkdGg9JzY0JyBoZWlnaHQ9JzY0JyBmaWxsPScjNmQyOGQ5Jy8+PHRleHQgeD0nMzInIHk9JzM0JyB0ZXh0LWFuY2hvcj0nbWlkZGxlJyBkb21pbmFudC1iYXNlbGluZT0nY2VudHJhbCcgZm9udC1mYW1pbHk9J3NhbnMtc2VyaWYnIGZvbnQtd2VpZ2h0PSc2MDAnIGZvbnQtc2l6ZT0nMjYnIGZpbGw9JyNmZmYnPkFMPC90ZXh0Pjwvc3ZnPg==",
+      "result": {
+        "kind": "skipped",
+        "reason": "unsupported-protocol"
+      },
+      "found_on": [
+        {
+          "page_url": "https://ui.gsxhq.dev/",
+          "original_url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc2NCcgaGVpZ2h0PSc2NCc+PHJlY3Qgd2lkdGg9JzY0JyBoZWlnaHQ9JzY0JyBmaWxsPScjNmQyOGQ5Jy8+PHRleHQgeD0nMzInIHk9JzM0JyB0ZXh0LWFuY2hvcj0nbWlkZGxlJyBkb21pbmFudC1iYXNlbGluZT0nY2VudHJhbCcgZm9udC1mYW1pbHk9J3NhbnMtc2VyaWYnIGZvbnQtd2VpZ2h0PSc2MDAnIGZvbnQtc2l6ZT0nMjYnIGZpbGw9JyNmZmYnPkFMPC90ZXh0Pjwvc3ZnPg==",
+          "element": "img",
+          "attribute": "src",
+          "descriptor": null,
+          "alt": "Ada Lovelace"
+        }
+      ]
+    }
+  ]
+}
+
