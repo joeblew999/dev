@@ -109,6 +109,13 @@ type cloud struct {
 	Delete   func(c cli.Call) error
 	Smoke    func(c cli.Call) error // nil when the target has no local runtime
 	NoSmoke  string                 // and why, in words a person can act on
+
+	// Name and PutSecret take plain arguments rather than a Call, because
+	// secrets reaches for them with no verb running. They are here all the
+	// same: they were the last two places that dispatched with `if target ==
+	// "fly"`, which is the switch this struct exists to have replaced.
+	Name      func(dir, env string) (string, error)
+	PutSecret func(dir, env, name, value string) error
 }
 
 // clouds is every target, by the name Target answers with.
@@ -129,6 +136,8 @@ var clouds = map[string]cloud{
 			d, _ := c.ValueAs("timeout", time.ParseDuration)
 			return cloudflare.Smoke(c.Stdout, c.Dir, c.Value("env"), c.Value("path"), c.Value("expect"), d)
 		},
+		Name:      cloudflare.Name,
+		PutSecret: cloudflare.PutSecret,
 	},
 	"fly": {
 		Before: func(c cli.Call) error { return fly.NoEnv(c.Dir, c.Value("env")) },
@@ -147,17 +156,20 @@ var clouds = map[string]cloud{
 			return fly.Destroy(c.Stdin, c.Stdout, c.Dir, c.Value("name"), c.Given("yes"))
 		},
 		NoSmoke: "smoke runs a Worker on local workerd; a Fly app has no local runtime here. dev check DIR tests it, and dev deploy DIR --wait PATH proves it online",
+		// A Fly app's name is in its fly.toml and has no environments, so both
+		// take the dir alone and ignore the env a Worker needs.
+		Name:      func(dir, _ string) (string, error) { return fly.App(dir) },
+		PutSecret: func(dir, _, name, value string) error { return fly.PutSecret(dir, name, value) },
 	},
 }
 
 // to sends a verb to whichever cloud the directory deploys to, and does the
 // part that is the same wherever it went.
 func to(c cli.Call, verb string) error {
-	target, err := Target(c.Dir)
+	t, err := cloudFor(c.Dir)
 	if err != nil {
 		return err
 	}
-	t := clouds[target]
 	if t.Before != nil {
 		if err := t.Before(c); err != nil {
 			return err
@@ -195,7 +207,11 @@ func to(c cli.Call, verb string) error {
 		}
 		return t.Smoke(c)
 	}
-	return cli.Usagef("%s: unknown verb %q", target, verb)
+	// Unreachable: to() is only ever called with one of the verbs above, from
+	// this file. It is here so that adding a verb without adding its case is a
+	// message and not a silent success.
+	return cli.Usagef("%v", cli.Unknown("deploy verb", verb,
+		[]string{"url", "deploy", "logs", "delete", "smoke"}))
 }
 
 // Target names the cloud dir deploys to, "cloudflare" or "fly", from the
@@ -220,25 +236,34 @@ func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 // Name is what the app in dir is called on its cloud, suffix included.
 func Name(dir, env string) (string, error) {
-	target, err := Target(dir)
+	to, err := cloudFor(dir)
 	if err != nil {
 		return "", err
 	}
-	if target == "fly" {
-		return fly.App(dir)
-	}
-	return cloudflare.Name(dir, env)
+	return to.Name(dir, env)
 }
 
 // PutSecret gives the deployed app in dir one secret, through its cloud's own
 // CLI, the value on stdin and never an argument.
 func PutSecret(dir, env, name, value string) error {
-	target, err := Target(dir)
+	to, err := cloudFor(dir)
 	if err != nil {
 		return err
 	}
-	if target == "fly" {
-		return fly.PutSecret(dir, name, value)
+	return to.PutSecret(dir, env, name, value)
+}
+
+// cloudFor is the target a directory deploys to, as the thing that can act on
+// it. One lookup, so that adding a cloud is adding an entry to clouds and
+// nothing else — which was true of the verbs and was not true of these two.
+func cloudFor(dir string) (cloud, error) {
+	target, err := Target(dir)
+	if err != nil {
+		return cloud{}, err
 	}
-	return cloudflare.PutSecret(dir, env, name, value)
+	to, ok := clouds[target]
+	if !ok {
+		return cloud{}, cli.Unknown("cloud", target, cli.SortedKeys(clouds))
+	}
+	return to, nil
 }

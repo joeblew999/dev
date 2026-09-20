@@ -48,3 +48,39 @@ func TestNameFollowsTheTarget(t *testing.T) {
 		t.Errorf("Name = %q, %v", got, err)
 	}
 }
+
+// Adding a cloud has to be adding an entry to clouds and nothing else. That
+// was true of the verbs and was not true of Name and PutSecret, which still
+// dispatched with `if target == "fly"` — the switch this registry exists to
+// have replaced, surviving in the two functions nobody looked at because they
+// are called from secrets rather than from a verb.
+//
+// The test is not "does it work"; it is "is every cloud complete". A cloud
+// added with a gap here fails at whichever call site reaches the nil first,
+// which is a panic somewhere unrelated.
+func TestEveryCloudIsWholeSoAddingOneIsOneEdit(t *testing.T) {
+	if len(clouds) == 0 {
+		t.Fatal("no clouds, so the dispatch answers nothing")
+	}
+	for name, c := range clouds {
+		for what, missing := range map[string]bool{
+			"URL":       c.URL == nil,
+			"Deployed":  c.Deployed == nil,
+			"Deploy":    c.Deploy == nil,
+			"Logs":      c.Logs == nil,
+			"Delete":    c.Delete == nil,
+			"Name":      c.Name == nil,
+			"PutSecret": c.PutSecret == nil,
+		} {
+			if missing {
+				t.Errorf("cloud %q has no %s, so whatever calls it panics", name, what)
+			}
+		}
+		// Smoke is the one a target may decline, and declining is saying why:
+		// a Fly app has no local runtime, and a reader needs that sentence
+		// rather than a nil.
+		if c.Smoke == nil && c.NoSmoke == "" {
+			t.Errorf("cloud %q cannot smoke and does not say why", name)
+		}
+	}
+}
