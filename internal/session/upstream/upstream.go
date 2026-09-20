@@ -79,14 +79,18 @@ func Get(repo, ref string) (*Archive, error) {
 // as one at all. A repository that is not a plugin is not an error: plenty of
 // upstreams are a skills directory and nothing more.
 func (a *Archive) Plugin() (Plugin, bool, error) {
-	return JSON[Plugin](a, PluginManifest)
+	return a.JSON[Plugin](PluginManifest)
 }
 
-// JSON reads one file from the archive into whatever shape the caller wants.
-// It is a function rather than a method because a method cannot introduce its
-// own type parameter beyond the receiver's, and the archive holds bytes that
-// only the caller knows the shape of.
-func JSON[T any](a *Archive, name string) (T, bool, error) {
+// JSON reads one file from the archive into whatever shape the caller wants,
+// and reports whether the repository has that file at all.
+//
+// A method with its own type parameter, which Go has had since 1.27 — the
+// same shape as tool.Result.JSON. Written as a package function first, on the
+// belief that a method could not introduce a type parameter beyond the
+// receiver's, which was true of the Go this was learned from and is not true
+// of the Go this repo pins.
+func (a *Archive) JSON[T any](name string) (T, bool, error) {
 	var out T
 	data, ok := a.files[name]
 	if !ok {
