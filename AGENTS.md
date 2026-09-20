@@ -116,6 +116,28 @@ This file says only what is about developing the tool itself.
   how many modules: it is the difference between a tool dev runs and code dev
   becomes.
 
+  Measured, because this was argued four times on reasoning and settled in
+  minutes on numbers. A throwaway module importing cloudflare-go/v7, against
+  the same program written with net/http:
+
+  | | dev today | with cloudflare-go |
+  |---|---|---|
+  | warm rebuild | 1.1s | 2.1s |
+  | cold build | 3.7s | 18.4s |
+  | binary | 11.3 MB | ~28 MB |
+  | modules | 4 | 9 |
+
+  The warm rebuild is the one that decides it. Everything about working here
+  rests on a build of about a second — it is why `mise run check` is worth
+  running after every edit — and doubling the inner loop taxes every edit for
+  as long as the dependency lives. cloudflare-go's own go.mod is tidy, two
+  direct dependencies; the weight is the generated SDK itself, which covers
+  every Cloudflare product and cannot be linked away.
+
+  fly-go is worse and not close: nine direct requires and twenty-odd indirect,
+  including the whole Prometheus client stack, OpenTelemetry and protobuf — to
+  replace a flyctl that already does everything and costs go.mod nothing.
+
   And there is no third door, which was worth an hour to establish rather than
   assume. Cloudflare did ship a general-purpose CLI — `flarectl`, inside
   cloudflare-go at `cmd/flarectl` — and dropped it in January 2025 when the
