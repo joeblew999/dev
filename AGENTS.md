@@ -146,6 +146,19 @@ This file says only what is about developing the tool itself.
   wrangler, workerd and cfssl; and GitHub has no maintained general-purpose
   Cloudflare CLI in any language.
 
+  Two near-misses, both worth recording so they are not re-found and mistaken
+  for answers. cloudflare-cli4 is Cloudflare's own generic CLI over the v4
+  API and is dead the same way flarectl is — last release May 2024, and the
+  library under it archived. dnscontrol is alive and excellent (Go, a binary,
+  pushed this week) and is the wrong model: it is declarative whole-zone sync,
+  so pointing it at a zone to add one record invites it to delete everything
+  not in the config, and it does not touch SSL mode, which is not DNS.
+
+  What is well served by binaries is tunnels: cloudflared is in the registry
+  as aqua:cloudflare/cloudflared, and wrangler has a tunnel command. When
+  fronting an app through a tunnel arrives, it is a pinned binary and neither
+  a library nor hand-rolled HTTP.
+
   Which means dev is that binary. It already ships through packslip and other
   repos on the stack install it from the registry, so when one of them wants a
   zone checked it runs `dev fronting`, exactly as it runs flyctl — a binary,
