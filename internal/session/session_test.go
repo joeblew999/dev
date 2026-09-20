@@ -3,12 +3,12 @@ package session
 import (
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/joeblew999/dev/cli"
+	"github.com/joeblew999/dev/internal/session/pins"
 )
 
 func writeFile(name, content string) error {
@@ -56,75 +56,6 @@ func TestIsClaudeBinary(t *testing.T) {
 	}
 }
 
-func TestDiffFiles(t *testing.T) {
-	have := skillFiles{"gsx/SKILL.md": []byte("a"), "old/SKILL.md": []byte("x")}
-	want := skillFiles{"gsx/SKILL.md": []byte("b"), "new/SKILL.md": []byte("c")}
-	got := strings.Join(diffFiles(have, want), "; ")
-	if got != "changed: gsx/SKILL.md; missing: new/SKILL.md; unexpected: old/SKILL.md" {
-		t.Errorf("diffFiles() = %q", got)
-	}
-	if !sameFiles(want, want) {
-		t.Error("sameFiles() = false for identical sets")
-	}
-}
-
-func TestLoadPins(t *testing.T) {
-	t.Chdir(t.TempDir())
-	content := "[source.a]\nrepo = \"org/a\"\nref = \"dddddddddddddddddddddddddddddddddddddddd\"\nskills = [\"x\", \"y\"]\n\n[source.b]\nrepo = \"org/repo\"\nref = \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\nskills = [\"z\"]\n"
-	if err := writeFile("session.toml", content); err != nil {
-		t.Fatal(err)
-	}
-	p, err := loadPins()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := p.names(); len(got) != 2 || got[0] != "a" || got[1] != "b" {
-		t.Errorf("names = %v", got)
-	}
-	a := p.Source["a"]
-	if a.Repo != "org/a" || a.Ref != "dddddddddddddddddddddddddddddddddddddddd" || len(a.Skills) != 2 {
-		t.Errorf("source a = %+v", a)
-	}
-	b := p.Source["b"]
-	if b.Repo != "org/repo" || b.Ref != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" || len(b.Skills) != 1 {
-		t.Errorf("source b = %+v", b)
-	}
-}
-
-func TestLoadPinsRejectsUnknownKeys(t *testing.T) {
-	t.Chdir(t.TempDir())
-	if err := writeFile("session.toml", "[source.a]\nrepo = \"x/y\"\nref = \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\nskills = [\"z\"]\nbogus = 1\n"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := loadPins(); err == nil {
-		t.Error("loadPins succeeded with an unknown key, want an error naming the fix")
-	}
-}
-
-func TestLoadPinsAllowsOnlyClaudeSettings(t *testing.T) {
-	t.Chdir(t.TempDir())
-	if err := writeFile("session.toml", "[claude]\nblocked_plugins = [\"x@y\"]\n"); err != nil {
-		t.Fatal(err)
-	}
-	p, err := loadPins()
-	if err != nil {
-		t.Fatalf("a repo pinning only its Claude settings was rejected: %v", err)
-	}
-	if len(p.Source) != 0 || len(p.Claude.BlockedPlugins) != 1 {
-		t.Fatalf("got %+v", p)
-	}
-}
-
-func TestLoadPinsRejectsBadSource(t *testing.T) {
-	t.Chdir(t.TempDir())
-	if err := writeFile("session.toml", "[source.a]\nskills = [\"z\"]\n"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := loadPins(); err == nil {
-		t.Error("loadPins succeeded with no repo or ref, want an error naming the fix")
-	}
-}
-
 func TestWarnStaleSessionsSaysNothingWithoutSkills(t *testing.T) {
 	var out strings.Builder
 	t.Chdir(t.TempDir())
@@ -141,7 +72,7 @@ func TestSyncSettingsKeepsWhatItDoesNotOwn(t *testing.T) {
 	if err := writeFile(settingsFile, `{"hooks":{"Stop":[]},"enabledPlugins":{"stale@old":false}}`); err != nil {
 		t.Fatal(err)
 	}
-	c := claudePins{BlockedPlugins: []string{"a@b"}, ApproveMCPServers: true}
+	c := pins.Claude{BlockedPlugins: []string{"a@b"}, ApproveMCPServers: true}
 	if err := syncSettings(io.Discard, c); err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +104,7 @@ func TestCheckSettingsCatchesHandEdits(t *testing.T) {
 	}
 	// The pins the finding is checked against come from session.toml, which
 	// this test wrote above.
-	found, _, err := settingsFindings(claudePins{BlockedPlugins: []string{"a@b"}})
+	found, _, err := settingsFindings(pins.Claude{BlockedPlugins: []string{"a@b"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,41 +113,24 @@ func TestCheckSettingsCatchesHandEdits(t *testing.T) {
 	}
 	// Every finding names the fix, which is what makes a report actionable.
 	for _, f := range found {
-		if !strings.Contains(f.Fix, syncCmd) {
-			t.Errorf("%s does not name %q as the fix: %q", f.ID, syncCmd, f.Fix)
+		if !strings.Contains(f.Fix, pins.SyncCommand()) {
+			t.Errorf("%s does not name %q as the fix: %q", f.ID, pins.SyncCommand(), f.Fix)
 		}
-	}
-}
-
-// Another repo runs this through its own task runner, so the fix an error
-// names has to come from that repo, not from this one's habits.
-func TestSyncCommandComesFromPins(t *testing.T) {
-	t.Chdir(t.TempDir())
-	defer func(old string) { syncCmd = old }(syncCmd)
-	syncCmd = "dev session sync"
-	if err := writeFile("session.toml", "sync_command = \"just skills\"\n[source.a]\nrepo = \"o/r\"\nref = \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\nskills = [\"z\"]\n"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := loadPins(); err != nil {
-		t.Fatal(err)
-	}
-	if syncCmd != "just skills" {
-		t.Errorf("syncCmd = %q; want the one session.toml names", syncCmd)
 	}
 }
 
 // A repo that never mentions connectors must not have them turned off behind
 // its back, so an absent key writes no setting at all.
 func TestConnectorsUnmanagedWhenUnset(t *testing.T) {
-	if _, ok := wantSettings(claudePins{})["disableClaudeAiConnectors"]; ok {
+	if _, ok := wantSettings(pins.Claude{})["disableClaudeAiConnectors"]; ok {
 		t.Error("an unset claude_ai_connectors disabled them anyway")
 	}
 	off := false
-	if want := wantSettings(claudePins{ClaudeAIConnectors: &off}); want["disableClaudeAiConnectors"] != true {
+	if want := wantSettings(pins.Claude{ClaudeAIConnectors: &off}); want["disableClaudeAiConnectors"] != true {
 		t.Errorf("claude_ai_connectors = false did not disable them: %v", want)
 	}
 	on := true
-	if _, ok := wantSettings(claudePins{ClaudeAIConnectors: &on})["disableClaudeAiConnectors"]; ok {
+	if _, ok := wantSettings(pins.Claude{ClaudeAIConnectors: &on})["disableClaudeAiConnectors"]; ok {
 		t.Error("claude_ai_connectors = true wrote a setting; it cannot force them on")
 	}
 }
@@ -306,58 +220,22 @@ func TestVerifyUpdateFlag(t *testing.T) {
 	}
 }
 
-// A repo that vendors no skills, has an empty lock,
-// and that is not an error: there is nothing to check.
-func TestEmptyLockIsNoSkills(t *testing.T) {
-	t.Chdir(t.TempDir())
-	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := writeFile(filepath.Join(skillsDir, lockFile), ""); err != nil {
-		t.Fatal(err)
-	}
-	files, err := lockedFiles()
-	if err != nil || len(files) != 0 {
-		t.Fatalf("lockedFiles() = %v, %v; want none and no error", files, err)
-	}
-}
-
-// A pin has to pin. `ref = "HEAD"` or a branch name reads as a version and is
-// not one: upstream moves it, two clones of this repo get different skills
-// from the same committed file, and nothing here would ever say so. It used to
-// be accepted and then panic much later, slicing four characters as twelve.
-func TestARefThatIsNotACommitIsRefused(t *testing.T) {
-	for _, ref := range []string{"HEAD", "main", "v1.2.0", "c55ee46", strings.Repeat("g", 40)} {
-		t.Run(ref, func(t *testing.T) {
-			t.Chdir(t.TempDir())
-			pin := "[source.a]\nrepo = \"o/r\"\nref = \"" + ref + "\"\nskills = [\"z\"]\n"
-			if err := writeFile("session.toml", pin); err != nil {
-				t.Fatal(err)
-			}
-			_, err := loadPins()
-			if err == nil {
-				t.Fatalf("ref %q was accepted, so this repo pins nothing", ref)
-			}
-			if !strings.Contains(err.Error(), ref) {
-				t.Errorf("the error does not quote the ref it rejected: %v", err)
-			}
-		})
-	}
-	if !isCommit(strings.Repeat("c5", 20)) {
-		t.Error("a real commit sha was called something else")
-	}
-}
-
-// The repo is asked of GitHub as owner/name, and it also names the directory
-// inside the tarball, so a half-written one has to be caught where it is read.
-func TestARepoWithoutAnOwnerIsRefused(t *testing.T) {
-	for _, repo := range []string{"skills", "github.com/o/r"} {
-		t.Chdir(t.TempDir())
-		if err := writeFile("session.toml", "[source.a]\nrepo = \""+repo+"\"\nref = \""+strings.Repeat("a", 40)+"\"\nskills = [\"z\"]\n"); err != nil {
-			t.Fatal(err)
+// The manual is what a repo reads before it has any of this. A preset dev
+// ships that the manual does not name is one nobody can opt into, and the
+// manual naming one that does not exist is worse — so the two are held
+// together here, where the prose and the catalogue are both in reach.
+func TestTheManualNamesEveryPreset(t *testing.T) {
+	for name := range pins.Presets {
+		if !strings.Contains(Usage, name) {
+			t.Errorf("dev ships the %q preset and usage.md never names it", name)
 		}
-		if _, err := loadPins(); err == nil {
-			t.Errorf("repo %q was accepted", repo)
+	}
+	// Every skill a preset vendors, named where a reader can see what they get.
+	for _, preset := range pins.Presets {
+		for _, src := range preset.Source {
+			if !strings.Contains(Usage, src.Repo) {
+				t.Errorf("a preset takes skills from %s and usage.md does not say so", src.Repo)
+			}
 		}
 	}
 }

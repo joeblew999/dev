@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/joeblew999/dev/cli"
+	"github.com/joeblew999/dev/internal/session/pins"
 )
 
 // The repo's own Claude Code settings. Only the keys below are written here;
@@ -27,7 +28,7 @@ var ownedKeys = []string{"enabledPlugins", "disableClaudeAiConnectors", "enableA
 // developer's own true: the repo decides, not whoever installed a marketplace
 // plugin once. disableClaudeAiConnectors is any-source-true, so the repo can
 // opt out but cannot force connectors back on.
-func wantSettings(c claudePins) map[string]any {
+func wantSettings(c pins.Claude) map[string]any {
 	want := map[string]any{}
 	if len(c.BlockedPlugins) > 0 {
 		blocked := map[string]any{}
@@ -49,7 +50,7 @@ func wantSettings(c claudePins) map[string]any {
 
 // syncSettings merges the generated keys into settings.json, preserving the
 // rest of the file.
-func syncSettings(out io.Writer, c claudePins) error {
+func syncSettings(out io.Writer, c pins.Claude) error {
 	have, err := readSettings()
 	if err != nil {
 		return err
@@ -79,14 +80,14 @@ func syncSettings(out io.Writer, c claudePins) error {
 
 // checkSettings fails when settings.json has drifted from session.toml, which
 // is what happens when someone edits the settings file by hand.
-func settingsFindings(c claudePins) ([]cli.Finding, string, error) {
+func settingsFindings(c pins.Claude) ([]cli.Finding, string, error) {
 	have, err := readSettings()
 	if err != nil {
 		return nil, "", err
 	}
 	want := wantSettings(c)
 	return findings("settings-drift", diffSettings(have, want),
-		settingsFile+" does not match [claude] in "+pinsFile), cli.Plural(len(want), "key"), nil
+		settingsFile+" does not match [claude] in "+pins.File), cli.Plural(len(want), "key"), nil
 }
 
 // diffSettings compares only the generated keys; the rest of the file is none
@@ -107,7 +108,7 @@ func readSettings() (map[string]any, error) {
 	}
 	settings := map[string]any{}
 	if err := json.Unmarshal(data, &settings); err != nil {
-		return nil, fmt.Errorf("%s: %w; fix the JSON, then: "+syncCmd, settingsFile, err)
+		return nil, fmt.Errorf("%s: %w; fix the JSON, then: "+pins.SyncCommand(), settingsFile, err)
 	}
 	return settings, nil
 }

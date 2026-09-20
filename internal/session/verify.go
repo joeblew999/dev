@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/joeblew999/dev/cli"
+	"github.com/joeblew999/dev/internal/session/pins"
+	"github.com/joeblew999/dev/internal/session/vendored"
 
 	"github.com/joeblew999/dev/cli/tool"
 )
@@ -45,14 +47,14 @@ func Verify(out io.Writer, update bool) error {
 
 	// Vendored skills that never load are the older failure, and worth their
 	// own message: the fix is frontmatter, not the lock.
-	locked, err := lockedSkillNames()
+	locked, err := vendored.LockedNames()
 	if err != nil {
 		return err
 	}
 	present := cli.ToSet(seen)
 	missingSkills := cli.Filter(locked, func(name string) bool { return !present[name] })
 	if len(missingSkills) > 0 {
-		return fmt.Errorf("a fresh Claude Code session cannot see: %s\nit answered:\n%scheck the SKILL.md frontmatter, then: "+syncCmd,
+		return fmt.Errorf("a fresh Claude Code session cannot see: %s\nit answered:\n%scheck the SKILL.md frontmatter, then: "+pins.SyncCommand(),
 			strings.Join(missingSkills, ", "), cli.Indent(answer))
 	}
 
@@ -88,7 +90,7 @@ func Verify(out io.Writer, update bool) error {
 	}
 	if len(gone) > 0 {
 		return fmt.Errorf("skills the lock allows are no longer in the session:\n%sif that is intended: %s --update",
-			listed(gone), verifyCmd())
+			listed(gone), pins.VerifyCommand())
 	}
 	if len(arrived) > 0 {
 		return fmt.Errorf("skills reached this session that %s does not allow:\n%s%s",
@@ -182,34 +184,9 @@ func arrivalAdvice(arrived []string) string {
 	if len(plugins) > 0 {
 		names := cli.SortedKeys(plugins)
 		return fmt.Sprintf("these came from the %s plugin(s); add them to blocked_plugins in %s, then: %s",
-			strings.Join(names, ", "), pinsFile, syncCmd)
+			strings.Join(names, ", "), pins.File, pins.SyncCommand())
 	}
-	return fmt.Sprintf("Claude Code has not changed, so these came from claude.ai (which no project setting can\nblock) or a plugin; if they are meant to be here: %s --update", verifyCmd())
-}
-
-func verifyCmd() string { return strings.TrimSuffix(syncCmd, "sync") + "verify" }
-
-// lockedSkillNames reads the skill names from SKILLS.lock.
-func lockedSkillNames() ([]string, error) {
-	data, err := os.ReadFile(filepath.Join(skillsDir, lockFile))
-	if os.IsNotExist(err) {
-		// A repo that pins only [claude] vendors no skills and has no lock.
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("%w; run: "+syncCmd, err)
-	}
-	// The lock has a row per skill and a row per file within it. Only the
-	// skills are names a session can report, so anything with a slash is a
-	// file row: asking a session to list cloudflare/references/kv/api.md as a
-	// skill fails every time.
-	var names []string
-	for _, line := range cli.Lines(string(data)) {
-		if name, _, ok := strings.Cut(line, "\t"); ok && !strings.Contains(name, "/") {
-			names = append(names, name)
-		}
-	}
-	return cli.Sorted(names), nil
+	return fmt.Sprintf("Claude Code has not changed, so these came from claude.ai (which no project setting can\nblock) or a plugin; if they are meant to be here: %s --update", pins.VerifyCommand())
 }
 
 // sessionLockFile records every skill a session is allowed to have: the ones
@@ -217,7 +194,7 @@ func lockedSkillNames() ([]string, error) {
 // skills so one directory holds everything the session is pinned to.
 const sessionLockFile = "SESSION.lock"
 
-func sessionLockPath() string { return filepath.Join(skillsDir, sessionLockFile) }
+func sessionLockPath() string { return filepath.Join(vendored.Primary(), sessionLockFile) }
 
 // versionLine marks which Claude Code recorded the lock.
 const versionLine = "# claude "
@@ -256,7 +233,7 @@ func writeSessionLock(names []string, recordedBy string) error {
 
 func formatSessionLock(names []string, recordedBy string) string {
 	return "# Every skill a session here is allowed to have, recorded by\n" +
-		"# `" + verifyCmd() + " --update`. Verify fails on anything else that arrives\n" +
+		"# `" + pins.VerifyCommand() + " --update`. Verify fails on anything else that arrives\n" +
 		"# while Claude Code stays at the version below: a plugin, or a skill synced\n" +
 		"# from claude.ai, which no setting can block. A Claude Code upgrade changes\n" +
 		"# the built-ins, and verify re-records the lock for it.\n" +

@@ -406,8 +406,29 @@ func Plural(n int, word string) string {
 	if n == 1 {
 		return "1 " + word
 	}
-	return strconv.Itoa(n) + " " + word + "s"
+	return strconv.Itoa(n) + " " + plural(word)
 }
+
+// plural is English's common rules, which is as far as a report needs to go:
+// the words these messages count are ordinary nouns. A consonant before a
+// final y becomes -ies, and a word already ending in a sibilant takes -es.
+// Without the first of those a report says "2 directorys", which it did.
+func plural(word string) string {
+	last := len(word) - 1
+	if last < 0 {
+		return word
+	}
+	switch {
+	case word[last] == 'y' && last > 0 && !isVowel(word[last-1]):
+		return word[:last] + "ies"
+	case strings.HasSuffix(word, "s"), strings.HasSuffix(word, "x"),
+		strings.HasSuffix(word, "ch"), strings.HasSuffix(word, "sh"):
+		return word + "es"
+	}
+	return word + "s"
+}
+
+func isVowel(b byte) bool { return strings.IndexByte("aeiouAEIOU", b) >= 0 }
 
 // Lines is a text's lines with the blank tail every file ends with dropped.
 //

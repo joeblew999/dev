@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/joeblew999/dev/cli/tool"
+	"github.com/joeblew999/dev/internal/session/vendored"
 
 	"github.com/joeblew999/dev/cli"
 )
@@ -26,7 +27,7 @@ type session struct {
 }
 
 func warnStaleSessions(out io.Writer, now time.Time) {
-	newest, ok := newestModTime(skillsDir)
+	newest, ok := newestModTime(vendored.Primary())
 	if !ok {
 		return
 	}

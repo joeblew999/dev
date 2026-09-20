@@ -1,94 +1,87 @@
-// Package session keeps the repo's Claude Code skills pinned. It writes them
-// from their upstreams into .claude/skills, checks that the copy on disk still
-// matches the pins, and proves that a fresh session can actually load them.
+// Package session keeps a repo's Claude Code session pinned: which skills an
+// agent may load, which settings keys those skills need, and whether a real
+// session agrees.
 //
-// What is pinned lives in session.toml; this package only reads it.
+// The work is split so that each part can be wrong about one thing only:
+//
+//	pins      what the repo declared     — session.toml, a committed file
+//	upstream  what a repo at a commit holds — the network
+//	vendored  what is on disk for agents  — the filesystem
+//
+// This package composes them and owns nothing else. A question about where a
+// skill came from is upstream's; a question about what is on disk is
+// vendored's; and a question about what the repo asked for is pins'. When
+// something here is confusing, it is because a fact was answered in the wrong
+// one of those, which is a thing the compiler can now say.
 package session
 
 import (
-	"bytes"
 	"fmt"
 	"io"
-	"io/fs"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/joeblew999/dev/cli"
+	"github.com/joeblew999/dev/internal/session/pins"
+	"github.com/joeblew999/dev/internal/session/vendored"
 )
 
-// Skills live in the repo so every Claude Code session here loads them, and are
-// pinned so they never drift from the tools they describe.
-const (
-	skillsDir = ".claude/skills"
-	lockFile  = "SKILLS.lock"
-	pinsFile  = "session.toml"
-)
-
-// skillFiles is a skill set: path relative to the skills directory -> contents.
-type skillFiles map[string][]byte
-
-// Sync writes the pinned skills into .claude/skills and reports sessions that
-// must restart to see them. Files it does not own are left alone, so skills
-// this repo writes itself survive a sync.
+// Sync writes the pinned skills into every directory an agent reads, and
+// reports sessions that must restart to see them. Files it does not own are
+// left alone, so skills this repo writes itself survive a sync.
 func Sync(out io.Writer) error {
-	want, err := pinnedSkills()
+	p, err := pins.Load()
 	if err != nil {
 		return err
 	}
-	existed := dirExists(skillsDir)
-	have, err := readDir(skillsDir)
+	want, err := collect(p)
 	if err != nil {
 		return err
 	}
-	if err := writeOwned(skillsDir, have, want); err != nil {
+	existed := vendored.Existing()
+	have, err := vendored.Read(vendored.Primary())
+	if err != nil {
+		return err
+	}
+	if err := vendored.Write(want); err != nil {
 		return err
 	}
 
-	fmt.Fprintf(out, "skills in %s:\n", skillsDir)
-	fmt.Fprint(out, cli.Indent(string(want[lockFile])))
-	if !existed {
-		fmt.Fprintf(out, "\nThese are new: Claude Code reads %s at startup.\n", skillsDir)
-	}
-	p, err := loadPins()
-	if err != nil {
-		return err
+	fmt.Fprintf(out, "skills in %s:\n", english(vendored.Dirs()))
+	fmt.Fprint(out, cli.Indent(string(want[vendored.LockFile])))
+	if len(existed) < len(vendored.Dirs()) {
+		fmt.Fprintf(out, "\nThese are new: an agent reads its own directory at startup.\n")
 	}
 	if err := syncSettings(out, p.Claude); err != nil {
 		return err
 	}
-	if !sameFiles(have, want) {
+	if !vendored.Same(have, want) {
 		warnStaleSessions(out, time.Now())
 	}
 	return nil
 }
 
-// Check fails when the skills on disk differ from the lock, or when a go.mod
-// disagrees with the mise pin that is the source of truth for its version. It
-// needs no network: file contents are compared against the hashes sync recorded
-// in the lock.
+// Check fails when what is on disk differs from what the pins imply. It needs
+// no network: file contents are compared against the hashes sync recorded.
 func Check(c cli.Call) error {
 	if err := c.CheckReportFlags(); err != nil {
 		return err
 	}
-	// The pins are read once, before anything is checked against them: a
-	// file that cannot be read is not three findings, it is one reason
-	// nothing could be checked.
-	pins, err := loadPins()
+	// The pins are read once, before anything is checked against them: a file
+	// that cannot be read is not three findings, it is one reason nothing
+	// could be checked.
+	p, err := pins.Load()
 	if err != nil {
 		return err
 	}
 	started := time.Now()
-	rep := cli.NewReport("session", skillsDir)
+	rep := cli.NewReport("session", english(vendored.Dirs()))
 	for _, part := range []struct {
 		name, provides string
 		look           func() ([]cli.Finding, string, error)
 	}{
-		{"skills", "the vendored skills are the ones session.toml pins", lockedSkills},
+		{"skills", "every agent's directory holds what session.toml pins", lockedSkills},
 		{"settings", ".claude/settings.json holds what [claude] implies",
-			func() ([]cli.Finding, string, error) { return settingsFindings(pins.Claude) }},
+			func() ([]cli.Finding, string, error) { return settingsFindings(p.Claude) }},
 		{"paths", "nothing committed names this machine's home directory", portableFindings},
 	} {
 		at := time.Now()
@@ -107,22 +100,22 @@ func Check(c cli.Call) error {
 		rep.Ran(step)
 	}
 	warnStaleSessions(c.Stderr, time.Now())
-	rep.Fail = skillsDir + " does not match session.toml; fix with: " + syncCmd
+	rep.Fail = "what agents read does not match " + pins.File + "; fix with: " + pins.SyncCommand()
 	return c.Finish(rep, started, func(r *cli.Report) { writeReport(c, r) })
 }
 
-// lockedSkills is the vendored skills against what the lock records.
+// lockedSkills is every agent's directory against what the lock records.
 func lockedSkills() ([]cli.Finding, string, error) {
-	have, err := readDir(skillsDir)
+	want, err := vendored.Locked()
 	if err != nil {
 		return nil, "", err
 	}
-	want, err := lockedFiles()
+	diff, n, err := vendored.Diff(want)
 	if err != nil {
 		return nil, "", err
 	}
-	return findings("skill-drift", diffLocked(have, want),
-		skillsDir+" does not match its pins"), cli.Plural(len(want), "file"), nil
+	return findings("skill-drift", diff, "what an agent reads does not match its pins"),
+		cli.Plural(n, "file") + " in each of " + cli.Plural(len(vendored.Dirs()), "directory"), nil
 }
 
 // findings turns a diff — the missing/changed/unexpected lines every check
@@ -131,7 +124,7 @@ func lockedSkills() ([]cli.Finding, string, error) {
 func findings(id string, diff []string, what string) []cli.Finding {
 	return cli.Map(diff, func(line string) cli.Finding {
 		return cli.Finding{Severity: cli.SevError, ID: id, Message: line,
-			Fix: what + "; fix with: " + syncCmd}
+			Fix: what + "; fix with: " + pins.SyncCommand()}
 	})
 }
 
@@ -151,127 +144,16 @@ func writeReport(c cli.Call, r *cli.Report) {
 		cli.Plural(r.BySeverity[cli.SevError], "problem"))
 }
 
-// pinnedSkills collects every skill at its pinned version. The lock records
-// one line per skill (its source) plus one line per file (its hash), so check
-// can verify the files without downloading anything.
-func pinnedSkills() (skillFiles, error) {
-	p, err := loadPins()
-	if err != nil {
-		return nil, err
+// english joins paths the way a sentence does, so a message names every
+// destination rather than the first one and an etcetera.
+func english(items []string) string {
+	switch len(items) {
+	case 0:
+		return "nowhere"
+	case 1:
+		return items[0]
+	case 2:
+		return items[0] + " and " + items[1]
 	}
-	files := skillFiles{}
-	var lock []string
-	// Which pin each vendored name came from, so two sources claiming one
-	// name is refused by saying both rather than by the second quietly
-	// overwriting the first.
-	from := map[string]string{}
-
-	for _, source := range p.names() {
-		s := p.Source[source]
-		archive, err := download(fmt.Sprintf("https://codeload.github.com/%s/tar.gz/%s", s.Repo, s.Ref))
-		if err != nil {
-			return nil, err
-		}
-		at := fmt.Sprintf("github.com/%s@%s", s.Repo, shortRef(s.Ref))
-		for _, name := range s.Skills {
-			as := vendored(name)
-			if was, taken := from[as]; taken {
-				return nil, fmt.Errorf("%s: two skills would both be vendored as %q — %s and %s/%s; one of them needs a source that spells it differently",
-					pinsFile, as, was, source, name)
-			}
-			within := path.Join(s.dir(), strings.Trim(name, "/"))
-			found, err := copyTar(files, archive, s.prefix()+strings.Trim(name, "/")+"/", as)
-			if err != nil {
-				return nil, err
-			}
-			if !found {
-				return nil, fmt.Errorf("%s: [source.%s] pins skill %q, and %s holds no %s/; check the name and this source's dir, then: "+syncCmd,
-					pinsFile, source, name, at, within)
-			}
-			from[as] = source + "/" + name
-			lock = append(lock, lockSkill(as, at, files))
-		}
-	}
-
-	files[lockFile] = []byte(strings.Join(cli.Sorted(lock), "\n") + "\n")
-	return files, nil
-}
-
-// writeOwned writes want into dir, deleting only files sync owned before:
-// anything in have that is neither in want nor owned by the previous sync is
-// left alone. Owned paths come from the previous lock: every top-level skill
-// directory it names, plus the lock file itself.
-func writeOwned(dir string, have, want skillFiles) error {
-	prefixes := ownedPaths(have[lockFile])
-	for name := range have {
-		if _, ok := want[name]; ok {
-			continue
-		}
-		if !isOwned(name, prefixes) {
-			continue
-		}
-		if err := os.Remove(filepath.Join(dir, filepath.FromSlash(name))); err != nil {
-			return err
-		}
-	}
-	for name, data := range want {
-		full := filepath.Join(dir, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			return err
-		}
-		if err := os.WriteFile(full, data, 0o644); err != nil {
-			return err
-		}
-	}
-	removeEmptyDirs(dir)
-	return nil
-}
-
-// ownedPaths returns the top-level paths the previous sync owned: the lock
-// file and every skill directory it names.
-func ownedPaths(lock []byte) []string {
-	owned := []string{lockFile}
-	for _, line := range cli.Lines(string(lock)) {
-		if name, _, ok := strings.Cut(line, "\t"); ok && name != "" {
-			owned = append(owned, name)
-		}
-	}
-	return owned
-}
-
-func isOwned(name string, owned []string) bool {
-	for _, prefix := range owned {
-		if name == prefix || strings.HasPrefix(name, prefix+"/") {
-			return true
-		}
-	}
-	return false
-}
-
-// removeEmptyDirs deletes directories left empty after owned files moved out,
-// so a dropped skill leaves no empty folder behind.
-func removeEmptyDirs(dir string) {
-	var dirs []string
-	_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
-		if err == nil && d.IsDir() && p != dir {
-			dirs = append(dirs, p)
-		}
-		return nil
-	})
-	// Deepest first, so a directory is removed after what it holds.
-	for _, d := range cli.SortedDesc(dirs) {
-		_ = os.Remove(d)
-	}
-}
-
-// diffFiles describes how have differs from want, most useful first.
-func diffFiles(have, want skillFiles) []string {
-	return cli.DiffMaps(have, want, bytes.Equal)
-}
-
-func sameFiles(a, b skillFiles) bool { return len(diffFiles(a, b)) == 0 }
-
-func dirExists(dir string) bool {
-	info, err := os.Stat(dir)
-	return err == nil && info.IsDir()
+	return items[0] + ", " + english(items[1:])
 }

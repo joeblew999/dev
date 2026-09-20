@@ -126,6 +126,16 @@ func TestPlural(t *testing.T) {
 		{2, "page", "2 pages"},
 		{1, "broken link", "1 broken link"},
 		{7, "broken link", "7 broken links"},
+		// A consonant before a final y: "2 directorys" reached a real report.
+		{2, "directory", "2 directories"},
+		{1, "directory", "1 directory"},
+		// A vowel before it does not: these stay regular.
+		{3, "key", "3 keys"},
+		// Already sibilant, so -es rather than a second s.
+		{2, "class", "2 classes"},
+		{2, "fix", "2 fixes"},
+		{2, "patch", "2 patches"},
+		{0, "", "0 "},
 	} {
 		if got := Plural(tc.n, tc.word); got != tc.want {
 			t.Errorf("Plural(%d, %q) = %q; want %q", tc.n, tc.word, got, tc.want)

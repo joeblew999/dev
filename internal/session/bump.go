@@ -7,47 +7,56 @@ import (
 	"os"
 	"strings"
 
-	"github.com/joeblew999/dev/cli/tool"
-
 	"github.com/joeblew999/dev/cli"
+	"github.com/joeblew999/dev/cli/tool"
+	"github.com/joeblew999/dev/internal/session/pins"
+	"github.com/joeblew999/dev/internal/session/vendored"
 )
 
-// Bump moves every github source's pin in session.toml to upstream HEAD. It
-// shows the file-level diff first and waits for confirmation, so moving forward
-// is one deliberate command instead of a silent drift. Usage:
-// dev skills bump [source] — one source, or all github sources when omitted.
+// Bump moves every source this repo declared to upstream HEAD. It shows what
+// would change first and waits for confirmation, so moving forward is one
+// deliberate command instead of a silent drift.
+//
+// A source that came from a dev preset is not moved and cannot be: it is not
+// in session.toml to rewrite, and it moves when dev is upgraded. Naming one
+// says so rather than appearing to work.
 func Bump(out io.Writer, sources []string) error {
-	p, err := loadPins()
+	p, err := pins.Load()
 	if err != nil {
 		return err
 	}
-	names := p.names()
+	names := p.Declared()
 	if len(sources) > 0 {
 		for _, name := range sources {
-			if _, ok := p.Source[name]; !ok {
-				return fmt.Errorf("%s has no [source.%s]", pinsFile, name)
+			src, known := p.Source[name]
+			if !known {
+				return fmt.Errorf("%s has no [source.%s]; it declares %s",
+					pins.File, name, cli.Or(english(p.Declared()), "no sources of its own"))
+			}
+			if preset, fromPreset := src.FromPreset(); fromPreset {
+				return fmt.Errorf("%s comes from dev's %q preset, not from %s, so there is no ref here to move; it follows the dev you pin",
+					name, preset, pins.File)
 			}
 		}
 		names = sources
 	}
-	github := names
 
-	oldFiles, err := pinnedSkills()
+	before, err := collect(p)
 	if err != nil {
 		return err
 	}
 	moved := false
-	for _, name := range github {
+	for _, name := range names {
 		s := p.Source[name]
 		head, err := lsRemoteHead(s.Repo)
 		if err != nil {
 			return err
 		}
 		if head == s.Ref {
-			fmt.Fprintf(out, "%s is already at upstream HEAD (%s)\n", s.Repo, shortRef(head))
+			fmt.Fprintf(out, "%s is already at upstream HEAD (%s)\n", s.Repo, pins.Short(head))
 			continue
 		}
-		fmt.Fprintf(out, "%s: %s -> %s\n", s.Repo, shortRef(s.Ref), shortRef(head))
+		fmt.Fprintf(out, "%s: %s -> %s\n", s.Repo, pins.Short(s.Ref), pins.Short(head))
 		s.Ref = head
 		p.Source[name] = s
 		moved = true
@@ -55,24 +64,26 @@ func Bump(out io.Writer, sources []string) error {
 	if !moved {
 		return nil
 	}
-	newFiles, err := pinnedSkills()
+	after, err := collect(p)
 	if err != nil {
 		return err
 	}
-	for _, line := range diffFiles(oldFiles, newFiles) {
-		if strings.HasPrefix(line, "missing: "+lockFile) || strings.HasPrefix(line, "changed: "+lockFile) {
+	for _, line := range cli.DiffMaps(before, after, func(a, b []byte) bool { return string(a) == string(b) }) {
+		// The lock changes on every bump by construction — it records the very
+		// refs being moved — so saying so tells a reader nothing.
+		if strings.HasSuffix(line, ": "+vendored.LockFile) {
 			continue
 		}
 		fmt.Fprintln(out, "  "+line)
 	}
 
-	if !confirm(out, "rewrite "+pinsFile+"? [y/N] ") {
+	if !confirm(out, "rewrite "+pins.File+"? [y/N] ") {
 		return fmt.Errorf("not bumped")
 	}
-	if err := rewriteRefs(pinsFile, p); err != nil {
+	if err := rewriteRefs(pins.File, p); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "pinned; run: %s\n", syncCmd)
+	fmt.Fprintf(out, "pinned; run: %s\n", pins.SyncCommand())
 	return nil
 }
 
@@ -83,18 +94,11 @@ func lsRemoteHead(repo string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("git ls-remote https://github.com/%s HEAD: %w", repo, err)
 	}
-	head, _, ok := strings.Cut(string(out), "\t")
+	head, _, ok := strings.Cut(out, "\t")
 	if !ok || head == "" {
-		return "", fmt.Errorf("git ls-remote https://github.com/%s HEAD answered %q", repo, strings.TrimSpace(string(out)))
+		return "", fmt.Errorf("git ls-remote https://github.com/%s HEAD answered %q", repo, strings.TrimSpace(out))
 	}
 	return head, nil
-}
-
-func shortRef(ref string) string {
-	if len(ref) > 12 {
-		return ref[:12]
-	}
-	return ref
 }
 
 func confirm(out io.Writer, prompt string) bool {
@@ -107,9 +111,10 @@ func confirm(out io.Writer, prompt string) bool {
 	return answer == "y" || answer == "yes"
 }
 
-// rewriteRefs replaces the ref line of every github source in session.toml,
-// keeping comments and order.
-func rewriteRefs(path string, p pins) error {
+// rewriteRefs replaces the ref line of every declared source in session.toml,
+// keeping comments and order. A preset source has no line here to find, which
+// is why it cannot be bumped.
+func rewriteRefs(path string, p pins.Pins) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
