@@ -17,9 +17,20 @@ import (
 	"github.com/joeblew999/dev/cli"
 )
 
-// Claude Code reads .claude/skills when a session starts, so a session older
-// than the skills cannot see them. That is worth saying out loud, rather than
-// leaving someone to wonder why the AI ignores a skill that is right there.
+// A session that started before these skills changed may be holding a stale
+// view of them, and saying so beats leaving someone to wonder why the agent
+// ignores a skill that is right there.
+//
+// It used to say the session "cannot see them" and to restart. That is not
+// true and was never checked: editing a SKILL.md applies without a restart,
+// which Claude Code documents, and a skill directory that appears while a
+// session runs was picked up here without one either.
+//
+// What is not documented either way is removal, which is the half that
+// matters after `remove`: the files are gone and the session may still be
+// offering them. So the advice is /reload-plugins — documented to reload
+// skills along with plugins, hooks and agents, and far cheaper than losing a
+// session — with a restart named only as the fallback it is.
 
 type session struct {
 	pid     int
@@ -33,10 +44,11 @@ func warnStaleSessions(out io.Writer, now time.Time) {
 	}
 	for _, s := range claudeSessions(now) {
 		if s.started.Before(newest) {
-			fmt.Fprintf(out, "\nClaude Code (pid %d, started %s) is older than the skills (%s),\n",
+			fmt.Fprintf(out, "\nClaude Code (pid %d, started %s) is older than these skills (%s),\n",
 				s.pid, s.started.Format("Jan 2 15:04"), newest.Format("Jan 2 15:04"))
-			fmt.Fprintln(out, "so that session cannot see them. Restart Claude Code (/exit and reopen,")
-			fmt.Fprintln(out, "or reload the VS Code window).")
+			fmt.Fprintln(out, "so it may still be offering a skill that has changed or gone. Run")
+			fmt.Fprintln(out, "/reload-plugins in that session; it reloads skills without losing it.")
+			fmt.Fprintln(out, "(Claude Code before 2.1.260 has no such command: restart instead.)")
 		}
 	}
 }

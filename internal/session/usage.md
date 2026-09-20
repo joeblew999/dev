@@ -67,6 +67,13 @@ what sync wrote, so check can verify the files without downloading anything.
 `SESSION.lock` is what a running Claude Code session reported it could load,
 which only verify writes and only a real session can answer.
 
+A session that is already open may be holding a stale view of skills that
+just changed: an edited `SKILL.md` is documented to apply without a restart,
+and a newly added one was seen to, but a removed one is documented neither
+way. `sync` and `remove` both say so when they find such a session, and name
+`/reload-plugins` — which reloads skills without losing the session — rather
+than telling you to restart.
+
 Every error names the sync that would fix it, in this repo's own spelling:
 `session.toml` sets `sync_command`, so the advice reads as the task you run
 rather than as a binary you may never call directly.

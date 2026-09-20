@@ -40,8 +40,11 @@ func Remove(out io.Writer) error {
 	if _, err := os.Stat(pins.File); err == nil {
 		fmt.Fprintf(out, "\n%s still pins them, so the next sync brings them back; remove what you\ndo not want there first.\n", pins.File)
 	}
-	// They are off disk and still in memory: an agent reads its skills when it
-	// starts, so a session running now has them until it restarts.
+	// Off disk is not the same as out of a running session. Claude Code is
+	// documented to reload an edited skill and was seen here to pick up a new
+	// one, but nothing says a removed one goes — so a session open now may
+	// still offer what was just taken back, and the warning says how to settle
+	// it without losing the session.
 	warnStaleSessions(out, time.Now())
 	return nil
 }
