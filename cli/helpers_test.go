@@ -6,6 +6,8 @@ package cli
 
 import (
 	"flag"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -349,14 +351,13 @@ func TestEveryToolSaysWhatItIsForAndHowToGetIt(t *testing.T) {
 }
 
 // What mise calls a tool and what the binary is called are not always the
-// same, and getting that wrong is the kind of error that sends somebody to
-// install what they already have: opentofu ships tofu, node ships npm, so
-// asking mise whether "tofu" is active says no in a repo that pins opentofu
-// and has it.
+// same, and getting that wrong sends somebody to install what they already
+// have: opentofu ships tofu, node ships npm, so asking mise whether "tofu" is
+// active says no in a repo that pins opentofu and has it.
 //
-// The pin line is the truth — it is what goes in [tools] — so the key it
-// names has to be the key this asks mise about.
-func TestTheMiseKeyMatchesThePinLine(t *testing.T) {
+// The pin is what `mise use` is given, so the name in it is the name mise
+// knows — and that has to be the name this asks mise about.
+func TestTheMiseKeyMatchesThePin(t *testing.T) {
 	for _, n := range Needs() {
 		if n.Pin == "" {
 			if n.Key != "" {
@@ -364,14 +365,18 @@ func TestTheMiseKeyMatchesThePinLine(t *testing.T) {
 			}
 			continue
 		}
-		key, _, ok := strings.Cut(n.Pin, " =")
-		if !ok {
-			t.Errorf("%s's pin is not a [tools] line: %q", n.Bin, n.Pin)
+		name, version, ok := strings.Cut(n.Pin, "@")
+		if !ok || name == "" || version == "" {
+			t.Errorf("%s's pin is not tool@version: %q", n.Bin, n.Pin)
 			continue
 		}
-		key = strings.Trim(strings.TrimSpace(key), `"`)
-		if got := n.MiseKey(); got != key {
-			t.Errorf("%s asks mise about %q and its pin installs %q; a repo that pins it would still read as missing", n.Bin, got, key)
+		if got := n.MiseKey(); got != name {
+			t.Errorf("%s asks mise about %q and its pin installs %q; a repo that pins it would still read as missing", n.Bin, got, name)
+		}
+		// And the [tools] line is derived from the same fact, so the two
+		// cannot drift — which they did when both were written by hand.
+		if line := n.Line(); !strings.Contains(line, version) {
+			t.Errorf("%s's line %q does not name the version its pin does", n.Bin, line)
 		}
 	}
 	// The two this was written for, so a refactor that loses the distinction
@@ -389,5 +394,60 @@ func TestTheMiseKeyMatchesThePinLine(t *testing.T) {
 		if !found {
 			t.Errorf("%s is no longer declared", bin)
 		}
+	}
+	// A backend path is quoted in TOML and bare in a spec, which is the one
+	// place the two spellings genuinely differ.
+	backend := Need{Bin: "hk", Pin: "packslip:github.com/jdx/hk@2.0.1"}
+	if got := backend.Line(); got != `"packslip:github.com/jdx/hk" = "2.0.1"` {
+		t.Errorf("a backend path renders as %q", got)
+	}
+	if got := backend.Spec(); got != "packslip:github.com/jdx/hk@2.0.1" {
+		t.Errorf("a backend spec is %q", got)
+	}
+}
+
+// The config this writes to is this directory's own, and nothing else.
+//
+// Asking mise which config it would write to answers with the whole
+// precedence chain, and the first line of that is the machine's global one —
+// so a --fresh in an empty scratch directory read ~/.config/mise/config.toml
+// as "the config here" and set about replacing a machine's own settings. It
+// failed on a path quirk rather than on judgement.
+func TestTheConfigIsThisDirectorysOwn(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if got := configHere(); got != "" {
+		t.Fatalf("an empty directory reported %q as its config; nothing above it is this command's to touch", got)
+	}
+	if err := os.WriteFile("mise.toml", []byte("[tools]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := configHere(); got != "mise.toml" {
+		t.Errorf("configHere() = %q; want the file in this directory", got)
+	}
+	// Whatever it returns is a bare name, never a path leading elsewhere.
+	if got := configHere(); filepath.IsAbs(got) || strings.Contains(got, "..") {
+		t.Errorf("configHere() = %q; it must not name anything outside this directory", got)
+	}
+}
+
+// Two tools can want one pin — node ships npm — and mise given the same spec
+// twice once wrote the same key twice into a [tools] table, which is not
+// valid TOML. The specs handed over are unique.
+func TestOnePinIsAskedForOnce(t *testing.T) {
+	var shared []Need
+	for _, n := range Needs() {
+		if n.Bin == "node" || n.Bin == "npm" {
+			shared = append(shared, n)
+		}
+	}
+	if len(shared) != 2 {
+		t.Fatalf("expected node and npm to be declared; got %d", len(shared))
+	}
+	if shared[0].Spec() != shared[1].Spec() {
+		t.Skip("node and npm no longer share a pin")
+	}
+	specs := Unique(Collect(shared, func(n Need) (string, bool) { return n.Spec(), n.Pin != "" }))
+	if len(specs) != 1 {
+		t.Errorf("two tools sharing one pin produced %v; mise must be asked once", specs)
 	}
 }

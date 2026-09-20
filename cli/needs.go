@@ -12,7 +12,10 @@
 // there is nothing to keep in step.
 package cli
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 // Need is one program, and how a repo gets it.
 type Need struct {
@@ -22,19 +25,32 @@ type Need struct {
 	// says no in a repo that pins opentofu and has it — which is the kind of
 	// wrong answer that sends somebody to install what they already have.
 	Key string
-	Pin string // the mise.toml [tools] line, "" when mise cannot install it
+	// Pin is what mise is asked for — "flyctl@latest", "opentofu@latest",
+	// "packslip:github.com/jdx/hk@2.0.1" — and "" when mise cannot install
+	// it at all. The [tools] line is derived from this rather than written
+	// beside it, because two spellings of one fact drift, and hand-writing
+	// TOML is how `node = "latest"` was once added twice.
+	Pin string
 	For string // which of dev's verbs want it, so a repo can skip what it will never run
 	// Why is what to say when mise cannot install it — Claude Code has its
 	// own installer, and git is expected to be there already.
 	Why string
 }
 
-// Line is the [tools] entry, or Why when there is no line to give.
+// Line is the [tools] entry this would become, or Why when mise cannot
+// install it. Derived from Pin so the two cannot disagree.
 func (n Need) Line() string {
 	if n.Pin == "" {
 		return n.Why
 	}
-	return n.Pin
+	name, version, ok := strings.Cut(n.Pin, "@")
+	if !ok {
+		return n.Pin
+	}
+	if strings.ContainsAny(name, ":/") {
+		name = `"` + name + `"`
+	}
+	return name + ` = "` + version + `"`
 }
 
 // needs is every program, by the name it has on PATH.
@@ -43,20 +59,20 @@ func (n Need) Line() string {
 // answerable as a set: "what does this repo need before it can use dev" is
 // one question, and fourteen constants in nine packages cannot answer it.
 var needs = map[string]Need{
-	"go":         {Bin: "go", Pin: `go = "1.27.1"`, For: "build, check, run, test"},
-	"tinygo":     {Bin: "tinygo", Pin: `tinygo = "latest"`, For: "wasm, for a Worker built from Go"},
-	"node":       {Bin: "node", Pin: `node = "latest"`, For: "wasm and deploy, because wrangler runs on it"},
-	"npm":        {Bin: "npm", Key: "node", Pin: `node = "latest"`, For: "a command directory holding a package.json"},
-	"wrangler":   {Bin: "wrangler", Pin: `wrangler = "latest"`, For: "deploy, delete, logs, smoke on Cloudflare"},
-	"workerd":    {Bin: "workerd", Pin: `workerd = "latest"`, For: "running a Worker locally"},
-	"flyctl":     {Bin: "flyctl", Pin: `flyctl = "latest"`, For: "deploy, delete, logs, list on Fly"},
-	"fnox":       {Bin: "fnox", Pin: `fnox = "latest"`, For: "every secret, and every cloud CLI runs under it"},
-	"goreleaser": {Bin: "goreleaser", Pin: `goreleaser = "latest"`, For: "release"},
-	"packslip":   {Bin: "packslip", Pin: `packslip = "latest"`, For: "release: the signed manifest mise installs from"},
-	"gh":         {Bin: "gh", Pin: `gh = "latest"`, For: "release: publishing it"},
-	"cloudflared": {Bin: "cloudflared", Pin: `cloudflared = "latest"`,
+	"go":         {Bin: "go", Pin: "go@1.27.1", For: "build, check, run, test"},
+	"tinygo":     {Bin: "tinygo", Pin: "tinygo@latest", For: "wasm, for a Worker built from Go"},
+	"node":       {Bin: "node", Pin: "node@latest", For: "wasm and deploy, because wrangler runs on it"},
+	"npm":        {Bin: "npm", Key: "node", Pin: "node@latest", For: "a command directory holding a package.json"},
+	"wrangler":   {Bin: "wrangler", Pin: "wrangler@latest", For: "deploy, delete, logs, smoke on Cloudflare"},
+	"workerd":    {Bin: "workerd", Pin: "workerd@latest", For: "running a Worker locally"},
+	"flyctl":     {Bin: "flyctl", Pin: "flyctl@latest", For: "deploy, delete, logs, list on Fly"},
+	"fnox":       {Bin: "fnox", Pin: "fnox@latest", For: "every secret, and every cloud CLI runs under it"},
+	"goreleaser": {Bin: "goreleaser", Pin: "goreleaser@latest", For: "release"},
+	"packslip":   {Bin: "packslip", Pin: "packslip@latest", For: "release: the signed manifest mise installs from"},
+	"gh":         {Bin: "gh", Pin: "gh@latest", For: "release: publishing it"},
+	"cloudflared": {Bin: "cloudflared", Pin: "cloudflared@latest",
 		For: "fronting an app through a tunnel"},
-	"tofu": {Bin: "tofu", Key: "opentofu", Pin: `opentofu = "latest"`,
+	"tofu": {Bin: "tofu", Key: "opentofu", Pin: "opentofu@latest",
 		For: "front and unfront: the Cloudflare zone changes, planned before they happen"},
 
 	// The three mise does not install.
@@ -87,6 +103,9 @@ func Needs() []Need {
 // needed and cannot be installed, and an error that offers a mise line for
 // them sends the reader somewhere that will not help.
 func Installable(bin string) bool { return needs[bin].Pin != "" }
+
+// Spec is what `mise use` is given.
+func (n Need) Spec() string { return n.Pin }
 
 // MiseKey is what mise calls this tool, which is its binary's name unless it
 // says otherwise.

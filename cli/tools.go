@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -25,7 +24,8 @@ import (
 func ToolsFlags(fs *flag.FlagSet) {
 	fs.Var(new(Bool), "missing", "only what this machine does not have")
 	fs.Var(new(Bool), "add", "write the missing [tools] lines into this repo's mise.toml")
-	fs.Var(new(Bool), "fresh", "replace the [tools] table with exactly what this command needs, making mise.toml when there is none")
+	fs.Var(new(Bool), "fresh", "replace what is pinned with exactly what this command needs, making a config when there is none")
+	fs.Var(new(Bool), "yes", "do not ask before replacing an existing config")
 	JSONFlags(fs)
 }
 
@@ -62,89 +62,135 @@ func (c Command) tools(call Call) error {
 		}
 		fmt.Fprintf(call.Stdout, "%-7s %-12s %s\n", mark, e.Bin, e.For)
 	}
-	// The lines to paste, for the half mise can install. A repo pins what it
-	// will actually run, so this is not written into anybody's file: a repo
-	// that never deploys to Fly should not carry flyctl to satisfy a checker.
-	var lines []string
-	for _, e := range found {
-		if e.Managed && !e.Present {
-			lines = append(lines, "  "+e.Pin)
+	// What mise could install and this directory does not have. A repo pins
+	// what it will actually run, so nothing is written unless asked: one that
+	// never deploys to Fly should not carry flyctl to satisfy a checker.
+	var want []Need
+	for _, n := range Needs() {
+		if n.Pin != "" && !here(n, active) {
+			want = append(want, n)
 		}
 	}
-	if len(lines) == 0 {
-		return nil
-	}
 	if call.Given("fresh") {
-		return c.freshTools(call, lines)
+		return c.freshTools(call, all(Needs()))
+	}
+	if len(want) == 0 {
+		return nil
 	}
 	if !call.Given("add") {
 		fmt.Fprintf(call.Stdout, "\nfor mise.toml [tools], the ones you will run:\n")
-		for _, l := range lines {
-			fmt.Fprintln(call.Stdout, l)
+		for _, n := range want {
+			fmt.Fprintf(call.Stdout, "  %s\n", n.Line())
 		}
-		fmt.Fprintf(call.Stdout, "\nOr let this write them: %s tools --add\n", c.Name)
+		fmt.Fprintf(call.Stdout, "\nOr have mise record them: %s tools --add\n", c.Name)
 		return nil
 	}
-	return addTools(call, lines)
+	return addTools(call, want)
 }
 
-// addTools writes the missing pins into the repo's mise.toml.
+// all is every tool mise can install, which is what fresh establishes: the
+// question there is not what is missing but what a working one looks like.
+func all(needs []Need) []Need {
+	return Filter(needs, func(n Need) bool { return n.Pin != "" })
+}
+
+// addTools has mise record the missing pins, leaving what is there alone.
+func addTools(call Call, needs []Need) error {
+	return record(call, needs, false)
+}
+
+// freshTools replaces what is pinned with exactly what this command needs.
 //
-// Appended to the [tools] table rather than rewritten, and only lines that
-// are not there: a repo's mise.toml is its own, holding versions somebody
-// chose and comments explaining why, and a tool that reformats it to add a
-// line will not be run twice.
-func addTools(call Call, lines []string) error {
-	dir, err := root(".")
-	if err != nil {
+// The other half of a pattern this stack keeps arriving at: something that
+// reconciles toward a state, and something that establishes one. sync and
+// remove, front and unfront, add and fresh. Add is right for a repo somebody
+// owns; fresh is right for a scratch directory, where the question is not
+// "what is missing" but "give me one that works".
+func (c Command) freshTools(call Call, needs []Need) error {
+	return record(call, needs, true)
+}
+
+// record is both of them: the same work, differing only in whether what is
+// already pinned survives.
+//
+// Through `mise use` rather than by editing a config, because mise owns that
+// file. It knows which of several spellings this directory uses, it creates
+// one when there is none, it spells a backend correctly, and it installs what
+// it records. Writing the TOML by hand put a duplicate key in a [tools] table
+// the first time it was tried, which is the argument in one line.
+//
+// mise itself is never installed, and never written outside this directory.
+func record(call Call, needs []Need, fresh bool) error {
+	if err := haveMise(); err != nil {
 		return err
 	}
-	path := filepath.Join(dir, "mise.toml")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("%s: %w; this is a repo on the stack, so it has one", rel(path), err)
-	}
-	text := string(data)
-	var added []string
-	// Two tools can share one line — node ships npm, so both ask for node —
-	// and a [tools] table with the same key twice is not valid TOML. Deduped
-	// within the batch as well as against the file, because the file has not
-	// been written yet when the second one is considered.
-	seen := map[string]bool{}
-	for _, l := range lines {
-		pin := strings.TrimSpace(l)
-		name, _, _ := strings.Cut(pin, " =")
-		if seen[name] {
-			continue
+	existing := configHere()
+	switch {
+	case !fresh && existing != "":
+		fmt.Fprintf(call.Stdout, "adding to %s\n", existing)
+	case !fresh:
+		fmt.Fprintf(call.Stdout, "no mise config in this directory; mise will make one\n")
+	case existing == "":
+		fmt.Fprintf(call.Stdout, "no mise config in this directory; making one with %s\n", Plural(len(needs), "tool"))
+	default:
+		fmt.Fprintf(call.Stdout, "%s already exists here.\nIts tools will be replaced with %s.\n\n", existing, Plural(len(needs), "tool"))
+		if !call.Given("yes") && !Confirm(call.Stdin, call.Stdout, "replace? [y/N] ") {
+			return fmt.Errorf("not replaced (pass --yes to skip the question)")
 		}
-		seen[name] = true
-		// Already pinned, whatever version it names: a repo that chose 1.24
-		// should not be given "latest" underneath it.
-		if strings.Contains(text, "\n"+name+" =") || strings.Contains(text, "\n"+name+"=") {
-			continue
+		// Emptied rather than deleted, and only ever this directory's own
+		// file: what is replaced is the set of tools, and a config may hold
+		// tasks and settings that are nobody's business here.
+		if err := os.WriteFile(existing, []byte("[tools]\n"), 0o644); err != nil {
+			return err
 		}
-		added = append(added, pin)
 	}
-	if len(added) == 0 {
-		fmt.Fprintln(call.Stdout, "\nmise.toml already pins everything that is missing")
-		return nil
+	specs := Unique(Collect(needs, func(n Need) (string, bool) { return n.Spec(), n.Pin != "" }))
+	// --path names this directory's own file, so mise cannot write anywhere
+	// else. Without it, mise picks by its own precedence, and in a directory
+	// with no config of its own that walks up to the machine's global one —
+	// which is never this command's to touch.
+	at := existing
+	if at == "" {
+		at = "mise.toml"
 	}
-	marker := "[tools]"
-	at := strings.Index(text, marker)
-	if at < 0 {
-		return fmt.Errorf("%s has no [tools] table to add to", rel(path))
+	fmt.Fprintf(call.Stdout, "\nmise use --path %s %s\n\n", at, strings.Join(specs, " "))
+	return mise(call, append([]string{"use", "--path", at}, specs...))
+}
+
+// haveMise refuses rather than installs.
+//
+// mise is what installs things, and a command about deploying should not put
+// a version manager on somebody's machine as a side effect. Saying where to
+// get it is the whole of what is appropriate here.
+func haveMise() error {
+	if _, err := exec.LookPath("mise"); err != nil {
+		return fmt.Errorf("mise is not installed, and this will not install it: it is a tool that manages your machine's tools, so that is your call. https://mise.jdx.dev/getting-started.html")
 	}
-	insert := at + len(marker)
-	written := text[:insert] + "\n" + strings.Join(added, "\n") + text[insert:]
-	if err := os.WriteFile(path, []byte(written), 0o644); err != nil {
-		return err
-	}
-	fmt.Fprintf(call.Stdout, "\nadded to %s:\n", rel(path))
-	for _, l := range added {
-		fmt.Fprintf(call.Stdout, "  %s\n", l)
-	}
-	fmt.Fprintln(call.Stdout, "\nthen: mise install")
 	return nil
+}
+
+// configHere is the mise config in this directory, or "" when there is none.
+//
+// This directory and nowhere else. Asking mise which config it would write to
+// answers with the whole precedence chain, and the first line of that is the
+// global one — so a --fresh in an empty scratch directory read
+// ~/.config/mise/config.toml as "the config here" and set about replacing a
+// machine's own settings. It failed on a path quirk rather than on judgement,
+// which is the kind of luck not to rely on twice.
+func configHere() string {
+	for _, name := range []string{"mise.toml", ".mise.toml", "mise/config.toml"} {
+		if _, err := os.Stat(name); err == nil {
+			return name
+		}
+	}
+	return ""
+}
+
+// mise runs it where the person can see what it did.
+func mise(call Call, args []string) error {
+	cmd := exec.Command("mise", args...)
+	cmd.Stdout, cmd.Stderr = call.Stdout, call.Stderr
+	return cmd.Run()
 }
 
 // here reports whether a tool can actually be run in this directory.
@@ -155,7 +201,7 @@ func addTools(call Call, lines []string) error {
 // run. Everything looked installed and nothing was.
 //
 // So mise is asked what is active here, and PATH is only consulted for the
-// three it does not manage.
+// few it does not manage.
 func here(n Need, active map[string]bool) bool {
 	if n.Pin == "" {
 		_, err := exec.LookPath(n.Bin)
@@ -196,59 +242,4 @@ func miseActive() map[string]bool {
 		}
 	}
 	return active
-}
-
-// freshTools replaces the [tools] table with exactly what this command needs,
-// and makes a mise.toml when there is none.
-//
-// The other half of a pattern this stack keeps arriving at: a thing that adds
-// what is missing, and a thing that makes the state known. `session sync` and
-// `session remove` are the same pair, and `dev front` and `dev unfront`. Add
-// is right for a repo somebody owns; fresh is right for a scratch directory,
-// where the question is not "what is missing" but "give me one that works".
-//
-// It says what it replaced rather than doing it quietly, because a mise.toml
-// holds versions somebody chose and comments explaining why, and this throws
-// both away.
-func (c Command) freshTools(call Call, lines []string) error {
-	dir, err := root(".")
-	if err != nil {
-		// No mise.toml above means no repo on this stack yet, which for a
-		// scratch directory is the normal state rather than an error: make
-		// one here.
-		dir, err = os.Getwd()
-		if err != nil {
-			return err
-		}
-	}
-	path := filepath.Join(dir, "mise.toml")
-	had, readErr := os.ReadFile(path)
-	seen := map[string]bool{}
-	var pins []string
-	for _, l := range lines {
-		pin := strings.TrimSpace(l)
-		name, _, _ := strings.Cut(pin, " =")
-		if seen[name] {
-			continue
-		}
-		seen[name] = true
-		pins = append(pins, pin)
-	}
-	body := "# Written by `" + c.Name + " tools --fresh`: every tool this command may run.\n" +
-		"# Trim it to what this repo actually does — a repo that never deploys to\n" +
-		"# Fly does not need flyctl, and mise installs what is listed.\n[tools]\n" +
-		strings.Join(pins, "\n") + "\n"
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		return err
-	}
-	switch {
-	case readErr != nil:
-		fmt.Fprintf(call.Stdout, "wrote %s with %s\n", rel(path), Plural(len(pins), "tool"))
-	default:
-		kept := strings.Count(strings.TrimSpace(string(had)), "\n") + 1
-		fmt.Fprintf(call.Stdout, "replaced %s (%s) with %s\n",
-			rel(path), Plural(kept, "line"), Plural(len(pins), "tool"))
-	}
-	fmt.Fprintln(call.Stdout, "then: mise install")
-	return nil
 }
