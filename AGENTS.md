@@ -94,6 +94,18 @@ This file says only what is about developing the tool itself.
   All compiled in by `go:embed`. A file added there goes in `mise.toml`'s
   build `sources`, or editing it leaves the binary stale while mise reports it
   fresh.
+- **A cloud is reached through its CLI, never through a Go client.** Fly has
+  `fly-go` and Cloudflare has `cloudflare-go`, both real and both maintained;
+  neither belongs here. The registry already loads `flyctl` and `wrangler` as
+  pinned binaries, so their versions are controlled there — a Go client would
+  control the same thing a second time and charge `go.mod` for it. dev has two
+  direct dependencies and four modules in the whole build, which is a property
+  worth keeping rather than an accident.
+
+  The cost of that choice is parsing output, so prefer `--json` and decide
+  from what parsed. Never decide from a tool's prose: this tree has been wrong
+  twice about what `flyctl` says and which stream it says it on, and once
+  about an empty list meaning a thing was absent.
 
 ## Refactoring without breaking it
 
