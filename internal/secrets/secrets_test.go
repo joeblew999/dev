@@ -3,7 +3,6 @@ package secrets
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"testing"
@@ -24,7 +23,7 @@ func aWorker(t *testing.T) {
 
 func stubFnox(t *testing.T, values map[string]string) (stored *[]string, pushed *[]string) {
 	t.Helper()
-	oldGet, oldSet, oldExec := fnox.Get, fnox.Set, fnox.Exec
+	oldGet, oldSet, oldRun := fnox.Get, fnox.Set, fnox.Run
 	var st, pu []string
 	fnox.Get = func(name string) (string, error) {
 		v, ok := values[name]
@@ -34,13 +33,15 @@ func stubFnox(t *testing.T, values map[string]string) (stored *[]string, pushed 
 		return v, nil
 	}
 	fnox.Set = func(name, value string) error { st = append(st, name+"="+value); return nil }
-	fnox.Exec = func(dir string, stdin io.Reader, _ io.Writer, args ...string) error {
+	fnox.Run = func(u fnox.Under) (string, error) {
 		var buf bytes.Buffer
-		buf.ReadFrom(stdin)
-		pu = append(pu, dir+": "+strings.Join(args, " ")+" <- "+buf.String())
-		return nil
+		if u.Stdin != nil {
+			buf.ReadFrom(u.Stdin)
+		}
+		pu = append(pu, u.Dir+": "+strings.Join(u.Args, " ")+" <- "+buf.String())
+		return "", nil
 	}
-	t.Cleanup(func() { fnox.Get, fnox.Set, fnox.Exec = oldGet, oldSet, oldExec })
+	t.Cleanup(func() { fnox.Get, fnox.Set, fnox.Run = oldGet, oldSet, oldRun })
 	return &st, &pu
 }
 

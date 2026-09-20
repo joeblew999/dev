@@ -46,8 +46,22 @@ func Delete(stdin io.Reader, out io.Writer, dir, env, name string, yes bool) err
 	if !yes && !cli.Confirm(stdin, out, "delete? [y/N] ") {
 		return fmt.Errorf("not deleted (pass --yes to skip the question)")
 	}
-	if err := fnox.Exec(dir, nil, out, "wrangler", "delete", "--name", name, "--force"); err != nil {
-		return fmt.Errorf("wrangler delete %s failed: %w", name, err)
+	// Asked with both streams so wrangler's own words reach the reader.
+	// Without them a Worker that is not there failed as a bare exit status,
+	// which says nothing about whether it was missing, not yours, or a
+	// credentials problem.
+	//
+	// Fly's side of this goes further: it asks whether the app exists first,
+	// so destroying what is already gone says so and succeeds, which is what
+	// a cleanup run needs the second time. The same is not done here because
+	// it would mean matching wrangler's wording for an absent Worker, and
+	// there is no wrangler.toml and no Cloudflare account on this machine to
+	// find out what that wording is. Guessing it is how the Fly version came
+	// to read an empty list as proof of absence.
+	said, err := fnox.Ask(dir, "wrangler", "delete", "--name", name, "--force")
+	fmt.Fprint(out, said)
+	if err != nil {
+		return fmt.Errorf("wrangler delete %s failed: %w\n%s", name, err, cli.Indent(said))
 	}
 	for _, ns := range doomed {
 		if err := fnox.Exec(dir, nil, out, "wrangler", "kv", "namespace", "delete", "--namespace-id", ns.ID); err != nil {

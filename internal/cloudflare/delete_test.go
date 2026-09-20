@@ -17,15 +17,20 @@ func TestDeleteTakesTheWorkerAndOnlyWhatWranglerProvisioned(t *testing.T) {
 		t.Fatal(err)
 	}
 	var ran []string
-	old := fnox.Exec
-	fnox.Exec = func(dir string, stdin io.Reader, stdout io.Writer, args ...string) error {
-		ran = append(ran, strings.Join(args, " "))
-		if strings.HasPrefix(strings.Join(args, " "), "wrangler kv namespace list") {
-			io.WriteString(stdout, " ⛅️ wrangler 4.131.1\n[{\"id\":\"1\",\"title\":\"api-grok-auth\"},{\"id\":\"2\",\"title\":\"GROK_AUTH\"},{\"id\":\"3\",\"title\":\"api-alice-grok-auth\"}]\n")
+	old := fnox.Run
+	fnox.Run = func(u fnox.Under) (string, error) {
+		line := strings.Join(u.Args, " ")
+		ran = append(ran, line)
+		if strings.HasPrefix(line, "wrangler kv namespace list") {
+			out := " ⛅️ wrangler 4.131.1\n[{\"id\":\"1\",\"title\":\"api-grok-auth\"},{\"id\":\"2\",\"title\":\"GROK_AUTH\"},{\"id\":\"3\",\"title\":\"api-alice-grok-auth\"}]\n"
+			if u.Out != nil {
+				io.WriteString(u.Out, out)
+			}
+			return out, nil
 		}
-		return nil
+		return "", nil
 	}
-	t.Cleanup(func() { fnox.Exec = old })
+	t.Cleanup(func() { fnox.Run = old })
 
 	var out bytes.Buffer
 	if err := Delete(strings.NewReader("y\n"), &out, ".", "", "", false); err != nil {

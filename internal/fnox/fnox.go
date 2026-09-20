@@ -33,26 +33,39 @@ var Set = func(name, value string) error {
 	return tool.Cmd{Bin: Bin, Pin: Pin, Args: []string{"set", "-g", name}, Stdin: strings.NewReader(value)}.Stream(io.Discard)
 }
 
-// Exec runs a command in dir with fnox's secrets in its environment.
-var Exec = func(dir string, stdin io.Reader, stdout io.Writer, args ...string) error {
-	return tool.Cmd{Bin: Bin, Pin: Pin, Args: append([]string{"exec", "--"}, args...), Dir: dir, Stdin: stdin}.Stream(stdout)
+// Under is one command to run with fnox's secrets in its environment: where,
+// what, what it reads, and where its output goes.
+type Under struct {
+	Dir   string    // where to run it; "" is the current directory
+	Args  []string  // the command and its arguments, after `fnox exec --`
+	Stdin io.Reader // what it reads, for a value handed over rather than argued
+	Out   io.Writer // where its stdout goes; nil keeps it
+
+	// Combined captures stderr as well and hands both back. A command whose
+	// output is for the person watching wants it off; a question wants it on,
+	// because a CLI answering "is this there" answers on stderr.
+	Combined bool
 }
 
-// Ask runs a command with fnox's secrets and returns everything it said,
-// stdout and stderr together.
+// Run is the one way into fnox, and the one thing a test replaces.
 //
-// Exec streams stdout and lets stderr reach the terminal, which is right for a
-// command whose output is for the person watching. It is wrong for a question:
-// a CLI answering "is this there" almost always answers on stderr, and reading
-// only stdout means never seeing the answer. That is exactly how `flyctl
-// status` saying `Could not find App` was missed, turning "no such app" into
-// an unrecognised failure.
-//
-// Quiet, because a question asked on the way to doing something should not
-// report its own timing as though it were the work.
-var Ask = func(dir string, args ...string) (string, error) {
-	res, err := tool.Cmd{Bin: Bin, Pin: Pin, Dir: dir, Quiet: true, Combined: true,
-		Args: append([]string{"exec", "--"}, args...)}.Capture()
+// There were two — Exec for work and Ask for a question — and three separate
+// tests stubbed Exec, then kept passing while running the real fnox against
+// the real account the moment their code moved a call to Ask. Two doors means
+// a test can only ever guard one of them, and it cannot tell that it missed.
+// Exec and Ask are ordinary functions over this now, so stubbing Run catches
+// everything, including whatever is written next.
+var Run = func(u Under) (string, error) {
+	cmd := tool.Cmd{Bin: Bin, Pin: Pin, Dir: u.Dir, Stdin: u.Stdin,
+		Args: append([]string{"exec", "--"}, u.Args...)}
+	if !u.Combined {
+		if u.Out == nil {
+			u.Out = io.Discard
+		}
+		return "", cmd.Stream(u.Out)
+	}
+	cmd.Quiet, cmd.Combined = true, true
+	res, err := cmd.Capture()
 	if err != nil {
 		return res.Out, err
 	}
@@ -62,7 +75,21 @@ var Ask = func(dir string, args ...string) (string, error) {
 	// reading that nil as yes is how `flyctl status` saying "Could not find
 	// App" was taken for "the app is there".
 	if !res.OK() {
-		return res.Out, fmt.Errorf("%s exited %d", strings.Join(args, " "), res.Code)
+		return res.Out, fmt.Errorf("%s exited %d", strings.Join(u.Args, " "), res.Code)
 	}
 	return res.Out, nil
+}
+
+// Exec runs a command in dir with fnox's secrets, its stdout going to stdout
+// and its own progress to the terminal. For work being watched.
+func Exec(dir string, stdin io.Reader, stdout io.Writer, args ...string) error {
+	_, err := Run(Under{Dir: dir, Args: args, Stdin: stdin, Out: stdout})
+	return err
+}
+
+// Ask runs a command with fnox's secrets and returns everything it said,
+// stdout and stderr together, reporting a non-zero exit as the error it is.
+// For a question rather than for work.
+func Ask(dir string, args ...string) (string, error) {
+	return Run(Under{Dir: dir, Args: args, Combined: true})
 }

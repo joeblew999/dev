@@ -98,11 +98,23 @@ func Destroy(stdin io.Reader, out io.Writer, dir, name string, yes bool) error {
 		}
 		name = app
 	}
+	// Asked before the question is put, because there is no sense asking
+	// someone to confirm destroying what is not there — and because an
+	// absent app is how this ends the second time a cleanup runs.
+	switch err := appStatus(name); {
+	case errors.Is(err, errNoSuchApp):
+		fmt.Fprintf(out, "there is no Fly app %s; nothing to destroy\n", name)
+		return nil
+	case err != nil:
+		return err
+	}
 	fmt.Fprintf(out, "will destroy the Fly app %s, its machines and volumes\n", name)
 	if !yes && !cli.Confirm(stdin, out, "destroy? [y/N] ") {
 		return fmt.Errorf("not destroyed (pass --yes to skip the question)")
 	}
-	if err := fnox.Exec(".", nil, out, FlyctlBin, "apps", "destroy", name, "--yes"); err != nil {
+	said, err := fnox.Ask(".", FlyctlBin, "apps", "destroy", name, "--yes")
+	fmt.Fprint(out, said)
+	if err != nil {
 		return fmt.Errorf("flyctl apps destroy %s failed: %w", name, err)
 	}
 	fmt.Fprintf(out, "destroyed %s\n", name)

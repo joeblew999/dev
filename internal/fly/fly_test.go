@@ -28,27 +28,22 @@ func capture(t *testing.T) *[]string {
 		}
 		return "", false
 	}
-	oldExec, oldAsk := fnox.Exec, fnox.Ask
-	fnox.Exec = func(dir string, stdin io.Reader, stdout io.Writer, args ...string) error {
-		if out, handled := answer(args); handled {
-			io.WriteString(stdout, out)
-			return nil
-		}
-		got = append([]string{"in:" + dir}, args...)
-		if stdin != nil {
-			b, _ := io.ReadAll(stdin)
-			got = append(got, "stdin:"+string(b))
-		}
-		return nil
-	}
-	fnox.Ask = func(dir string, args ...string) (string, error) {
-		if out, handled := answer(args); handled {
+	old := fnox.Run
+	fnox.Run = func(u fnox.Under) (string, error) {
+		if out, handled := answer(u.Args); handled {
+			if u.Out != nil {
+				io.WriteString(u.Out, out)
+			}
 			return out, nil
 		}
-		got = append([]string{"in:" + dir}, args...)
+		got = append([]string{"in:" + u.Dir}, u.Args...)
+		if u.Stdin != nil {
+			b, _ := io.ReadAll(u.Stdin)
+			got = append(got, "stdin:"+string(b))
+		}
 		return "", nil
 	}
-	t.Cleanup(func() { fnox.Exec, fnox.Ask = oldExec, oldAsk })
+	t.Cleanup(func() { fnox.Run = old })
 	oldLook := lookPath
 	lookPath = func(string) (string, error) { return "/x/flyctl", nil }
 	t.Cleanup(func() { lookPath = oldLook })
@@ -206,16 +201,15 @@ func TestDeployAsksAboutTheAppAndHandlesEachAnswer(t *testing.T) {
 				}
 				return "", nil
 			}
-			oldExec, oldAsk := fnox.Exec, fnox.Ask
-			fnox.Exec = func(_ string, _ io.Reader, stdout io.Writer, args ...string) error {
-				out, err := say(strings.Join(args, " "))
-				io.WriteString(stdout, out)
-				return err
+			old := fnox.Run
+			fnox.Run = func(u fnox.Under) (string, error) {
+				out, err := say(strings.Join(u.Args, " "))
+				if u.Out != nil {
+					io.WriteString(u.Out, out)
+				}
+				return out, err
 			}
-			fnox.Ask = func(_ string, args ...string) (string, error) {
-				return say(strings.Join(args, " "))
-			}
-			t.Cleanup(func() { fnox.Exec, fnox.Ask = oldExec, oldAsk })
+			t.Cleanup(func() { fnox.Run = old })
 			oldLook := lookPath
 			lookPath = func(string) (string, error) { return "/x/flyctl", nil }
 			t.Cleanup(func() { lookPath = oldLook })
