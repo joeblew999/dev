@@ -11,10 +11,6 @@ import (
 // git reads remotes and upstream refs, ps and lsof find live sessions.
 const (
 	ClaudeBin = "claude"
-	// claudePin is what installs it, quoted when it is missing. Claude Code
-	// is installed by its own installer rather than by mise, so this names
-	// that instead of a [tools] line.
-	claudePin = "install Claude Code: https://claude.com/product/claude-code"
 	GitBin    = "git"
 	PsBin     = "ps"
 	LsofBin   = "lsof"

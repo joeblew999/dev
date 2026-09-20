@@ -351,35 +351,13 @@ func TestEveryToolSaysWhatItIsForAndHowToGetIt(t *testing.T) {
 	}
 }
 
-// What mise calls a tool and what the binary is called are not always the
-// same, and getting that wrong sends somebody to install what they already
-// have: opentofu ships tofu, node ships npm, so asking mise whether "tofu" is
-// active says no in a repo that pins opentofu and has it.
+// The registry's own rules run from main_test.go, where every package that
+// registers a tool is linked and the whole set is visible — here only cli's
+// own are, which is how a checker's pin went unchecked for as long as it did.
 //
-// The pin is what `mise use` is given, so the name in it is the name mise
-// knows — and that has to be the name this asks mise about.
+// What is left is the two cases the rule was written for, named rather than
+// derived, so a refactor that loses the distinction is caught by name.
 func TestTheMiseKeyMatchesThePin(t *testing.T) {
-	for _, n := range Needs() {
-		if n.Pin == "" {
-			if n.Key != "" {
-				t.Errorf("%s names a mise key and mise cannot install it", n.Bin)
-			}
-			continue
-		}
-		name, version, ok := strings.Cut(n.Pin, "@")
-		if !ok || name == "" || version == "" {
-			t.Errorf("%s's pin is not tool@version: %q", n.Bin, n.Pin)
-			continue
-		}
-		if got := n.MiseKey(); got != name {
-			t.Errorf("%s asks mise about %q and its pin installs %q; a repo that pins it would still read as missing", n.Bin, got, name)
-		}
-		// And the [tools] line is derived from the same fact, so the two
-		// cannot drift — which they did when both were written by hand.
-		if line := n.Line(); !strings.Contains(line, version) {
-			t.Errorf("%s's line %q does not name the version its pin does", n.Bin, line)
-		}
-	}
 	// The two this was written for, so a refactor that loses the distinction
 	// is caught by name rather than by the rule alone.
 	for bin, key := range map[string]string{"tofu": "opentofu", "npm": "node"} {

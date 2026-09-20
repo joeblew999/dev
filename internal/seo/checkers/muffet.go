@@ -14,7 +14,7 @@ import (
 
 var muffet = Checker{
 	Name:     "muffet",
-	Pin:      `"go:github.com/raviqqe/muffet/v2" = "v2.11.5"`,
+	Spec:     "go:github.com/raviqqe/muffet/v2@v2.11.5",
 	Provides: "every link on every page followed, and which ones do not answer",
 	Cost:     "~3s, the slowest of the three",
 	Args: func(a Ask) []string {

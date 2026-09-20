@@ -47,7 +47,7 @@ type scoutlyIssue struct {
 // each page and reports one issue per thing it found.
 var scoutly = Checker{
 	Name:     "scoutly",
-	Pin:      `"go:github.com/nelsonlaidev/scoutly/cmd/scoutly" = "v0.5.0"`,
+	Spec:     "go:github.com/nelsonlaidev/scoutly/cmd/scoutly@v0.5.0",
 	Provides: "what Google reads on each page: title, meta description, H1, canonical, Open Graph, images",
 	Cost:     "~1s for a few pages",
 	Args: func(a Ask) []string {

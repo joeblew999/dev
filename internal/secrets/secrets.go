@@ -212,7 +212,7 @@ var CI = func(name, value string) error {
 	if err != nil {
 		return err
 	}
-	err = tool.Cmd{Bin: GhBin, Pin: `gh = "latest"`, Args: []string{"secret", "set", name, "--repo", slug}, Stdin: strings.NewReader(value)}.Stream(io.Discard)
+	err = tool.Cmd{Bin: GhBin, Args: []string{"secret", "set", name, "--repo", slug}, Stdin: strings.NewReader(value)}.Stream(io.Discard)
 	if err != nil {
 		return fmt.Errorf("gh secret set %s failed: %w (gh must be logged in with access to this repo)", name, err)
 	}

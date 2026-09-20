@@ -21,7 +21,7 @@ import (
 
 var scry = Checker{
 	Name:     "scry",
-	Pin:      `"go:github.com/meysam81/scry" = "latest"`,
+	Spec:     "go:github.com/meysam81/scry@latest",
 	Provides: "90-odd checks a page at a time, including TLS expiry and the security headers",
 	Cost:     "~1s",
 	Args: func(a Ask) []string {

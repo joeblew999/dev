@@ -14,7 +14,7 @@ import (
 
 var seoAudit = Checker{
 	Name:     "seo-audit",
-	Pin:      `"go:github.com/Erose112/seo-audit" = "latest"`,
+	Spec:     "go:github.com/Erose112/seo-audit@latest",
 	Provides: "a fixed list of checks scored across the site, and duplicate titles between pages",
 	Cost:     "~600ms",
 	Args: func(a Ask) []string {

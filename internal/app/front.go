@@ -178,7 +178,7 @@ func tofu(c cli.Call, dir string, args ...string) error {
 		}
 	}
 	return tool.Cmd{
-		Bin: fnox.Bin, Pin: fnox.Pin, Dir: dir, Env: env,
+		Bin: fnox.Bin, Dir: dir, Env: env,
 		Args: append([]string{"exec", "--", TofuBin}, args...),
 	}.Stream(c.Stdout)
 }

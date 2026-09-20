@@ -24,8 +24,12 @@ import (
 // Checker is one tool. Everything that knows a tool exists is one of these
 // and the Read that goes with it.
 type Checker struct {
-	Name     string                               // the binary, and what it is called in the report
-	Pin      string                               // the mise.toml [tools] line that installs it
+	Name string // the binary, and what it is called in the report
+	// Spec is what mise installs it from, in mise's own spelling
+	// ("go:github.com/raviqqe/muffet/v2@v2.11.5"). Not the [tools] line: that
+	// is derived from this by cli.Need.Line, in the one place that knows how,
+	// so a checker cannot spell the TOML differently from the rest.
+	Spec     string
 	Provides string                               // what running it gets you, said in the report when it does not
 	Cost     string                               // roughly how long it takes
 	Args     func(a Ask) []string                 // how to ask it
@@ -97,6 +101,20 @@ func Paged(args []string, pages int) []string {
 // All is the registry, in the order a report lists them — whatever order they
 // finished in.
 var All = []Checker{kitsune, scoutly, scry, muffet, seoAudit, ldlint, robotsRules}
+
+// Every checker is a program a repo has to install, so every checker is in
+// cli's registry — the one list `<cmd> tools` prints, `<cmd> tools --add`
+// pins, and a missing binary's error reads from.
+//
+// Here rather than written out again there: this package is where a checker
+// is added, and a registration it has to remember is one it will forget. The
+// verb these belong to is named once, because seven copies of "seo check"
+// would be the same mistake one level down.
+func init() {
+	cli.Register(cli.Map(All, func(ch Checker) cli.Need {
+		return cli.Need{Bin: ch.Name, Pin: ch.Spec, For: "seo check: " + ch.Provides}
+	})...)
+}
 
 // JSON builds a Read for a checker that answers in JSON: decode into T, then
 // say what was found. Every one of them had written the same decode and the

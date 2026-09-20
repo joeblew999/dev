@@ -15,7 +15,6 @@ package tool
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -34,7 +33,6 @@ import (
 // only when it needs it, so nobody passes six arguments it does not use.
 type Cmd struct {
 	Bin  string   // the program
-	Pin  string   // the mise.toml [tools] line that installs it, quoted when it is missing
 	Args []string // its arguments
 	Dir  string   // where to run it; "" is the current directory
 
@@ -177,15 +175,16 @@ func (c Cmd) Started(stdout, stderr io.Writer, before ...func(*exec.Cmd)) (*exec
 func (c Cmd) build() (*exec.Cmd, context.CancelFunc, error) {
 	nothing := context.CancelFunc(func() {})
 	if _, err := exec.LookPath(c.Bin); err != nil {
-		// The caller's own wording wins, then what the tool registry knows.
-		// Every caller used to have to remember a pin, and thirteen of the
-		// fourteen did not, so a missing binary said only that it was
-		// missing — which is useless to the one person it matters to, the
-		// one who has just adopted dev and does not know what it wants.
-		switch pin := cmp.Or(c.Pin, cli.PinFor(c.Bin)); {
+		// What the tool registry knows. A caller used to be able to pass its
+		// own pin as well, and thirteen of the fourteen did not bother — so a
+		// missing binary said only that it was missing, which is useless to
+		// the one person it matters to: whoever has just adopted dev and does
+		// not know what it wants. The override is gone with the last caller
+		// that used it, because a pin in two places is a pin that drifts.
+		switch pin := cli.PinFor(c.Bin); {
 		case pin == "":
 			return nil, nothing, fmt.Errorf("%s is not on PATH", c.Bin)
-		case !cli.Installable(c.Bin) && c.Pin == "":
+		case !cli.Installable(c.Bin):
 			return nil, nothing, fmt.Errorf("%s is not on PATH: %s", c.Bin, pin)
 		default:
 			return nil, nothing, fmt.Errorf("%s is not on PATH; add it to mise.toml [tools] and run mise install:\n  %s", c.Bin, pin)
@@ -233,10 +232,10 @@ func report(r Result, quiet bool) {
 	}
 }
 
-// Run is Capture for the common case: a tool, its pin, its arguments. A
-// variable, so a test can hand back a recorded run instead.
-var Run = func(bin, pin string, args ...string) (Result, error) {
-	return Cmd{Bin: bin, Pin: pin, Args: args}.Capture()
+// Run is Capture for the common case: a tool and its arguments. A variable,
+// so a test can hand back a recorded run instead.
+var Run = func(bin string, args ...string) (Result, error) {
+	return Cmd{Bin: bin, Args: args}.Capture()
 }
 
 // Attached runs bin wired to the terminal, in dir.

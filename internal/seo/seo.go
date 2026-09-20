@@ -189,7 +189,7 @@ func Audit(c cli.Call, rep *cli.Report, url string, maxPages int, pick *picked) 
 	for _, ch := range checkers.All {
 		if why := pick.skipped(ch.Name); why != "" {
 			rep.NotRun(cli.Step{Name: ch.Name, Provides: ch.Provides, Cost: ch.Cost,
-				Requires: ch.Pin}, why)
+				Requires: cli.PinFor(ch.Name)}, why)
 			continue
 		}
 		run = append(run, ch)
@@ -278,14 +278,14 @@ func run1(ch checkers.Checker, c cli.Call, url string, maxPages int) result {
 		path, cleanup, err := download(originOf(url) + ch.Fetch)
 		if err != nil {
 			return result{step: cli.Step{Name: ch.Name, Status: cli.StatusSkipped,
-				Note: err.Error(), Provides: ch.Provides, Cost: ch.Cost, Requires: ch.Pin}}
+				Note: err.Error(), Provides: ch.Provides, Cost: ch.Cost, Requires: cli.PinFor(ch.Name)}}
 		}
 		defer cleanup()
 		ask.File = path
 	}
-	res, err := tool.Run(ch.Name, ch.Pin, ch.Args(ask)...)
+	res, err := tool.Run(ch.Name, ch.Args(ask)...)
 	step := cli.Step{Name: ch.Name, Provides: ch.Provides, Cost: ch.Cost,
-		Requires: ch.Pin, Took: cli.Took(res.Took), TookMs: res.Took.Milliseconds()}
+		Requires: cli.PinFor(ch.Name), Took: cli.Took(res.Took), TookMs: res.Took.Milliseconds()}
 	// A checker that could not run, and one whose output could not be read,
 	// are the same to a reader: it did not answer, and here is why.
 	gaveUp := func(err error) result {

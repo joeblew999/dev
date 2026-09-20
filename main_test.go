@@ -21,3 +21,9 @@ func TestUsage(t *testing.T) { cli.CheckUsage(t, dev) }
 // TestSurfaces holds the terminal index and the skill together: one render,
 // one difference, so a verb cannot reach a developer and not an agent.
 func TestSurfaces(t *testing.T) { cli.CheckSurfaces(t, dev) }
+
+// TestPinned holds this repo's mise.toml to the tool registry: dev runs
+// twenty-two programs, this repo pins the ones it runs on itself, and a
+// version bumped in one place and not the other is silent until somebody
+// installs the wrong one.
+func TestPinned(t *testing.T) { cli.CheckPinned(t, "mise.toml") }

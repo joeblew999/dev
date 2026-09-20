@@ -19,7 +19,7 @@ import (
 
 var robotsRules = Checker{
 	Name:     "icanhasrobot",
-	Pin:      `"go:github.com/jimsmart/grobotstxt/cmd/icanhasrobot" = "latest"`,
+	Spec:     "go:github.com/jimsmart/grobotstxt/cmd/icanhasrobot@latest",
 	Provides: "Google's own matcher on whether Googlebot may fetch this exact URL",
 	Cost:     "<10ms",
 	// It takes the rules as a file rather than a URL, so they are fetched

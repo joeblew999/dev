@@ -17,7 +17,7 @@ import (
 
 // MCP runs `claude mcp list` and fails on any server that does not connect.
 func MCP(stdout, stderr io.Writer) error {
-	res, err := tool.Cmd{Bin: ClaudeBin, Pin: claudePin, Args: []string{"mcp", "list"}, Combined: true}.Capture()
+	res, err := tool.Cmd{Bin: ClaudeBin, Args: []string{"mcp", "list"}, Combined: true}.Capture()
 	out := res.Out
 	fmt.Fprint(stdout, out)
 	if err != nil && len(out) == 0 {

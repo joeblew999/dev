@@ -18,7 +18,7 @@ import (
 
 var ldlint = Checker{
 	Name:     "ldlint",
-	Pin:      `"go:github.com/kevhq/ldlint/cmd/ldlint" = "latest"`,
+	Spec:     "go:github.com/kevhq/ldlint/cmd/ldlint@latest",
 	Provides: "schema.org vocabulary validation: a property that is not valid on the type it is on",
 	Cost:     "~700ms",
 	Args:     func(a Ask) []string { return []string{a.URL} },

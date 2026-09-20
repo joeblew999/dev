@@ -35,7 +35,7 @@ func Capabilities() []Can {
 	return append(out, cli.Map(checkers.All, func(ch checkers.Checker) Can {
 		_, err := exec.LookPath(ch.Name)
 		return Can{Name: ch.Name, Kind: "check", Provides: ch.Provides,
-			Cost: ch.Cost, Needs: ch.Pin, Installed: err == nil}
+			Cost: ch.Cost, Needs: cli.PinFor(ch.Name), Installed: err == nil}
 	})...)
 }
 

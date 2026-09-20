@@ -44,7 +44,7 @@ func each(c cli.Call, flags ...string) error {
 	}
 	for _, dir := range dirs {
 		fmt.Fprintf(c.Stdout, "== %s ==\n", dir)
-		run := tool.Cmd{Bin: "go-mod-upgrade", Pin: `"go:github.com/oligot/go-mod-upgrade" = "latest"`, Args: flags, Dir: dir, Stdin: c.Stdin}
+		run := tool.Cmd{Bin: "go-mod-upgrade", Args: flags, Dir: dir, Stdin: c.Stdin}
 		if err := run.Stream(c.Stdout); err != nil {
 			return fmt.Errorf("%s: %w", dir, err)
 		}

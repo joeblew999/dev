@@ -28,12 +28,9 @@ import (
 // Bin is the fnox CLI every function here shells out to.
 const Bin = "fnox"
 
-// Pin is what installs it, quoted when it is missing.
-const Pin = `fnox = "latest"`
-
 // Get returns a secret's value, or an error when fnox does not have it.
 var Get = func(name string) (string, error) {
-	res, err := tool.Cmd{Bin: Bin, Pin: Pin, Args: []string{"get", name}, Quiet: true}.Capture()
+	res, err := tool.Cmd{Bin: Bin, Args: []string{"get", name}, Quiet: true}.Capture()
 	if err != nil {
 		return "", err
 	}
@@ -43,7 +40,7 @@ var Get = func(name string) (string, error) {
 // Set stores a value in the developer's global fnox config. The value goes in
 // on stdin, so it is never an argument, a process list or a shell history.
 var Set = func(name, value string) error {
-	return tool.Cmd{Bin: Bin, Pin: Pin, Args: []string{"set", "-g", name}, Stdin: strings.NewReader(value)}.Stream(io.Discard)
+	return tool.Cmd{Bin: Bin, Args: []string{"set", "-g", name}, Stdin: strings.NewReader(value)}.Stream(io.Discard)
 }
 
 // Under is one command to run with fnox's secrets in its environment: where,
@@ -69,7 +66,7 @@ type Under struct {
 // Exec and Ask are ordinary functions over this now, so stubbing Run catches
 // everything, including whatever is written next.
 var Run = func(u Under) (string, error) {
-	cmd := tool.Cmd{Bin: Bin, Pin: Pin, Dir: u.Dir, Stdin: u.Stdin,
+	cmd := tool.Cmd{Bin: Bin, Dir: u.Dir, Stdin: u.Stdin,
 		Args: append([]string{"exec", "--"}, u.Args...)}
 	if !u.Combined {
 		if u.Out == nil {

@@ -3,13 +3,19 @@ package tool
 import (
 	"strings"
 	"testing"
+
+	"github.com/joeblew999/dev/cli"
 )
 
 // A missing binary is nearly always a missing pin or the wrong directory, so
 // the error is the line to add rather than exec's "file not found in $PATH".
 func TestMissingBinaryNamesThePin(t *testing.T) {
-	pin := `"go:example.com/cmd/nope" = "v1.0.0"`
-	_, err := Run("a-binary-nothing-has", pin, "--version")
+	// From the registry, which is the only place a pin lives now: a caller
+	// could once pass its own, and thirteen of fourteen did not bother.
+	cli.Register(cli.Need{Bin: "a-binary-nothing-has", Pin: "go:example.com/cmd/nope@v1.0.0",
+		For: "a test that nothing on PATH can satisfy"})
+	pin := cli.PinFor("a-binary-nothing-has")
+	_, err := Run("a-binary-nothing-has", "--version")
 	if err == nil {
 		t.Fatal("no error for a binary that does not exist")
 	}
@@ -21,7 +27,7 @@ func TestMissingBinaryNamesThePin(t *testing.T) {
 // A checker exits non-zero because it found something. That is its answer,
 // not a failure to run, so what it printed comes back.
 func TestNonZeroWithOutputIsStillAnAnswer(t *testing.T) {
-	res, err := Run("sh", "(no pin)", "-c", "echo '{\"found\":1}'; exit 1")
+	res, err := Run("sh", "-c", "echo '{\"found\":1}'; exit 1")
 	if err != nil {
 		t.Fatalf("err = %v; want the output back", err)
 	}
@@ -44,7 +50,7 @@ func TestNonZeroWithOutputIsStillAnAnswer(t *testing.T) {
 
 // Nothing printed and a failure is a real failure.
 func TestNonZeroWithNoOutputIsAFailure(t *testing.T) {
-	if _, err := Run("sh", "(no pin)", "-c", "exit 3"); err == nil {
+	if _, err := Run("sh", "-c", "exit 3"); err == nil {
 		t.Error("no error for a tool that printed nothing and failed")
 	}
 }

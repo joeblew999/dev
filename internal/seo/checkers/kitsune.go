@@ -15,7 +15,7 @@ import (
 
 var kitsune = Checker{
 	Name:     "kitsune",
-	Pin:      `"go:github.com/berkaycubuk/kitsune/cmd/kitsune" = "latest"`,
+	Spec:     "go:github.com/berkaycubuk/kitsune/cmd/kitsune@latest",
 	Provides: "per-page findings with stable dotted ids, and Google's own guideline link for each",
 	Cost:     "~300ms, the fastest of them",
 	Args: func(a Ask) []string {

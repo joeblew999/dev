@@ -131,7 +131,7 @@ var errNoLock = errors.New("no session lock yet")
 // claudeVersion is Claude Code's own version, "" when it cannot be read. A
 // change in it is the one legitimate way the built-in skills change.
 func claudeVersion() string {
-	res, err := tool.Cmd{Bin: ClaudeBin, Pin: claudePin, Quiet: true, Args: []string{"--version"}}.Capture()
+	res, err := tool.Cmd{Bin: ClaudeBin, Quiet: true, Args: []string{"--version"}}.Capture()
 	fields := strings.Fields(res.Out)
 	if err != nil || len(fields) == 0 {
 		return ""
@@ -144,7 +144,6 @@ func claudeVersion() string {
 func sessionSkills() ([]string, string, error) {
 	res, err := tool.Cmd{
 		Bin:     ClaudeBin,
-		Pin:     claudePin,
 		Args:    []string{"-p", "List the names of every skill available to you, one per line, nothing else."},
 		Timeout: 2 * time.Minute,
 	}.Capture()

@@ -70,6 +70,8 @@ var needs = map[string]Need{
 	"goreleaser": {Bin: "goreleaser", Pin: "goreleaser@latest", For: "release"},
 	"packslip":   {Bin: "packslip", Pin: "packslip@latest", For: "release: the signed manifest mise installs from"},
 	"gh":         {Bin: "gh", Pin: "gh@latest", For: "release: publishing it"},
+	"go-mod-upgrade": {Bin: "go-mod-upgrade", Pin: "go:github.com/oligot/go-mod-upgrade@latest",
+		For: "deps upgrade: choosing which modules to take"},
 	"cloudflared": {Bin: "cloudflared", Pin: "cloudflared@latest",
 		For: "fronting an app through a tunnel"},
 	"tofu": {Bin: "tofu", Key: "opentofu", Pin: "opentofu@latest",
@@ -114,4 +116,28 @@ func (n Need) MiseKey() string {
 		return n.Key
 	}
 	return n.Bin
+}
+
+// Register adds programs to the registry, for a package that runs one cli
+// has never heard of.
+//
+// The registry above is what cli itself shells out to. `dev seo` runs seven
+// more, and they were declared a second time in their own package — with the
+// [tools] line written out by hand, which is the one thing Need.Line exists
+// to stop. So `dev tools` listed fourteen programs while the binary ran
+// twenty-one, and a repo adopting `dev seo` met them one missing binary at a
+// time: exactly the adoption cost this file was written to end.
+//
+// Called from a package's init, so by the time anything asks the registry is
+// whole. Declaring the same binary twice with different pins is a programming
+// error and says so, rather than letting whichever package initialised last
+// decide what version a repo installs.
+func Register(more ...Need) {
+	for _, n := range more {
+		if was, ok := needs[n.Bin]; ok && was != n {
+			panic("cli: " + n.Bin + " is declared twice and differently: " +
+				was.Pin + " (for " + was.For + ") and " + n.Pin + " (for " + n.For + ")")
+		}
+		needs[n.Bin] = n
+	}
 }

@@ -249,3 +249,90 @@ func CheckSurfaces(t TB, c Command) {
 		}
 	}
 }
+
+// CheckPinned holds a repo's pins to the tool registry, in both directions
+// a pin can be wrong: the registry disagreeing with itself, and the registry
+// disagreeing with the mise.toml that is actually read.
+//
+// Both facts — what a program is called to mise, and which version to take —
+// live in cli.Needs, and a repo's mise.toml is a second copy of them. The
+// copy is unavoidable: mise reads TOML and cannot call Go. What is avoidable
+// is the two drifting in silence, and they did — seven checkers wrote their
+// own pins by hand, in TOML, with nothing holding them to the file mise
+// actually reads.
+//
+// Only the intersection, and deliberately: a repo pins what it will run, and
+// one that never deploys to Fly should not be failed for having no flyctl.
+// What this catches is a version bumped in one place and not the other, and
+// a backend path mistyped in either.
+func CheckPinned(t TB, misePath string) {
+	t.Helper()
+	config, err := os.ReadFile(misePath)
+	if err != nil {
+		t.Errorf("cannot read %s: %v", misePath, err)
+		return
+	}
+	pinned := miseTools(string(config))
+	for _, n := range Needs() {
+		if n.Pin == "" {
+			if n.Key != "" {
+				t.Errorf("%s names a mise key and mise cannot install it", n.Bin)
+			}
+			continue
+		}
+		key, version, ok := strings.Cut(n.Pin, "@")
+		if !ok || key == "" || version == "" {
+			t.Errorf("%s's pin is not tool@version: %q", n.Bin, n.Pin)
+			continue
+		}
+		// What mise calls a tool and what the binary is called are not always
+		// the same, and getting it wrong sends somebody to install what they
+		// already have: opentofu ships tofu, node ships npm. Read the way
+		// mise's own listing is read, so the two cannot disagree.
+		if got, want := n.MiseKey(), miseBinary(key); got != want {
+			t.Errorf("%s asks mise about %q and its pin installs %q; a repo that pins it would still read as missing", n.Bin, got, want)
+		}
+		// And the [tools] line is derived from the same fact, so the two
+		// cannot drift — which they did when both were written by hand.
+		if line := n.Line(); !strings.Contains(line, version) {
+			t.Errorf("%s's line %q does not name the version its pin does", n.Bin, line)
+		}
+		switch was, there := pinned[key]; {
+		case !there:
+		case was != version:
+			t.Errorf("%s pins %s at %q and the registry says %q.\nOne of them is stale, and the registry is the one every other repo reads:\n  %s",
+				misePath, key, was, version, n.Line())
+		}
+	}
+}
+
+// miseTools is the [tools] table: the name mise is given, and the version
+// asked for. A small reader rather than a TOML library, because the section
+// is flat and one key per line, and the dependency would be carried by every
+// command on the stack for the sake of it.
+func miseTools(config string) map[string]string {
+	tools, inTools := map[string]string{}, false
+	for line := range strings.Lines(config) {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "[") {
+			// A table header, and only the flat [tools] one is pins: a
+			// [tools.something] sub-table is settings for one of them.
+			inTools = trimmed == "[tools]"
+			continue
+		}
+		key, value, ok := strings.Cut(trimmed, "=")
+		if !inTools || !ok || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		// The comment this repo writes beside a pin is not part of the
+		// version, and a key is quoted because of the : and / in a backend
+		// path, not because mise calls it that.
+		value, _, _ = strings.Cut(value, "#")
+		tools[unquoted(key)] = unquoted(value)
+	}
+	return tools
+}
+
+// unquoted is one TOML string: trimmed, and without the quotes it was
+// written with.
+func unquoted(s string) string { return strings.Trim(strings.TrimSpace(s), `"`) }

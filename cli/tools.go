@@ -186,6 +186,44 @@ func configHere() string {
 	return ""
 }
 
+// miseBinary is what a [tools] key puts on PATH. A key may be a backend path
+// — "npm:wrangler", "packslip:github.com/jdx/fnox", "go:github.com/mibk/dupl"
+// — and the binary is the last word of it.
+//
+// A Go module path may end in its major version, and that is never the
+// binary: "go:github.com/raviqqe/muffet/v2" installs muffet, and reading the
+// last word alone made it "v2" — so muffet was reported missing in a repo
+// that pins it and has it, which is the same wrong answer Need.Key exists to
+// prevent, arriving by a different road.
+//
+// One function because two callers have to agree: mise's listing is read
+// through it, and the test that holds a Need's key to its pin has to strip
+// the pin the same way or it fails a pin that works.
+func miseBinary(key string) string {
+	for range 2 {
+		i := strings.LastIndexAny(key, ":/")
+		if i < 0 {
+			break
+		}
+		last := key[i+1:]
+		if !majorVersion(last) {
+			return last
+		}
+		key = key[:i]
+	}
+	return key
+}
+
+// majorVersion reports whether a path segment is a Go module's major version
+// — "v2", "v11" — rather than the name of what it builds.
+func majorVersion(segment string) bool {
+	rest, ok := strings.CutPrefix(segment, "v")
+	if !ok || rest == "" {
+		return false
+	}
+	return strings.IndexFunc(rest, func(r rune) bool { return r < '0' || r > '9' }) < 0
+}
+
 // mise runs it where the person can see what it did.
 func mise(call Call, args []string) error {
 	cmd := exec.Command("mise", args...)
@@ -231,14 +269,7 @@ func miseActive() map[string]bool {
 			if !v.Installed {
 				continue
 			}
-			// A tool is listed by its [tools] key, which may be a backend
-			// path — "npm:wrangler", "packslip:github.com/jdx/fnox" — and
-			// the binary is the last word of it.
-			bin := name
-			if i := strings.LastIndexAny(bin, ":/"); i >= 0 {
-				bin = bin[i+1:]
-			}
-			active[bin] = true
+			active[miseBinary(name)] = true
 		}
 	}
 	return active
