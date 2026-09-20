@@ -26,11 +26,20 @@ import (
 // which Claude Code documents, and a skill directory that appears while a
 // session runs was picked up here without one either.
 //
-// What is not documented either way is removal, which is the half that
-// matters after `remove`: the files are gone and the session may still be
-// offering them. So the advice is /reload-plugins — documented to reload
-// skills along with plugins, hooks and agents, and far cheaper than losing a
-// session — with a restart named only as the fallback it is.
+// Removal is the half that matters after `remove` — the files are gone and a
+// session open since before may still be offering them — and it is documented
+// nowhere. So it was tested: one `claude` process driven over streaming input,
+// asked whether it had a skill (yes), the directory deleted underneath it
+// while it stayed alive, /reload-skills sent, and asked again (no). The reload
+// reported "(1 removed)" on its own.
+//
+// So a reload is enough, for arriving and for going, and a restart is not
+// needed for either.
+//
+// Both commands are named because both are in the binary and they are not
+// equally visible: the docs describe /reload-plugins, and a 2.1.278 session
+// here offered /reload-skills in its menu and not the other. Naming one would
+// have sent half of readers looking for a command their menu does not show.
 
 type session struct {
 	pid     int
@@ -46,9 +55,9 @@ func warnStaleSessions(out io.Writer, now time.Time) {
 		if s.started.Before(newest) {
 			fmt.Fprintf(out, "\nClaude Code (pid %d, started %s) is older than these skills (%s),\n",
 				s.pid, s.started.Format("Jan 2 15:04"), newest.Format("Jan 2 15:04"))
-			fmt.Fprintln(out, "so it may still be offering a skill that has changed or gone. Run")
-			fmt.Fprintln(out, "/reload-plugins in that session; it reloads skills without losing it.")
-			fmt.Fprintln(out, "(Claude Code before 2.1.260 has no such command: restart instead.)")
+			fmt.Fprintln(out, "so it is still offering the skills as they were. Run")
+			fmt.Fprintln(out, "/reload-skills in that session, or /reload-plugins; either reloads")
+			fmt.Fprintln(out, "skills without losing it. Older Claude Code has neither: restart.")
 		}
 	}
 }

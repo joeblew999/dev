@@ -40,11 +40,11 @@ func Remove(out io.Writer) error {
 	if _, err := os.Stat(pins.File); err == nil {
 		fmt.Fprintf(out, "\n%s still pins them, so the next sync brings them back; remove what you\ndo not want there first.\n", pins.File)
 	}
-	// Off disk is not the same as out of a running session. Claude Code is
-	// documented to reload an edited skill and was seen here to pick up a new
-	// one, but nothing says a removed one goes — so a session open now may
-	// still offer what was just taken back, and the warning says how to settle
-	// it without losing the session.
+	// Off disk is not the same as out of a running session: one open since
+	// before this still offers what was just taken back. A reload is enough to
+	// settle it — tested against a live process, which stopped having a skill
+	// after its directory went and /reload-skills was sent — so the warning
+	// names that rather than a restart.
 	warnStaleSessions(out, time.Now())
 	return nil
 }
