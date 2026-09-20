@@ -167,3 +167,51 @@ func TestNothingLargeIsCommitted(t *testing.T) {
 		}
 	}
 }
+
+// Nothing builds an http.Client that escapes the seal.
+//
+// check runs the tests behind a dead proxy, and that works because every
+// client here leaves Transport nil and so gets http.DefaultTransport, whose
+// Proxy is ProxyFromEnvironment. A client with its own Transport and no
+// Proxy field silently opts out — the seal would still pass and would be
+// checking nothing, which is worse than not having it, because a guard
+// nobody can see fail is a guard nobody knows is gone.
+//
+// So the rule is the narrow one it can actually enforce: a custom Transport
+// in non-test code has to say what its Proxy is. Setting it to nil on
+// purpose is allowed and visible; not mentioning it is not.
+func TestNoHTTPClientEscapesTheSeal(t *testing.T) {
+	for _, path := range goFiles(t) {
+		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			continue
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			lit, ok := n.(*ast.CompositeLit)
+			if !ok || !isHTTPTransport(lit.Type) {
+				return true
+			}
+			for _, elt := range lit.Elts {
+				if kv, ok := elt.(*ast.KeyValueExpr); ok {
+					if id, ok := kv.Key.(*ast.Ident); ok && id.Name == "Proxy" {
+						return true
+					}
+				}
+			}
+			t.Errorf("%s: an http.Transport is built without naming Proxy.\n"+
+				"check seals the tests behind a proxy and a Transport that does not set one ignores it. "+
+				"Set Proxy: http.ProxyFromEnvironment, or say Proxy: nil to opt out where that is meant.", path)
+			return true
+		})
+	}
+}
+
+// isHTTPTransport is `http.Transport{...}` or a pointer to one.
+func isHTTPTransport(e ast.Expr) bool {
+	sel, ok := e.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	return ok && pkg.Name == "http" && sel.Sel.Name == "Transport"
+}
