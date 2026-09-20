@@ -94,18 +94,31 @@ This file says only what is about developing the tool itself.
   All compiled in by `go:embed`. A file added there goes in `mise.toml`'s
   build `sources`, or editing it leaves the binary stale while mise reports it
   fresh.
-- **A cloud is reached through its CLI, never through a Go client.** Fly has
-  `fly-go` and Cloudflare has `cloudflare-go`, both real and both maintained;
-  neither belongs here. The registry already loads `flyctl` and `wrangler` as
-  pinned binaries, so their versions are controlled there — a Go client would
-  control the same thing a second time and charge `go.mod` for it. dev has two
-  direct dependencies and four modules in the whole build, which is a property
-  worth keeping rather than an accident.
+- **Work goes through the cloud's CLI; questions it cannot answer go to the
+  API.** `flyctl` and `wrangler` build images, upload Workers, push secrets
+  and hold the credential while they do it. The registry pins them, so their
+  versions are controlled there, and replacing that with a Go client would
+  control the same thing twice.
 
-  The cost of that choice is parsing output, so prefer `--json` and decide
-  from what parsed. Never decide from a tool's prose: this tree has been wrong
-  twice about what `flyctl` says and which stream it says it on, and once
-  about an empty list meaning a thing was absent.
+  That argument only covers what a CLI does. It does not cover zones, DNS,
+  SSL settings, listing an account's Workers, querying stored telemetry or
+  reading the workers.dev subdomain — `wrangler` does none of those, and dev
+  already calls the API directly for all six. An earlier version of this rule
+  said "never a Go client" and gave the registry as the reason, which was
+  wrong: for those six there is no binary to duplicate, and hand-rolled HTTP
+  is a Go client too, only one nobody generated.
+
+  So for the API half the question is open and the threshold is writes. Reads
+  are cheap to hand-roll and a wrong field name returns nothing; a wrong field
+  name on a write does something. `cloudflare-go/v7` is four modules, not the
+  hundreds this rule once implied. Read-only, as now, hand-rolled is fine.
+  When dev starts writing to a cloud's API, weigh it again with that number
+  rather than with a slogan.
+
+  The cost of a CLI is parsing output, so prefer `--json` and decide from what
+  parsed. Never decide from a tool's prose: this tree has been wrong twice
+  about what `flyctl` says and which stream it says it on, and once about an
+  empty list meaning a thing was absent.
 
 ## Refactoring without breaking it
 
@@ -146,8 +159,8 @@ and green first.
 | `main.go` | the verb table, its order, and the prose around it |
 | `cli/` | the public API: verbs, the manual, the markdown it is written in |
 | `internal/stage/` | build, wasm, check, run, workerd: one command directory, read from what it holds |
-| `internal/app/` | url, deploy, logs, smoke, wait: which cloud a directory deploys to, the dispatch, and waiting for an address that belongs to neither |
-| `internal/cloudflare/` | the Workers target: wrangler, the workers.dev subdomain, the throwaway deploy copy |
+| `internal/app/` | url, deploy, list, logs, smoke, wait, domains, fronting: which cloud a directory deploys to, the dispatch, waiting for an address that belongs to neither, and what stands in front |
+| `internal/cloudflare/` | the Workers target through wrangler, and the API for what wrangler cannot answer: zones, DNS, SSL mode, telemetry, the workers.dev subdomain |
 | `internal/fly/` | the Fly target: flyctl from the repo root, `<app>.fly.dev` |
 | `internal/secrets/` | set and push: fnox in, the cloud's CLI out, values never as arguments |
 | `internal/session/` | the pinned Claude Code session: sync, check, verify, bump, mcp |
