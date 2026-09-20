@@ -16,12 +16,13 @@ local linters = new Mapping {
     // lived in this tree until this ran on commit — running it only in a task
     // means it runs when someone remembers, which is not a check.
     //
-    // internal/session is skipped while its verb is parked: the package is
-    // unreachable, so reporting it every commit teaches people to ignore the
-    // whole step.
+    // Every package, with no exceptions: internal/session was skipped while
+    // its verb was parked and unreachable, and an exclusion outlives the
+    // reason for it silently — the verb has been back for some time and
+    // nothing said that its lint had stopped running.
     ["staticcheck"] = new Step {
         glob = List("**/*.go")
-        check = "staticcheck $(go list ./... | grep -v internal/session)"
+        check = "staticcheck ./..."
     }
 }
 

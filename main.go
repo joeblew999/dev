@@ -66,11 +66,6 @@ var dev = cli.Command{
 		"delete":  {Run: app.DeleteVerb, Args: "DIR", Flags: app.DeleteFlags, Desc: "remove a deployed app, and the storage created with it; asks first", Usage: app.Usage},
 		"secrets": {Subs: secrets.Subs, Usage: secrets.Usage},
 		"session": {Subs: session.Subs, Usage: session.Usage},
-		// session was out of this table while it still answered to the
-		// pre-Call signature: the manual, the index and --help are all
-		// rendered from here, so a verb left out is gone from every one of
-		// them with nothing else to change. It declares its subcommands like
-		// every other package now, so it is back.
 		"release": {Run: release.Run, Args: "DIR [VERSION]", Flags: release.Flags, Desc: "build for every platform, sign it, and publish it to GitHub", Usage: release.Usage},
 		"deps":    {Subs: deps.Subs, Usage: deps.Usage},
 	},
