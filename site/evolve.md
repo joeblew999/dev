@@ -28,6 +28,31 @@ dev itself:
 
 Deciding which of those it is, is the work. Say which one you chose and why.
 
+## Read the history before you decide
+
+`.reports/site/` is every recorded run, and `mise run site:check` ends by
+saying what moved:
+
+    FIXED  kitsune      security.csp.missing
+    NEW    scry         security/csp-unsafe — ...
+    STOOD  seo-audit    TITLE_LENGTH — unchanged across 5 runs
+
+That last line is the one to read first, and it is why this loop is not the
+same loop every time.
+
+- **STOOD at 2** is a finding waiting its turn. Take the obvious fix.
+- **STOOD at 5 or more** has had the obvious fix tried four times. It did not
+  work, or it was never the fix. Do not try it again — go and find out why
+  the previous attempts failed, and if the honest answer is that no writer
+  can close it, say that and close the loop on it instead.
+- **NEW, right after a run of this task, is a regression you caused.** That
+  is the most important line on the page. Fix it before anything else, or
+  revert what caused it.
+
+Read the last few files in `.reports/site/` directly if the summary is not
+enough — they are the full reports, and the drift between two of them is
+what your last change actually did.
+
 ## What you must not do
 
 - **Do not commit.** The tree was clean when you started — the task refuses to

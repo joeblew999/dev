@@ -38,6 +38,13 @@ node = "latest"
 [vars]
 site_origin = "https://dev-docs.gedw99.workers.dev"
 
+# What the site says it is, and what it is allowed to load. Both were written
+# into two tasks each, which is two chances to change one and not the other —
+# and a --csp that disagrees between the task that writes the files and the
+# task that fixes them is a header that flickers with whichever ran last.
+site_desc = "The developer tool of the mise + fnox + hk + packslip stack."
+site_csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
 [hooks]
 postinstall = { task = "bootstrap" }
 
@@ -257,7 +264,7 @@ outputs = ["site/public/index.html", "site/public/sitemap.xml", "site/public/llm
 run = [
   "go run ./site/gen --out site/public --origin {{ vars.site_origin }}",
   ".bin/dev llms site/public --origin {{ vars.site_origin }}",
-  ".bin/dev seo write site/public --url {{ vars.site_origin }}/ --urls site/urls.txt --skip llms,head --title dev --desc 'The developer tool of the mise + fnox + hk + packslip stack.' --csp \"default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'\"",
+  ".bin/dev seo write site/public --url {{ vars.site_origin }}/ --urls site/urls.txt --skip llms,head --title dev --desc '{{ vars.site_desc }}' --csp \"{{ vars.site_csp }}\"",
 ]
 
 [tasks."site:run"]
@@ -277,7 +284,7 @@ description = "Run every SEO checker against the deployed site, which is the onl
 depends = ["build"]
 # Against the URL and not the directory on purpose: what Search reads is what
 # the edge serves, headers and all, not what the source says it will.
-run = ".bin/dev seo check {{ vars.site_origin }}/"
+run = ".bin/dev seo check {{ vars.site_origin }}/ --record .reports/site"
 
 [tasks."site:evolve"]
 description = "Check the live site, write the files that fix what was found, deploy, and check again"
@@ -290,9 +297,9 @@ depends = ["build"]
 # It ends with a second check rather than a claim, because "fixed" is a thing
 # the site says, not a thing this says about the site.
 run = [
-  ".bin/dev seo check {{ vars.site_origin }}/ --fix site/public --urls site/urls.txt --title dev --desc 'The developer tool of the mise + fnox + hk + packslip stack.' --csp \"default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'\"",
+  ".bin/dev seo check {{ vars.site_origin }}/ --fix site/public --urls site/urls.txt --title dev --desc '{{ vars.site_desc }}' --csp \"{{ vars.site_csp }}\" --record .reports/site",
   ".bin/dev deploy site",
-  ".bin/dev seo check {{ vars.site_origin }}/",
+  ".bin/dev seo check {{ vars.site_origin }}/ --record .reports/site",
 ]
 
 [tasks."site:evolve:agent"]
@@ -322,4 +329,25 @@ run = [
   "command -v claude >/dev/null || { .bin/dev tools --missing | grep claude; exit 1; }",
   "git diff --quiet && git diff --cached --quiet || { echo 'the tree is dirty; commit or stash first — a clean tree is the only way back from an agent that goes wrong' >&2; exit 1; }",
   "claude -p \"$(cat site/evolve.md)\" --permission-mode acceptEdits --allowed-tools Bash Read Edit Write Glob Grep --model claude-opus-5",
+]
+
+[tasks."site:evolve:all"]
+description = "The whole loop: fix what dev can, change dev for what it cannot, then prove it"
+# Three passes, and the order is the argument.
+#
+# The mechanical pass first, because it is free and it closes everything dev
+# already knows how to close. What survives it is not a list of faults — it
+# is the list of things dev has no answer for, which is exactly the brief an
+# agent needs and could not have been written by hand.
+#
+# Then the agent, which changes dev rather than the site.
+#
+# Then the mechanical pass again, which is the only honest way to know the
+# code change worked: it runs the new writer against the live site and says
+# what is left. A run that ends by asserting success would be the report
+# contradicting the site, which this tree has done enough times today.
+run = [
+  "mise run site:evolve",
+  "mise run site:evolve:agent",
+  "mise run site:evolve",
 ]

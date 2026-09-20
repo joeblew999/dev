@@ -387,3 +387,58 @@ func TestSeveritiesAreOneList(t *testing.T) {
 		t.Error("an unknown severity does not sort last, so it could satisfy a gate")
 	}
 }
+
+// Provenance is what makes a loop that improves something different from a
+// loop that repeats itself. Comparing against one previous run says a
+// finding is "unchanged", which is the same word for a thing nobody has
+// tried yet and a thing six attempts have not moved — and those want
+// opposite decisions.
+func TestStandingCountsHowLongAFindingHasHeld(t *testing.T) {
+	old := Finding{Tool: "t", ID: "stubborn", Message: "still here"}
+	fresh := Finding{Tool: "t", ID: "new", Message: "just arrived"}
+	// Four recorded runs, all carrying the stubborn one.
+	var history []*Report
+	for range 4 {
+		r := NewReport("t", "target")
+		r.Add(old)
+		history = append(history, r)
+	}
+	if got := Standing(history, old); got != 5 {
+		t.Errorf("standing = %d; four recorded runs plus the one being reported is 5", got)
+	}
+	if got := Standing(history, fresh); got != 1 {
+		t.Errorf("standing = %d; a finding no recorded run carried is new, which is 1", got)
+	}
+	// A run that did not carry it breaks the streak, counting back from the
+	// most recent — a finding that came back is not one that never left.
+	gap := NewReport("t", "target")
+	if got := Standing(append(history, gap), old); got != 1 {
+		t.Errorf("standing = %d; the most recent run did not carry it, so it is new again", got)
+	}
+}
+
+// Drift and Standing must agree about when two findings are the one finding,
+// or a report says a thing was fixed and counts it as standing in the same
+// breath.
+func TestFixedAndStandingUseOneRuleForSameness(t *testing.T) {
+	was, now := NewReport("t", "x"), NewReport("t", "x")
+	kept := Finding{Tool: "a", ID: "id", Message: "m"}
+	// Same id, different subject: one broken link is not another.
+	other := Finding{Tool: "a", ID: "id", Message: "a different link"}
+	was.Add(kept)
+	was.Add(other)
+	now.Add(kept)
+	fixed, arrived := Drift(was, now)
+	if len(fixed) != 1 || fixed[0].Message != other.Message {
+		t.Errorf("fixed = %v; only the one that is gone", fixed)
+	}
+	if len(arrived) != 0 {
+		t.Errorf("arrived = %v; nothing is new", arrived)
+	}
+	if got := Standing([]*Report{was}, kept); got != 2 {
+		t.Errorf("standing = %d; it was in the previous run and is in this one", got)
+	}
+	if got := Standing([]*Report{now}, other); got != 1 {
+		t.Errorf("standing = %d; Drift called it fixed, so it cannot be standing", got)
+	}
+}

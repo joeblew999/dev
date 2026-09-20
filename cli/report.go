@@ -191,7 +191,7 @@ func (c Call) Finish(r *Report, started time.Time, write func(*Report)) error {
 	if path, err := c.Record(r); err == nil && path != "" && !c.Given("quiet") {
 		fmt.Fprintf(c.Stderr, "recorded: %s\n", path)
 		if prev, ok := c.Previous(r, path); ok {
-			c.drift(prev, r)
+			c.drift(prev, r, path)
 		}
 	}
 	if r.Outcome == "pass" {
@@ -206,10 +206,14 @@ func (c Call) Finish(r *Report, started time.Time, write func(*Report)) error {
 
 // drift says what moved since the last recorded run: the point of keeping a
 // history is seeing which way things went, not the total.
-func (c Call) drift(prev, cur *Report) {
+func (c Call) drift(prev, cur *Report, path string) {
 	fixed, arrived := Drift(prev, cur)
+	// "No change" used to end it here, which suppressed the standing counts
+	// in the one case they are for: a run that moved nothing is exactly when
+	// it matters that something has not moved in seven.
 	if len(fixed)+len(arrived) == 0 {
 		fmt.Fprintf(c.Stderr, "  no change since %s\n", prev.RanAt.Format(time.RFC3339))
+		c.stood(cur, path)
 		return
 	}
 	fmt.Fprintf(c.Stderr, "\n  since %s\n", prev.RanAt.Format(time.RFC3339))
@@ -218,6 +222,24 @@ func (c Call) drift(prev, cur *Report) {
 	}
 	for _, f := range arrived {
 		fmt.Fprintf(c.Stderr, "    NEW    %-12s %s — %s\n", f.Tool, f.ID, f.Message)
+	}
+	c.stood(cur, path)
+}
+
+// stood says what has not moved, and for how long.
+//
+// A finding standing at two is waiting its turn; one standing at seven has
+// had six attempts made at it, and saying so is the difference between a
+// loop that learns and one that repeats itself. Only the stubborn ones:
+// listing everything unchanged would bury the signal in the noise it is
+// meant to cut through.
+func (c Call) stood(cur *Report, path string) {
+	history := c.History(path)
+	for _, f := range cur.Findings {
+		if n := Standing(history, f); n > 2 {
+			fmt.Fprintf(c.Stderr, "    STOOD  %-12s %s — unchanged across %s\n",
+				f.Tool, Or(f.ID, f.Message), Plural(n, "run"))
+		}
 	}
 }
 
@@ -295,13 +317,18 @@ func (c Call) Record(r *Report) (string, error) {
 	return path, os.WriteFile(filepath.Join(dir, "latest.json"), data, 0o644)
 }
 
-// Previous is the most recent recorded run before this one, for the drift
-// report. Nothing recorded yet is not an error: the first run has nothing to
-// differ from.
-func (c Call) Previous(r *Report, exclude string) (*Report, bool) {
+// History is every run recorded in --record, oldest first, minus the one
+// being written now.
+//
+// The whole history rather than the last one, because a loop that improves
+// something needs to know what it has already failed at. Comparing against a
+// single previous run says a finding is "unchanged", which is the same word
+// for a thing nobody has tried yet and a thing six attempts have not moved.
+// Those want opposite decisions.
+func (c Call) History(exclude string) []*Report {
 	dir := c.Value("record")
 	if dir == "" {
-		return nil, false
+		return nil
 	}
 	if !filepath.IsAbs(dir) {
 		if root, err := root("."); err == nil {
@@ -310,38 +337,81 @@ func (c Call) Previous(r *Report, exclude string) (*Report, bool) {
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, false
+		return nil
 	}
 	var names []string
 	for _, e := range entries {
 		n := e.Name()
+		// latest.json is a copy of one of the others and would count twice.
 		if n != "latest.json" && filepath.Ext(n) == ".json" && filepath.Join(dir, n) != exclude {
 			names = append(names, n)
 		}
 	}
-	if len(names) == 0 {
+	// The name carries the time it ran, so sorting the names is sorting the
+	// runs — no file needs opening to put them in order.
+	var out []*Report
+	for _, n := range Sorted(names) {
+		data, err := os.ReadFile(filepath.Join(dir, n))
+		if err != nil {
+			continue
+		}
+		var r Report
+		if json.Unmarshal(data, &r) == nil {
+			out = append(out, &r)
+		}
+	}
+	return out
+}
+
+// Previous is the most recent recorded run before this one, for the drift
+// report. Nothing recorded yet is not an error: the first run has nothing to
+// differ from.
+func (c Call) Previous(r *Report, exclude string) (*Report, bool) {
+	history := c.History(exclude)
+	if len(history) == 0 {
 		return nil, false
 	}
-	names = Sorted(names)
-	data, err := os.ReadFile(filepath.Join(dir, names[len(names)-1]))
-	if err != nil {
-		return nil, false
+	return history[len(history)-1], true
+}
+
+// Standing is how many recorded runs in a row have carried this finding,
+// counting back from the most recent. 1 means it is new.
+//
+// This is the number that tells a loop what to do next. A finding standing
+// at 1 is worth the obvious fix; one standing at 6 has had the obvious fix
+// tried five times, and doing it again is the definition of not learning.
+// Without it every run starts from nothing and re-attempts what the last one
+// already failed at — which is what an evolving system must not do.
+func Standing(history []*Report, f Finding) int {
+	n := 0
+	for _, h := range slices.Backward(history) {
+		if !slices.ContainsFunc(h.Findings, func(had Finding) bool { return same(had, f) }) {
+			break
+		}
+		n++
 	}
-	var prev Report
-	if json.Unmarshal(data, &prev) != nil {
-		return nil, false
-	}
-	return &prev, true
+	return n + 1 // the run being reported now
+}
+
+// same is when two findings from different runs are the one finding. The
+// message is part of it because one id covers many subjects — a broken link
+// is "broken-link" whichever link it is.
+func same(a, b Finding) bool {
+	return a.Tool == b.Tool && a.ID == b.ID && a.Message == b.Message
 }
 
 // Drift is what changed since a previous run: what was fixed, and what is
 // new. The point of keeping a history is seeing movement, not totals.
 func Drift(prev, cur *Report) (fixed, arrived []Finding) {
-	key := func(f Finding) string { return f.Tool + "|" + f.ID + "|" + f.Message }
-	was := ToSet(Map(prev.Findings, key))
-	now := ToSet(Map(cur.Findings, key))
-	return Filter(prev.Findings, func(f Finding) bool { return !now[key(f)] }),
-		Filter(cur.Findings, func(f Finding) bool { return !was[key(f)] })
+	// Through the same rule Standing uses. Written out here as well, the two
+	// could disagree about whether a finding is the same finding, and then a
+	// report would say a thing was fixed and count it as standing.
+	held := func(in []Finding) func(Finding) bool {
+		return func(f Finding) bool {
+			return !slices.ContainsFunc(in, func(had Finding) bool { return same(had, f) })
+		}
+	}
+	return Filter(prev.Findings, held(cur.Findings)), Filter(cur.Findings, held(prev.Findings))
 }
 
 // Parallel runs each unit of work and returns their results in the order they
