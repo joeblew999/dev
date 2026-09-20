@@ -18,6 +18,7 @@ package session
 import (
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/joeblew999/dev/cli"
@@ -31,7 +32,7 @@ import (
 func Sync(out io.Writer) error {
 	p, err := pins.Load()
 	if err != nil {
-		return err
+		return orphaned(err)
 	}
 	want, err := collect(p)
 	if err != nil {
@@ -156,4 +157,24 @@ func english(items []string) string {
 		return items[0] + " and " + items[1]
 	}
 	return items[0] + ", " + english(items[1:])
+}
+
+// orphaned answers the one case where "fix session.toml" is the wrong advice:
+// the file is gone, and skills a previous sync wrote are still on disk. That
+// is what deleting it looks like, and telling someone to fix a file they just
+// deleted sends them in a circle while every vendored skill stays loaded.
+//
+// pins cannot say this — it knows nothing of what is on disk, which is the
+// point of it. Here, where both are in reach, it can.
+func orphaned(err error) error {
+	if _, statErr := os.Stat(pins.File); !os.IsNotExist(statErr) {
+		return err
+	}
+	went, lockErr := vendored.LockedNames()
+	if lockErr != nil || len(went) == 0 {
+		return err
+	}
+	return fmt.Errorf("there is no %s, and %s from an earlier sync are still in %s — nothing pins them now and nothing will remove them; take them back with: %s",
+		pins.File, cli.Plural(len(went), "skill"), english(vendored.Dirs()),
+		pins.SwapVerb(pins.SyncCommand(), "sync", "remove"))
 }

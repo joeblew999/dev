@@ -81,8 +81,8 @@ func TestVerifyIsSpelledLikeSync(t *testing.T) {
 		"just skills":           "just skills verify",
 		"dev session sync":      "dev session verify",
 	} {
-		if got := swapVerb(cmd, "sync", "verify"); got != want {
-			t.Errorf("swapVerb(%q) = %q; want %q", cmd, got, want)
+		if got := SwapVerb(cmd, "sync", "verify"); got != want {
+			t.Errorf("SwapVerb(%q) = %q; want %q", cmd, got, want)
 		}
 	}
 }

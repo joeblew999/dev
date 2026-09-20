@@ -40,10 +40,11 @@ func SyncCommand() string { return syncCommand() }
 
 // VerifyCommand is the sibling verb, spelled the same way: a repo that runs
 // sync as `mise run session:sync` runs verify as `mise run session:verify`.
-func VerifyCommand() string { return swapVerb(SyncCommand(), "sync", "verify") }
+func VerifyCommand() string { return SwapVerb(SyncCommand(), "sync", "verify") }
 
-// swapVerb replaces a trailing verb, leaving the rest of the spelling alone.
-func swapVerb(cmd, from, to string) string {
+// SwapVerb replaces a trailing verb, leaving the rest of the spelling alone,
+// so advice always names a command spelled the way this repo spells them.
+func SwapVerb(cmd, from, to string) string {
 	if len(cmd) >= len(from) && cmd[len(cmd)-len(from):] == from {
 		return cmd[:len(cmd)-len(from)] + to
 	}

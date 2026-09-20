@@ -239,3 +239,28 @@ func hashes(files Set) map[string]string {
 	}
 	return out
 }
+
+// Remove takes back everything a previous sync owned, in every destination,
+// and reports the skills that went. Anything sync did not own is left exactly
+// as it was: a skill the repo wrote itself, a symlink mise made, a file
+// somebody dropped in by hand.
+//
+// It is Write with nothing wanted, which is the whole of what "undo" means
+// here — the ownership rule that keeps sync from trampling a repo's own files
+// is the same rule that lets it take back only its own.
+func Remove() ([]string, error) {
+	went, err := LockedNames()
+	if err != nil {
+		return nil, err
+	}
+	for _, dir := range Dirs() {
+		have, err := Read(dir)
+		if err != nil {
+			return nil, err
+		}
+		if err := writeOwned(dir, have, Set{}); err != nil {
+			return nil, err
+		}
+	}
+	return went, nil
+}

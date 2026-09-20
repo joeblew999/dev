@@ -43,6 +43,7 @@ var Subs = map[string]cli.Verb{
 	"check":  {Run: Check, Flags: cli.ReportFlags, Desc: "fail when either has drifted from session.toml"},
 	"verify": {Run: runVerify, Flags: VerifyFlags, Desc: "hold a fresh Claude Code session against SESSION.lock"},
 	"bump":   {Run: runBump, Args: "[SOURCE...]", Desc: "move a pin in session.toml to upstream HEAD"},
+	"remove": {Run: func(c cli.Call) error { return Remove(c.Stdout) }, Desc: "take back every skill sync put here, leaving this repo's own alone"},
 	"mcp":    {Run: func(c cli.Call) error { return MCP(c.Stdout, c.Stderr) }, Desc: "every MCP server .mcp.json declares connects"},
 }
 

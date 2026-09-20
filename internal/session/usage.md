@@ -53,6 +53,15 @@ actually loaded; `--update` records what it saw instead of only reporting it.
 sources this repo declared, since a preset has no ref here to rewrite. `mcp`
 says which MCP servers `.mcp.json` really connects.
 
+`remove` is the undo: it takes back every skill sync put here, in every
+directory, and leaves alone anything sync did not put there — a skill this
+repo wrote itself, one mise linked from a pinned tool, one dropped in by hand.
+`SKILLS.lock` is the list of what sync owns, and it is the only thing
+consulted, so adopting a preset is a decision that can be reversed rather than
+one that has to be lived with. Dropping a pin and syncing again does the same
+for one source; deleting `session.toml` outright does not, and sync says so
+and names this verb rather than advising you to fix a file you deleted.
+
 There are two locks and they answer different questions. `SKILLS.lock` is
 what sync wrote, so check can verify the files without downloading anything.
 `SESSION.lock` is what a running Claude Code session reported it could load,

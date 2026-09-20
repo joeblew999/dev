@@ -108,3 +108,66 @@ func TestWriteRemovesOnlyWhatItOwned(t *testing.T) {
 		}
 	}
 }
+
+// Undo takes back what sync owns and nothing else. The skills a repo writes
+// itself sit in the same directory — `dev skill` writes a manual for each of a
+// command's own verbs — and they are not sync's to remove. The lock is the
+// list of what is, and it is the only thing consulted.
+func TestRemoveTakesBackOnlyWhatSyncOwns(t *testing.T) {
+	t.Chdir(t.TempDir())
+	set := Set{
+		"tdd/SKILL.md":           []byte("# tdd"),
+		"brainstorming/SKILL.md": []byte("# brainstorming"),
+		LockFile:                 []byte("brainstorming\tgithub.com/obra/superpowers@abc123abc123\ntdd\tgithub.com/mattpocock/skills@abc123abc123\n"),
+	}
+	if err := Write(set); err != nil {
+		t.Fatal(err)
+	}
+	// The repo's own, written by `dev skill`, in the very same directory.
+	for _, dir := range Dirs() {
+		for _, own := range []string{"dev", "cli"} {
+			if err := os.MkdirAll(filepath.Join(dir, own), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := writeFile(filepath.Join(dir, own, "SKILL.md"), "# "+own); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	went, err := Remove()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(went, ",") != "brainstorming,tdd" {
+		t.Errorf("Remove() reported %v; want the two it vendored", went)
+	}
+	for _, dir := range Dirs() {
+		have, err := Read(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, gone := range []string{"tdd/SKILL.md", "brainstorming/SKILL.md", LockFile} {
+			if _, still := have[gone]; still {
+				t.Errorf("%s still holds %s, which sync owned", dir, gone)
+			}
+		}
+		for _, kept := range []string{"dev/SKILL.md", "cli/SKILL.md"} {
+			if _, ok := have[kept]; !ok {
+				t.Errorf("%s lost %s, which this repo wrote and sync never owned", dir, kept)
+			}
+		}
+	}
+}
+
+// Undo on a repo that vendored nothing is not an error and does nothing.
+func TestRemoveWithNothingVendored(t *testing.T) {
+	t.Chdir(t.TempDir())
+	went, err := Remove()
+	if err != nil {
+		t.Fatalf("Remove() on a repo with no lock: %v", err)
+	}
+	if len(went) != 0 {
+		t.Errorf("Remove() reported %v; want nothing", went)
+	}
+}
