@@ -159,6 +159,17 @@ This file says only what is about developing the tool itself.
   fronting an app through a tunnel arrives, it is a pinned binary and neither
   a library nor hand-rolled HTTP.
 
+  Which vendor keeps what alive is the thing to look up, and they chose
+  opposite answers. Cloudflare maintains a Terraform provider — official, a
+  thousand stars, pushed this month — and killed both of their CLIs. Fly
+  maintains flyctl and archived their provider in November 2023; what exists
+  now is a single-maintainer revival with no adoption, and putting
+  infrastructure on it to replace an official CLI that already does
+  everything would be a poor trade.
+
+  So dev uses tofu for Cloudflare and flyctl for Fly, and that is not an
+  inconsistency to tidy up later. It is following the maintenance.
+
   For writing, there is a binary after all, and it is the obvious one once
   somebody says it: opentofu with cloudflare's own provider. Both are fetched
   by the registry — aqua:opentofu/opentofu, and the provider by tofu itself —
