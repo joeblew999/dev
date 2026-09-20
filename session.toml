@@ -1,0 +1,12 @@
+# What this repo pins of its Claude Code session. `mise run session:sync`
+# writes every agent's skills directory and the settings.json keys from it.
+#
+# `dev session remove` takes back everything sync put here and leaves this
+# repo's own skills alone, so this file is a decision that can be reversed.
+
+sync_command = "mise run session:sync"
+
+# The set dev keeps for the stack, at the commits this dev pins. dev decides
+# what is in it; this line decides to take it. Being the repo that owns the
+# preset, it would be odd not to run on it.
+presets = ["recommended"]

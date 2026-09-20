@@ -111,6 +111,13 @@ func Read(dir string) (Set, error) {
 // Diff describes how what is on disk differs from what the lock records, for
 // every destination. A skill missing from one agent's directory is as much a
 // difference as one whose contents changed.
+//
+// Only what sync owns is compared, by the same rule that decides what sync may
+// delete. Without that, check and sync disagreed: sync leaves a skill the repo
+// wrote itself exactly where it is, and check called that same file
+// "unexpected" drift and told you to sync it away — which sync would then
+// decline to do, every time. Any repo with both its own skills and vendored
+// ones failed forever, and that is the normal repo on this stack.
 func Diff(want map[string]string) ([]string, int, error) {
 	var all []string
 	for _, dir := range Dirs() {
@@ -118,11 +125,24 @@ func Diff(want map[string]string) ([]string, int, error) {
 		if err != nil {
 			return nil, 0, err
 		}
-		for _, line := range diffLocked(have, want) {
+		for _, line := range diffLocked(ours(have), want) {
 			all = append(all, dir+": "+line)
 		}
 	}
 	return all, len(want), nil
+}
+
+// ours narrows a directory to the files a previous sync put there, which the
+// lock beside them names.
+func ours(have Set) Set {
+	owned := ownedPaths(have[LockFile])
+	mine := Set{}
+	for name, data := range have {
+		if isOwned(name, owned) {
+			mine[name] = data
+		}
+	}
+	return mine
 }
 
 // isSymlink reports whether p itself is a symlink, without following it.

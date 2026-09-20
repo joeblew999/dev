@@ -171,3 +171,51 @@ func TestRemoveWithNothingVendored(t *testing.T) {
 		t.Errorf("Remove() reported %v; want nothing", went)
 	}
 }
+
+// check and sync have to agree about what is sync's. They did not: sync leaves
+// a skill the repo wrote itself exactly where it is, and check called that
+// same file unexpected drift and said to sync it away — which sync would then
+// decline to do. A repo with both its own skills and vendored ones failed
+// forever, which is the normal repo on this stack, and adopting a preset here
+// found it in under a minute.
+func TestCheckIgnoresWhatSyncDoesNotOwn(t *testing.T) {
+	t.Chdir(t.TempDir())
+	set := Set{
+		"tdd/SKILL.md": []byte("# tdd"),
+		LockFile:       []byte("tdd\tgithub.com/mattpocock/skills@abc123abc123\ntdd/SKILL.md\t" + Hash([]byte("# tdd")) + "\n"),
+	}
+	if err := Write(set); err != nil {
+		t.Fatal(err)
+	}
+	// The repo's own, written by `dev skill`, beside the vendored one.
+	for _, dir := range Dirs() {
+		if err := os.MkdirAll(filepath.Join(dir, "dev"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := writeFile(filepath.Join(dir, "dev", "SKILL.md"), "# dev"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want, err := Locked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	diff, _, err := Diff(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(diff) > 0 {
+		t.Errorf("check reported %v; a skill sync never owned is not drift", diff)
+	}
+	// A vendored file that really did change is still caught.
+	if err := writeFile(filepath.Join(Primary(), "tdd", "SKILL.md"), "tampered"); err != nil {
+		t.Fatal(err)
+	}
+	diff, _, err = Diff(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(diff) != 1 || !strings.Contains(diff[0], "tdd/SKILL.md") {
+		t.Errorf("check reported %v; want the one vendored file that changed", diff)
+	}
+}

@@ -114,6 +114,26 @@ description = "Regenerate skills/dev/SKILL.md, and the copy Claude Code reads he
 depends = ["build"]
 run = ".bin/dev skill"
 
+[tasks."session:sync"]
+description = "Write every agent's skills directory and the settings.json keys session.toml implies"
+depends = ["build"]
+run = ".bin/dev session sync"
+
+[tasks."session:check"]
+description = "Fail when what agents read has drifted from session.toml"
+depends = ["build"]
+run = ".bin/dev session check"
+
+[tasks."session:remove"]
+description = "Take back every skill sync put here, leaving this repo's own alone"
+depends = ["build"]
+run = ".bin/dev session remove"
+
+[tasks."session:verify"]
+description = "Hold a fresh Claude Code session against SESSION.lock"
+depends = ["build"]
+run = ".bin/dev session verify"
+
 [tasks.usage]
 description = "Every verb and what it does, as the binary itself prints it"
 depends = ["build"]
