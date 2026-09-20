@@ -29,24 +29,45 @@ func Domains(c cli.Call) error {
 	if err != nil {
 		return err
 	}
-	for _, z := range zones {
-		at := time.Now()
-		records, err := cloudflare.Records(z.ID)
-		took := time.Since(at)
-		step := cli.Step{Name: z.Name, Took: cli.Took(took), TookMs: took.Milliseconds(),
+	// Asked at once rather than one after another. Each zone is its own
+	// request and they do not depend on each other, so doing them in a loop
+	// made an account's worth of domains take as long as the sum of them —
+	// four and a half seconds here, against one for the same questions asked
+	// together.
+	type answer struct {
+		zone    cloudflare.Zone
+		records []cloudflare.Record
+		took    time.Duration
+		err     error
+	}
+	work := cli.Map(zones, func(z cloudflare.Zone) func() answer {
+		return func() answer {
+			at := time.Now()
+			records, err := cloudflare.Records(z.ID)
+			return answer{zone: z, records: records, took: time.Since(at), err: err}
+		}
+	})
+	// Merged in the registry's order, so the report is the same however they
+	// were scheduled — which is what makes two runs comparable.
+	for _, got := range cli.Parallel(len(work), work, func(i int, v any) answer {
+		return answer{zone: zones[i], err: fmt.Errorf("panicked: %v", v)}
+	}) {
+		z := got.zone
+		step := cli.Step{Name: z.Name, Took: cli.Took(got.took), TookMs: got.took.Milliseconds(),
 			Provides: "what this domain points at"}
-		if err != nil {
-			rep.NotRun(step, err.Error())
+		if got.err != nil {
+			rep.NotRun(step, got.err.Error())
 			continue
 		}
-		serving := cli.Filter(records, cloudflare.Record.Serves)
+		serving := cli.Filter(got.records, cloudflare.Record.Serves)
 		apex := cli.Filter(serving, func(r cloudflare.Record) bool { return r.Apex(z.Name) })
 		step.Covered = fmt.Sprintf("%s, %s at the apex",
 			cli.Plural(len(serving), "name"), cli.Plural(len(apex), "record"))
-		for _, f := range unmapped(z, serving, apex) {
+		found := unmapped(z, serving, apex)
+		for _, f := range found {
 			rep.Add(f)
 		}
-		step.Findings = len(unmapped(z, serving, apex))
+		step.Findings = len(found)
 		rep.Ran(step)
 	}
 	rep.Fail = "some domains on this account point at nothing"

@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/joeblew999/dev/internal/fnox"
 )
@@ -121,11 +122,43 @@ func sent[T any](method, what, url, token string, send io.Reader) (T, error) {
 	return reply.Result, nil
 }
 
-// credential is one of the two, out of fnox.
+// credential is one of the two, out of fnox — asked once per run.
+//
+// fnox.Get spawns a process, which costs about 120ms, and every request here
+// needs both the token and the account. Asked per request that was eighteen
+// spawns to read one account's domains and most of the four seconds it took.
+// A credential does not change while a command runs, so it is read when
+// something first wants it and kept.
+//
+// Memoised per name rather than once for both, because a command that only
+// ever needs the token should not be made to fetch the account as well.
+var credentials sync.Map // name -> *sync.Once-guarded result
+
+type credential_ struct {
+	once  sync.Once
+	value string
+	err   error
+}
+
+// forgetCredentials drops what was read, so a test that replaces fnox gets
+// the replacement rather than what a previous test left behind.
+//
+// Needed because the memo is exactly as invisible to a stub as it is fast: a
+// test here stubbed fnox with an empty store, expected "not in fnox", and
+// instead got the real token and made a live API call — which passed for
+// nobody and reached the real account.
+func forgetCredentials() { credentials.Clear() }
+
 func credential(name string) (string, error) {
-	v, err := fnox.Get(name)
-	if err != nil || v == "" {
-		return "", fmt.Errorf("%s is not in fnox; store it with: fnox set -g %s", name, name)
-	}
-	return v, nil
+	c, _ := credentials.LoadOrStore(name, &credential_{})
+	got := c.(*credential_)
+	got.once.Do(func() {
+		v, err := fnox.Get(name)
+		if err != nil || v == "" {
+			got.err = fmt.Errorf("%s is not in fnox; store it with: fnox set -g %s", name, name)
+			return
+		}
+		got.value = v
+	})
+	return got.value, got.err
 }

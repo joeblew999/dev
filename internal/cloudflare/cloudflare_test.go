@@ -56,6 +56,13 @@ func fakeAccount(t *testing.T, token, subdomain string) (calls *int) {
 }
 
 func stubFnox(t *testing.T, values map[string]string) {
+	// Every stub starts from nothing read. The credential memo is as
+	// invisible to a stub as it is fast, and without this a test that
+	// replaces fnox gets whatever an earlier test caused to be read — which
+	// here meant a real token and a real request.
+	forgetCredentials()
+	t.Cleanup(forgetCredentials)
+
 	t.Helper()
 	old := fnox.Get
 	fnox.Get = func(name string) (string, error) {
@@ -202,5 +209,49 @@ func TestSuffixGivesADeveloperTheirOwnApps(t *testing.T) {
 	t.Setenv(suffix.Env, "")
 	if string(withSuffix([]byte("name = \"app\"\n"))) != "name = \"app\"\n" {
 		t.Fatal("no suffix must leave the config alone")
+	}
+}
+
+// A credential is read once per run, because fnox.Get spawns a process and
+// every request here wants two of them — eighteen spawns to read one
+// account's domains, and most of the four seconds that took.
+//
+// The memo has to be as droppable as it is fast. Without that a test which
+// replaces fnox gets whatever an earlier test caused to be read, and this one
+// found out the expensive way: a stub with an empty store returned the real
+// token and the code made a live request.
+func TestACredentialIsReadOnceAndCanBeForgotten(t *testing.T) {
+	reads := 0
+	old := fnox.Get
+	fnox.Get = func(name string) (string, error) {
+		reads++
+		return "value-" + name, nil
+	}
+	t.Cleanup(func() { fnox.Get = old; forgetCredentials() })
+	forgetCredentials()
+
+	for range 5 {
+		if v, err := credential("SOME_TOKEN"); err != nil || v != "value-SOME_TOKEN" {
+			t.Fatalf("credential = %q, %v", v, err)
+		}
+	}
+	if reads != 1 {
+		t.Errorf("fnox was asked %d times for one credential; once is the point", reads)
+	}
+	// A second name is its own read: a command that wants only the token
+	// should not be made to fetch the account as well.
+	if _, err := credential("OTHER"); err != nil {
+		t.Fatal(err)
+	}
+	if reads != 2 {
+		t.Errorf("reads = %d; a different name is a different read", reads)
+	}
+	// And forgetting means forgetting, which is what makes a stub work.
+	forgetCredentials()
+	if _, err := credential("SOME_TOKEN"); err != nil {
+		t.Fatal(err)
+	}
+	if reads != 3 {
+		t.Errorf("reads = %d; after forgetting it should ask again", reads)
 	}
 }
