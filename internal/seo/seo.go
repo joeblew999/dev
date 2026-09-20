@@ -329,8 +329,11 @@ func write(c cli.Call, r *cli.Report) {
 	c.Findings(r)
 	notRun(c, r)
 	fixable(c, r)
-	fmt.Fprintf(c.Stdout, "%s in %s: %s, %s\n", r.Outcome, r.Took,
-		cli.Plural(r.BySeverity[cli.SevError], "error"), cli.Plural(r.BySeverity[cli.SevWarning], "warning"))
+	// The same last line every report on the stack ends with. Written out
+	// here it named errors and warnings only, and named them whether or not
+	// there were any — so a clean run said "0 errors, 0 warnings" and a run
+	// with notes did not mention them.
+	fmt.Fprintf(c.Stdout, "%s in %s: %s\n", r.Outcome, r.Took, r.Summary())
 }
 
 // short keeps a column a column. What is cut is in the JSON in full.

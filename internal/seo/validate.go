@@ -211,3 +211,51 @@ func one(code, sev, msg, fix string) []cli.Finding {
 }
 
 const docSitemaps = "https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview"
+
+// validateLlms holds llms.txt to the convention it is written against: an H1
+// naming the site, and at least one link under it.
+//
+// Not a strict parser, deliberately. The file is markdown a person may edit
+// by hand after this writes it, and a validator that refuses their wording is
+// one they will delete. What it catches is the two ways the file is useless:
+// no heading, so nothing says what the site is, and no links, so nothing says
+// where anything is.
+func validateLlms(name, content, origin string) (found []cli.Finding, covered string) {
+	var out []cli.Finding
+	var title, summary string
+	links := 0
+	for _, line := range cli.Lines(content) {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case title == "" && strings.HasPrefix(trimmed, "# "):
+			title = strings.TrimSpace(trimmed[2:])
+		case summary == "" && strings.HasPrefix(trimmed, "> "):
+			summary = strings.TrimSpace(trimmed[2:])
+		case strings.Contains(trimmed, "](") && strings.HasPrefix(trimmed, "-"):
+			links++
+		}
+	}
+	if title == "" {
+		out = append(out, cli.Finding{
+			Tool: name, Severity: cli.SevError, ID: "llms-no-title", Where: name,
+			Message: name + " has no H1, so nothing names the site",
+			Fix:     "start the file with `# <the site's name>`"})
+	}
+	if summary == "" {
+		out = append(out, cli.Finding{
+			Tool: name, Severity: cli.SevWarning, ID: "llms-no-summary", Where: name,
+			Message: name + " has no one-line summary",
+			Fix:     "a `> ` blockquote under the title is what a model quotes when it describes you"})
+	}
+	if links == 0 {
+		out = append(out, cli.Finding{
+			Tool: name, Severity: cli.SevError, ID: "llms-no-links", Where: name,
+			Message: name + " lists no pages",
+			Fix:     "list them as `- [name](url)` under an `## ` heading"})
+	}
+	named := "untitled"
+	if title != "" {
+		named = strconv.Quote(title)
+	}
+	return out, cli.Plural(links, "link") + " under " + named
+}

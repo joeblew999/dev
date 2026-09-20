@@ -15,6 +15,7 @@ package seo
 import (
 	"encoding/xml"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,6 +72,13 @@ var writers = []Writer{
 		Produces: Artifact{Name: "sitemap.xml", Validate: validateSitemap},
 		Fixes:    []string{"sitemap-", "seo.sitemap.", "seo/sitemap", "SITEMAP"},
 		Write:    writeSitemap,
+	},
+	{
+		Name:     "llms",
+		Provides: "llms.txt — the site in the shape a language model reads it",
+		Produces: Artifact{Name: "llms.txt", Validate: validateLlms},
+		Fixes:    []string{"llms-", "seo.llms."},
+		Write:    writeLlms,
 	},
 	{
 		Name:     "robots",
@@ -310,4 +318,50 @@ func fixedBy(id string) string {
 		}
 	}
 	return ""
+}
+
+// writeLlms is llms.txt: the site in the shape a language model reads it.
+//
+// The convention (llmstxt.org) is markdown, not a robots-style directive
+// list: an H1 that names the site, a blockquote that says what it is in one
+// sentence, then H2 sections of links. A model landing on a site has to crawl
+// and guess otherwise, and what it guesses becomes what it tells people about
+// you — which is the same problem a meta description solves for Search, one
+// audience later.
+//
+// The same Site the other four writers read, so a repo that can write a
+// sitemap can write this with no new input: the URLs are the pages, the title
+// and description are the site's own words.
+func writeLlms(s Site) (content, covered string, err error) {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n\n", cli.Or(s.Title, hostOf(s.Origin)))
+	if s.Desc != "" {
+		fmt.Fprintf(&b, "> %s\n\n", s.Desc)
+	}
+	fmt.Fprintf(&b, "## Pages\n\n")
+	for _, u := range s.URLs {
+		fmt.Fprintf(&b, "- [%s](%s)\n", pathOf(u), u)
+	}
+	// Named rather than listed among the pages: a model that wants the whole
+	// list should be told where it is, not handed it twice.
+	fmt.Fprintf(&b, "\n## Optional\n\n- [sitemap.xml](%s/sitemap.xml): every page, machine-readable\n", s.Origin)
+	return b.String(), cli.Plural(len(s.URLs), "page") + " listed", nil
+}
+
+// pathOf is what to call a URL in a list of links: the last part of its path,
+// or the host when it is the site's own front page.
+func pathOf(u string) string {
+	parsed, err := url.Parse(u)
+	if err != nil || parsed.Path == "" || parsed.Path == "/" {
+		return cli.Or(parsed.Host, u)
+	}
+	return strings.Trim(parsed.Path, "/")
+}
+
+// hostOf is the site's name when nothing better was given.
+func hostOf(origin string) string {
+	if parsed, err := url.Parse(origin); err == nil && parsed.Host != "" {
+		return parsed.Host
+	}
+	return origin
 }
