@@ -211,3 +211,41 @@ func described(t TB, c Command, v Verb, path string) {
 		described(t, c, v.Subs[sub], path+" "+sub)
 	}
 }
+
+// CheckSurfaces fails the test when a verb reaches one of a command's two
+// surfaces and not the other.
+//
+// The terminal index and the skill a repo's agents read are one render with
+// one difference: the terminal flattens the markdown so a shell can show it
+// with no renderer. Nothing said so, and nothing would have noticed a change
+// that let them part — a group filtered on one path and not the other, say.
+// Then a verb would exist for a developer and not for an agent, or the
+// reverse, and the only way to find out would be for someone to go looking.
+//
+// A command's main_test.go calls it, so `go test` — and so `dev check` —
+// holds the two together for every repo on the stack rather than for the one
+// that happened to write the test.
+func CheckSurfaces(t TB, c Command) {
+	t.Helper()
+	index, skill := c.index(), c.render()
+	for name, v := range c.all() {
+		sig := c.Name + " " + name
+		if v.Args != "" {
+			sig += " " + v.Args
+		}
+		for _, surface := range []struct{ what, text, who string }{
+			{"the terminal index", index, "a developer"},
+			{"the skill", skill, "an agent"},
+		} {
+			if !strings.Contains(surface.text, sig) {
+				t.Errorf("%q is not in %s, so %s cannot find it", sig, surface.what, surface.who)
+				continue
+			}
+			// A signature with no sentence under it is a verb nobody knows
+			// when to use, which is half of not being there at all.
+			if v.Desc != "" && !strings.Contains(surface.text, v.Desc) {
+				t.Errorf("%s: %s has the signature and not the description", name, surface.what)
+			}
+		}
+	}
+}

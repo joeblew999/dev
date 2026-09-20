@@ -231,3 +231,8 @@ func TestVersionPinNeedsBoth(t *testing.T) {
 		t.Errorf("printed %q; want the version without its v", out.String())
 	}
 }
+
+// The unification of the two surfaces is held by cli.CheckSurfaces, which
+// every command on the stack calls from its own main_test.go rather than only
+// this package testing its own synthetic command.
+func TestBothSurfacesShowTheSameVerbs(t *testing.T) { CheckSurfaces(t, testCommand()) }

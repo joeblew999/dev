@@ -17,3 +17,7 @@ func TestDescribed(t *testing.T) { cli.CheckDescribed(t, dev) }
 // rendering can read, and catches a `<placeholder>` written without the
 // backticks that stop a renderer eating it.
 func TestUsage(t *testing.T) { cli.CheckUsage(t, dev) }
+
+// TestSurfaces holds the terminal index and the skill together: one render,
+// one difference, so a verb cannot reach a developer and not an agent.
+func TestSurfaces(t *testing.T) { cli.CheckSurfaces(t, dev) }
