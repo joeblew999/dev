@@ -129,7 +129,7 @@ func Set(stdin io.Reader, stdout, stderr io.Writer, name string, generate, ifMis
 		return fmt.Errorf("storing %s in fnox: %w", name, err)
 	}
 	fmt.Fprintf(stdout, "Stored %s in fnox.\n", name)
-	if err := push(dir, name, value, env); err != nil {
+	if err := app.PutSecret(dir, env, name, value); err != nil {
 		return fmt.Errorf("pushing %s to the app: %w (retry with: mise run secrets:push)", name, err)
 	}
 	target, _ := app.Name(dir, env)
@@ -164,11 +164,6 @@ func value(stdin io.Reader, prompt io.Writer, name string, generate bool) (strin
 	return v, nil
 }
 
-// push hands the value to the app's cloud through its CLI, on stdin.
-func push(dir, name, value, env string) error {
-	return app.PutSecret(dir, env, name, value)
-}
-
 // Push reads "NAME<TAB>OWNER" lines (owner optional) and pushes every named
 // secret from fnox to the app. A secret fnox does not have is reported
 // with fix, {provider} replaced, and the error at the end carries the count
@@ -191,7 +186,7 @@ func Push(stdin io.Reader, out io.Writer, dir, env, fix string) error {
 			problems++
 			continue
 		}
-		if err := push(dir, name, v, env); err != nil {
+		if err := app.PutSecret(dir, env, name, v); err != nil {
 			fmt.Fprintf(out, "failed  %s (%v; retry with: mise run secrets:push)\n", name, err)
 			problems++
 			continue

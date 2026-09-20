@@ -1,8 +1,24 @@
 // Package app is what a command becomes once deployed, on whichever cloud its
 // directory names: a wrangler.toml means Cloudflare Workers, a fly.toml means
 // Fly. The verbs are the same for both; this package reads the directory and
-// hands over to the target, so a task never says which cloud, and secrets go
-// the same way.
+// hands over to the target, so a task never says which cloud.
+//
+// Two things vary on their own here. Which cloud a directory deploys to is a
+// property of the directory; what is being asked for is a property of the
+// verb. Neither decides the other, so something has to hold the pair, and
+// `clouds` is it: one entry per target, every operation that differs filled
+// in, and one lookup reaching it.
+//
+// It lives below its callers rather than in any of them because more than one
+// needs it — the verbs in main, and secrets, which pushes a secret through
+// whichever CLI the directory implies and runs no verb at all. Putting the
+// table in main would make it unreachable from secrets, since main imports
+// secrets and not the other way about.
+//
+// The test of all this is that adding a third cloud is adding one entry and
+// nothing else. A test holds every entry complete, because a gap would not
+// fail where the cloud was added; it would fail later, as a nil, at whichever
+// call site reached it first.
 package app
 
 import (
