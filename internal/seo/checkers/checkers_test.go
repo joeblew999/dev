@@ -154,6 +154,27 @@ func TestEveryKnownCodeHasAdvice(t *testing.T) {
 	}
 }
 
+// scry says what is wrong and not what to do, and these two it reported
+// against this repo's own site with nothing to say about either: the fallback
+// names the check and shrugs. They are also the two the _headers validator
+// now reports from the file, so the sentence is written once here and both
+// halves read it — a reader should be told the same thing whether a checker
+// found it on a deployed URL or a validator found it on disk.
+func TestScryAdvisesOnWhatItFoundHere(t *testing.T) {
+	for _, tc := range []struct{ check, want string }{
+		{"security/csp-unsafe", "unsafe-inline"},
+		{"health/missing-charset", "charset=utf-8"},
+	} {
+		fix := scryFix(tc.check)
+		switch {
+		case strings.Contains(fix, "see scry's report"):
+			t.Errorf("%s still falls back to naming itself: %q", tc.check, fix)
+		case !strings.Contains(fix, tc.want):
+			t.Errorf("%s = %q; want it to say %q", tc.check, fix, tc.want)
+		}
+	}
+}
+
 func byName(t *testing.T, name string) Checker {
 	t.Helper()
 	for _, ch := range All {

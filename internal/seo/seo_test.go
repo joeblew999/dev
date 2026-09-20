@@ -123,7 +123,11 @@ func TestWriteThenValidateAgree(t *testing.T) {
 	c := call(t, io.Discard, WriteFlags, "--quiet")
 	site := Site{
 		Origin: "https://example.com", URL: "https://example.com/page",
-		Title: "A page worth finding", Desc: "What this page answers, in one line.",
+		// Long enough to clear the title range: validateHead reports a title
+		// under 30 characters now, and a fixture that a validator faults is
+		// one that cannot prove write and validate agree.
+		Title: "A page worth finding, and what it answers",
+		Desc:  "What this page answers, in one line.",
 		Image: "https://example.com/og.png",
 		URLs:  []string{"https://example.com/", "https://example.com/page"},
 		Now:   time.Now().UTC(),
@@ -172,6 +176,62 @@ func TestValidatorsCatchWhatTheyAreFor(t *testing.T) {
 		{"head has no canonical", "<title>T</title>", "", "missing-canonical", validateHead},
 		{"relative canonical", `<title>T</title><link rel="canonical" href="/page">`,
 			"", "canonical-relative", validateHead},
+		// absolute() was three different tests before it was one, and this was
+		// the loose one: it asked only for the prefix "http", so a path that
+		// begins with those four letters read as a full URL.
+		{"canonical that only starts like a URL",
+			`<title>T</title><link rel="canonical" href="httpsites/page">`,
+			"", "canonical-relative", validateHead},
+
+		// The live checkers found these eight on this repo's own deployed
+		// site. Each one below is a validator that could have said so before
+		// the deploy and did not.
+		//
+		// seo-audit's TITLE_LENGTH, which is its name for both ends of the
+		// range: the site's title was "dev" and only the long end was read.
+		{"title of one word", "<title>dev</title>", "", "title-too-short", validateHead},
+		// kitsune's seo.open_graph.incomplete names whichever og tag is
+		// absent, and two of the five writeHead emits were never read back.
+		{"open graph without og:url",
+			`<title>A title long enough to describe the page</title><meta property="og:type" content="website">`,
+			"", "missing-og-url", validateHead},
+		{"open graph without og:type",
+			`<title>A title long enough to describe the page</title><meta property="og:url" content="https://example.com/">`,
+			"", "missing-og-type", validateHead},
+		// kitsune's security.csp.unsafe.style-src and scry's
+		// security/csp-unsafe, both against a _headers this package wrote and
+		// then validated as good, because it only asked whether the header
+		// was there.
+		{"csp allows inline style",
+			"/*\n  Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'\n",
+			"", "headers-csp-unsafe-inline", validateHeaders},
+		{"csp allows eval",
+			"/*\n  Content-Security-Policy: default-src 'self'; script-src 'unsafe-eval'\n",
+			"", "headers-csp-unsafe-eval", validateHeaders},
+		{"csp allows any source",
+			"/*\n  Content-Security-Policy: default-src 'self'; img-src *\n",
+			"", "headers-csp-wildcard", validateHeaders},
+		{"csp with no floor",
+			"/*\n  Content-Security-Policy: script-src 'self'\n",
+			"", "headers-csp-no-default-src", validateHeaders},
+		// A header that is present and switched off reads as done to every
+		// checker that only counts headers, which is what this used to be.
+		{"hsts expires immediately",
+			"/*\n  Strict-Transport-Security: max-age=0\n",
+			"", "headers-hsts-disabled", validateHeaders},
+		{"nosniff misspelled",
+			"/*\n  X-Content-Type-Options: none\n",
+			"", "headers-nosniff-wrong", validateHeaders},
+		// scry's health/missing-charset, in the half that is in a file: the
+		// live one is the type the host serves and no file here holds it.
+		{"content type without an encoding",
+			"/*\n  Content-Type: text/html\n",
+			"", "headers-content-type-no-charset", validateHeaders},
+		// A header named only in a comment used to count as present, because
+		// the check was a substring search over the whole file.
+		{"header only mentioned in a comment",
+			"/*\n  # X-Frame-Options: SAMEORIGIN\n",
+			"", "missing-header-x-frame-options", validateHeaders},
 	} {
 		found, covered := tc.check(tc.name, tc.content, tc.origin)
 		if covered == "" {
@@ -185,6 +245,121 @@ func TestValidatorsCatchWhatTheyAreFor(t *testing.T) {
 			if f.Fix == "" {
 				t.Errorf("%s: %s carries no fix", tc.name, f.ID)
 			}
+			// An id no writer claims is a finding a reader can do nothing
+			// with: `check --fix` routes by prefix-matching Writer.Fixes, so
+			// a validator that emits an unclaimed id is a dead end.
+			if fixedBy(f.ID) == "" {
+				t.Errorf("%s: %s names no writer that fixes it — add the prefix to one, "+
+					"or the report is a fault with no route out", tc.name, f.ID)
+			}
+		}
+	}
+}
+
+// A CSP that names its sources and allows nothing unsafe is left alone.
+//
+// The line validateHeaders draws is correctness, not preference: it reports a
+// value that cannot do the header's job and never one that is merely not the
+// value this tool would have picked. A check that faulted a good policy would
+// be the second kind, and nobody would keep it on.
+func TestHeaderPolicyLeavesAGoodValueAlone(t *testing.T) {
+	// Through writeHeaders and not a file spelled out here: a second copy of
+	// the header table drifts the day the table gains a header, which it did
+	// while this test was being written.
+	good, _, err := writeHeaders(Site{CSP: "default-src 'self'; script-src 'none'; img-src 'self' data:"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found, covered := validateHeaders("_headers", good, "")
+	for _, f := range found {
+		t.Errorf("a sound _headers was faulted: %s %s — %s", f.Severity, f.ID, f.Message)
+	}
+	if covered == "" {
+		t.Error("the check says nothing about what it looked at")
+	}
+}
+
+// And the same file with the policy this repo's own site is served with is
+// not left alone. That is the bug in one line: this package wrote that CSP
+// into _headers, validated the file it had just written and called it good,
+// while kitsune and scry each reported the 'unsafe-inline' in it against the
+// deployed site.
+func TestTheCSPThisSiteShipsIsCaughtBeforeItDeploys(t *testing.T) {
+	content, _, err := writeHeaders(Site{CSP: "default-src 'self'; style-src 'self' 'unsafe-inline'; " +
+		"script-src 'none'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found, _ := validateHeaders("_headers", content, "")
+	ids := cli.Map(found, func(f cli.Finding) string { return f.ID })
+	if !cli.ToSet(ids)["headers-csp-unsafe-inline"] {
+		t.Errorf("got %v; want headers-csp-unsafe-inline — a deploy should not be "+
+			"the first thing that says so", ids)
+	}
+}
+
+// A finding that stops Google indexing the site is an error; one that makes a
+// preview or a description worse is a warning, because --fail-on error is
+// what a repo puts in CI and that line decides whether a build fails.
+//
+// robots-relative-sitemap was the error that should not have been: Google
+// ignores a relative Sitemap: line, which leaves the file naming no sitemap —
+// exactly the state robots-no-sitemap reports as a warning. One outcome
+// cannot fail a build two ways depending on how it was spelled.
+func TestSeveritiesFollowTheConsequence(t *testing.T) {
+	for _, tc := range []struct {
+		name, content, id, want string
+		check                   func(string, string, string) ([]cli.Finding, string)
+	}{
+		{"nothing is indexed", "User-agent: *\nDisallow: /\n",
+			"robots-blocks-all", cli.SevError, validateRobots},
+		{"the sitemap is not found", "User-agent: *\nSitemap: /sitemap.xml\n",
+			"robots-relative-sitemap", cli.SevWarning, validateRobots},
+		{"the sitemap is not named", "User-agent: *\nAllow: /\n",
+			"robots-no-sitemap", cli.SevWarning, validateRobots},
+		{"the result has no headline", "<meta name=\"description\" content=\"x\">",
+			"missing-title", cli.SevError, validateHead},
+		{"the headline is thin", "<title>dev</title>",
+			"title-too-short", cli.SevWarning, validateHead},
+		{"the preview is poorer", "<title>A title long enough to describe the page</title>",
+			"missing-og-image", cli.SevWarning, validateHead},
+		{"none of the headers applies", "  X-Frame-Options: SAMEORIGIN\n",
+			"headers-no-rule", cli.SevError, validateHeaders},
+		{"a header is present and off", "/*\n  Strict-Transport-Security: max-age=0\n",
+			"headers-hsts-disabled", cli.SevWarning, validateHeaders},
+	} {
+		found, _ := tc.check(tc.name, tc.content, "https://example.com")
+		got := ""
+		for _, f := range found {
+			if f.ID == tc.id {
+				got = f.Severity
+			}
+		}
+		switch {
+		case got == "":
+			t.Errorf("%s: %s was not reported at all", tc.name, tc.id)
+		case got != tc.want:
+			t.Errorf("%s: %s is a %s; want %s — %s", tc.name, tc.id, got, tc.want, tc.name)
+		}
+	}
+}
+
+// directives reads the one format robots.txt and _headers share, and both
+// validators had written the walk out. What it must get right is the two
+// things that are not directives: a comment, and a line with no colon — which
+// is what a path rule in _headers is.
+func TestDirectivesReadsTheFormatBothFilesShare(t *testing.T) {
+	got := directives("# a comment\n\n/*\n  X-Frame-Options: SAMEORIGIN\nSitemap: https://example.com/sitemap.xml\n")
+	want := []directive{
+		{"x-frame-options", "SAMEORIGIN"},
+		{"sitemap", "https://example.com/sitemap.xml"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %v; want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("line %d = %v; want %v", i, got[i], want[i])
 		}
 	}
 }

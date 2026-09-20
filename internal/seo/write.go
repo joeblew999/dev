@@ -119,18 +119,38 @@ var writers = []Writer{
 	},
 	{
 		Name:     "headers",
-		Provides: "_headers — the response headers two checkers report missing and nothing could fix",
+		Provides: "_headers — the response headers three checkers report missing and nothing could fix",
 		Produces: Artifact{Name: "_headers", Validate: validateHeaders},
+		// Caching and the charset are here for the same reason the security
+		// four are: they are decided by a response header and by nothing in
+		// the page, so this is the only file that can answer them.
 		Fixes: []string{
 			"security.", "security/", "missing-header-", "headers-",
-			"health/missing-charset",
+			"health/missing-charset", "perf.cache_control.",
 		},
 		Write: writeHeaders,
 	},
 	{
+		Name:     "icon",
+		Provides: iconFile + " — the mark a tab, a home screen and a link preview all ask for",
+		Produces: Artifact{Name: iconFile, Validate: validateIcon},
+		// No Fixes of its own, and that is deliberate rather than forgotten.
+		// Every checker reports the missing <link rel="icon"> and the missing
+		// og:image, which are tags in the document head — so the finding
+		// routes to the writer that emits the tags, and this one is reached
+		// through that writer's Needs. The chain already knows how to walk
+		// that, and it is the only route that cannot write a tag pointing at
+		// a file nobody wrote.
+		Write: writeIcon,
+	},
+	{
 		Name:     "head",
-		Provides: "head.html — title, description, canonical, Open Graph and JSON-LD",
+		Provides: "head.html — title, description, canonical, icons, Open Graph and JSON-LD",
 		Produces: Artifact{Name: "head.html", Validate: validateHead},
+		// The two icon tags and og:image all point at the icon writer's file,
+		// so writing this without it produces a head that promises a mark the
+		// site does not serve.
+		Needs: []string{iconFile},
 		// Each checker's own spelling, because none of them is rewritten:
 		// scoutly's hyphenated codes, kitsune's dotted ids, scry's slashed
 		// ones, seo-audit's SHOUTING ones. A new checker adds its own here.
@@ -139,7 +159,7 @@ var writers = []Writer{
 			"missing-canonical", "canonical-", "missing-og-", "missing-json-ld",
 			"json-ld-invalid", "thin-content",
 			"seo.title.", "seo.description.", "seo.canonical.", "seo.open_graph.",
-			"geo.jsonld.", "geo.content_depth.",
+			"seo.icons.", "geo.jsonld.", "geo.content_depth.",
 			"seo/title-", "seo/missing-canonical", "seo/missing-meta-description",
 			"seo/missing-og", "structured-data/",
 			"TITLE_", "META_DESCRIPTION", "CANONICAL", "DUPLICATE_TITLE", "VIEWPORT",
@@ -218,12 +238,17 @@ func writeHead(s Site) (content, covered string, err error) {
 	fmt.Fprintf(&b, "<title>%s</title>\n", esc(s.Title))
 	fmt.Fprintf(&b, "<meta name=\"description\" content=%q>\n", esc(s.Desc))
 	fmt.Fprintf(&b, "<link rel=\"canonical\" href=%q>\n", s.URL)
+	// Both rels point at the one file, because it is the one mark: a tab
+	// wants 16px of it and an iOS home screen wants 180, and a 512 square
+	// scales to either. Two files would be two things to keep the same.
+	fmt.Fprintf(&b, "<link rel=\"icon\" href=\"/%s\">\n", iconFile)
+	fmt.Fprintf(&b, "<link rel=\"apple-touch-icon\" href=\"/%s\">\n", iconFile)
 	for _, tag := range [][2]string{
 		{"og:type", "website"},
 		{"og:title", esc(s.Title)},
 		{"og:description", esc(s.Desc)},
 		{"og:url", s.URL},
-		{"og:image", s.Image},
+		{"og:image", socialImage(s)},
 	} {
 		if tag[1] == "" {
 			continue
@@ -236,12 +261,33 @@ func writeHead(s Site) (content, covered string, err error) {
 </script>
 `, s.URL, s.Title, s.Desc)
 	// What a reader wants to know is which of these the page now carries, and
-	// og:image is the one that is missing when nobody passed --image.
-	tags := "title, description, canonical, Open Graph, JSON-LD"
+	// og:image is the one whose answer depends on what was given.
+	tags := "title, description, canonical, icon, Open Graph, JSON-LD"
 	if s.Image == "" {
-		tags += " (no og:image: pass --image)"
+		tags += " (og:image is the icon)"
 	}
 	return b.String(), tags, nil
+}
+
+// socialImage is the picture a shared link previews.
+//
+// --image is a real card: 1200×630 with the site's own words on it, and
+// nothing here can invent one. But the icon writer guarantees a square mark
+// on every site, and a preview carrying the site's mark beats the grey
+// rectangle a missing og:image gets — so the flag is the better answer and
+// this is the one that is always true.
+//
+// Absolute, because a scraper does not resolve a relative og:image. With no
+// origin there is no absolute URL to build, and an og:image that cannot be
+// fetched is worse than none: it is a broken image where a preview would be.
+func socialImage(s Site) string {
+	switch {
+	case s.Image != "":
+		return s.Image
+	case s.Origin == "":
+		return ""
+	}
+	return s.Origin + "/" + iconFile
 }
 
 // each walks the writers, honouring --only and --skip, and hands every one

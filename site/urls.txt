@@ -1,2 +1,36 @@
+# Written by site/gen. Every page of the site, in the order it
+# renders them; the sitemap and llms.txt are built from this.
 https://dev-docs.gedw99.workers.dev/
+https://dev-docs.gedw99.workers.dev/dev/
+https://dev-docs.gedw99.workers.dev/dev/verbs/
+https://dev-docs.gedw99.workers.dev/dev/stages/
+https://dev-docs.gedw99.workers.dev/dev/deploying/
+https://dev-docs.gedw99.workers.dev/dev/secrets/
+https://dev-docs.gedw99.workers.dev/dev/releasing/
+https://dev-docs.gedw99.workers.dev/dev/dependencies/
+https://dev-docs.gedw99.workers.dev/dev/the-tool-itself/
+https://dev-docs.gedw99.workers.dev/dev/describing-the-command-to-a-model/
+https://dev-docs.gedw99.workers.dev/dev/tools/
+https://dev-docs.gedw99.workers.dev/dev/what-google-asks-of-a-page/
+https://dev-docs.gedw99.workers.dev/dev/the-pinned-session/
+https://dev-docs.gedw99.workers.dev/dev/what-a-repo-supplies/
+https://dev-docs.gedw99.workers.dev/dev/a-commands-manual/
+https://dev-docs.gedw99.workers.dev/dev/rules-the-tool-keeps/
+https://dev-docs.gedw99.workers.dev/dev/working-on-a-repo-on-this-stack/
 https://dev-docs.gedw99.workers.dev/cli/
+https://dev-docs.gedw99.workers.dev/cli/generics-are-how-this-package-stops-repeating-itself/
+https://dev-docs.gedw99.workers.dev/cli/the-shape/
+https://dev-docs.gedw99.workers.dev/cli/a-verb/
+https://dev-docs.gedw99.workers.dev/cli/the-generic-helpers/
+https://dev-docs.gedw99.workers.dev/cli/answering-in-json-and-reading-what-other-tools-print/
+https://dev-docs.gedw99.workers.dev/cli/reporting-what-a-verb-found/
+https://dev-docs.gedw99.workers.dev/cli/running-several-things-at-once/
+https://dev-docs.gedw99.workers.dev/cli/running-another-program/
+https://dev-docs.gedw99.workers.dev/cli/how-a-manual-reaches-another-repo/
+https://dev-docs.gedw99.workers.dev/cli/describing-the-command-to-a-model/
+https://dev-docs.gedw99.workers.dev/cli/the-tests/
+https://dev-docs.gedw99.workers.dev/cli/seeing-what-an-agent-can-read/
+https://dev-docs.gedw99.workers.dev/cli/holding-a-skill-to-the-code-it-documents/
+https://dev-docs.gedw99.workers.dev/cli/the-markdown-a-usage-md-may-use/
+https://dev-docs.gedw99.workers.dev/cli/if-your-command-stopped-compiling/
+https://dev-docs.gedw99.workers.dev/cli/porting-a-command-that-predates-this/

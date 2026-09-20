@@ -58,6 +58,14 @@ var fixes = map[string]string{
 	"missing-og-description":   "add og:description so a shared link says what the page is about — " + DocEssentials,
 	"missing-viewport":         `add <meta name="viewport" content="width=device-width, initial-scale=1"> — Search indexes the mobile page, and without it the mobile page is the desktop one — ` + DocEssentials,
 	"missing-og-image":         "add og:image so a shared link is not a bare URL — " + DocEssentials,
-	"missing-json-ld":          `add a <script type="application/ld+json"> block describing the page — it is what a rich result is built from — ` + DocStructured,
-	"thin-content":             "say more on the page: there is not enough here for Search to know what it answers — " + DocEssentials,
+	"missing-og-url":           "add og:url with the canonical URL, so a shared link credits the page you want indexed and not the one it was copied from — " + DocEssentials,
+	"missing-og-type":          "add og:type — website for a page, article for a post — so a preview knows what it is showing — " + DocEssentials,
+	// The two the header validator and scry both need a sentence for. Written
+	// here rather than beside either, because scry reports them against a
+	// deployed URL and the validator reports them against the _headers file,
+	// and a reader should be told the same thing whichever found it.
+	"csp-unsafe":      "drop 'unsafe-inline' and 'unsafe-eval': a policy that allows inline script or style does not stop the injection the header exists to stop, so it reads as protection and is none — " + DocEssentials,
+	"missing-charset": "say the encoding in the type: Content-Type: text/html; charset=utf-8 — a browser left to guess can render the page in the wrong encoding, and what a crawler indexes is what the browser rendered — " + DocEssentials,
+	"missing-json-ld": `add a <script type="application/ld+json"> block describing the page — it is what a rich result is built from — ` + DocStructured,
+	"thin-content":    "say more on the page: there is not enough here for Search to know what it answers — " + DocEssentials,
 }

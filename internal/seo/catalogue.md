@@ -43,8 +43,9 @@ tool has two dependencies. A sitemap is XML and robots.txt is four lines.
 |---|---|
 | `sitemap.xml` | absolute `<loc>` on the site's own host, priority in range, the 50,000-URL and 50MB caps Google enforces |
 | `robots.txt` | not blocking Googlebot, an absolute `Sitemap:` directive, the 500 KiB Google reads to |
-| `_headers` | the four response headers it sets are there, and a path rule applies them |
-| `head.html` | one `<title>` under 60 characters, a meta description, an **absolute** canonical, the four Open Graph tags, a JSON-LD block |
+| `_headers` | every response header it sets is there, a path rule applies them, and the values that can be wrong are not: `'unsafe-inline'` or `'unsafe-eval'` in a CSP, a `*` source, a policy with no `default-src`, an HSTS that expires at once, an `X-Content-Type-Options` no browser acts on, a `Content-Type` with no charset |
+| `icon.png` | it decodes as a PNG, and is at least 200×200 — the size below which a link preview silently drops it |
+| `head.html` | a `<title>` between 30 and 60 characters, a meta description, an **absolute** canonical, the five Open Graph tags, a JSON-LD block |
 
 `_headers` exists because running the checkers said so. Of 39 findings on a
 real site, 22 named no file that would fix them — and eight of those were
@@ -53,10 +54,75 @@ scry as `security/*`, and answerable only with a shrug. Cloudflare Pages and
 Netlify both read `_headers`, so it is a writer like any other, and 26 of the
 39 now name a file.
 
-Four of the five headers are written. The Content-Security-Policy is not, and
-the file says why where whoever edits it will read it: a policy describes one
-site's own sources, so a default either allows everything and means nothing,
-or breaks the page in a browser where no check here would see it.
+All but one of the headers are written. The Content-Security-Policy is not,
+and the file says why where whoever edits it will read it: a policy describes
+one site's own sources, so a default either allows everything and means
+nothing, or breaks the page in a browser where no check here would see it.
+
+Two more joined the security four once the checkers were run against a live
+site, and both are per-path rather than site-wide, which is why the table
+carries a path per header:
+
+- **`Cache-Control: public, max-age=60, must-revalidate`** on `/*`. A host's
+  default for a static asset is `max-age=0, must-revalidate` — never stale,
+  and a conditional request before every file on every view. A minute is the
+  smallest number that buys the obvious thing back and short enough that a
+  deploy is visible almost at once. It is not longer, and not a different
+  value per path, because a long TTL is only safe on a name that changes when
+  its content does, and this cannot know whether a site fingerprints its
+  assets.
+- **`Content-Type: text/html; charset=utf-8`** on `/`, `/*/` and `/*.html`.
+  A host works the type out from a file's extension, and the two shapes a
+  static site serves pages at — the root and a directory URL like `/cli/` —
+  have no extension to work from, so the edge serves them as bare `text/html`.
+  Deliberately not on `/*`: a charset on `sitemap.xml` would be a header
+  claiming a file is something it is not.
+
+`icon.png` is the one writer here that produces something a person looks at,
+and it exists because two findings had no file to name: a tab with no favicon
+shows the blank-page glyph, and a link with no `og:image` previews as a grey
+rectangle. It cannot be a photograph of the site, so it is the next honest
+thing — a mark derived from the site's own origin, five cells across and
+mirrored down the middle, the way a version control host draws one for an
+account with no avatar. Deterministic, so a rebuild that changed nothing
+writes the same bytes.
+
+**A PNG and not an SVG**, which is the whole decision. An SVG favicon is fine
+in every current browser and no social scraper renders one, so an SVG mark
+would close the favicon finding and leave the link preview exactly as empty as
+it was. One file has to do both jobs and only PNG does. It carries no `Fixes`
+of its own: every checker reports the missing `<link rel="icon">` and the
+missing `og:image`, which are tags in the head, so the finding routes to the
+`head` writer and this one is reached through that writer's `Needs` — the only
+route that cannot write a tag pointing at a file nobody wrote.
+
+### What a validator can say before a deploy, and what it cannot
+
+`validate` reads files and touches no network, so it can only see what is in
+a file. Where a checker's finding is about something a file holds, the
+validator is the cheaper half of the same check and should be the one that
+says so first — `'unsafe-inline'` in a CSP is in `_headers`, a three-character
+title is in `head.html`, and both were reported by live checkers against this
+repo's own site while `validate` read the same files and called them clean.
+Those are now caught on disk.
+
+Three kinds it cannot be asked for, and they are worth naming so nobody looks
+for them again:
+
+- **A header the host adds.** scry's `health/missing-charset` and kitsune's
+  `perf.cache_control.short_ttl` were about the response the edge served, not
+  about any file — the fix for both was to write the header into `_headers`,
+  which is the writer's half, not the validator's. What `validate` checks is
+  the other case: a `Content-Type` this file *does* declare and leaves
+  without a charset.
+- **The rendered page.** `perf.dom_size.metrics` counts nodes in a document
+  this command does not write. No artifact here holds a page body, so nothing
+  on disk could answer it.
+- **A tag in the page template.** `head.html` is a fragment, not a whole
+  head: `charset`, `viewport` and anything else the template owns are absent
+  from it by design, so their absence *there* says nothing about the page.
+  `validateHead` checks the tags `writeHead` emits and no others, which is
+  what keeps every one of its findings closeable by the writer.
 
 Each finding names its fix and the Google page that explains why — the same
 rule the live checkers follow, because a code and a severity say what is wrong

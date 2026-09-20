@@ -236,11 +236,45 @@ func (c Call) drift(prev, cur *Report, path string) {
 func (c Call) stood(cur *Report, path string) {
 	history := c.History(path)
 	for _, f := range cur.Findings {
-		if n := Standing(history, f); n > 2 {
-			fmt.Fprintf(c.Stderr, "    STOOD  %-12s %s — unchanged across %s\n",
-				f.Tool, Or(f.ID, f.Message), Plural(n, "run"))
+		n := Standing(history, f)
+		if n <= 2 {
+			continue
 		}
+		// A finding nothing claims is a hard problem. A finding something
+		// claims, that has stood anyway, is a different thing entirely: the
+		// registry says a writer resolves it, the writer has run, and it is
+		// still here. That is a claim the code does not keep, and it is worse
+		// than an unclaimed finding because a loop acting on the report will
+		// rewrite the same file forever and report progress.
+		//
+		// Four of these were found by hand in this tree on the day it was
+		// written — head claiming thin-content when a head fragment is not a
+		// page body, head claiming VIEWPORT while writing no viewport tag,
+		// sitemap claiming seo.sitemap.unreferenced when it is robots.txt
+		// that does the referencing. Nothing could have told them apart from
+		// a hard problem, so nobody looked.
+		if f.FixedBy != "" {
+			fmt.Fprintf(c.Stderr, "    UNFIXED %-11s %s — %s claims this and %s have not closed it\n",
+				f.Tool, Or(f.ID, f.Message), f.FixedBy, Plural(n, "run"))
+			continue
+		}
+		fmt.Fprintf(c.Stderr, "    STOOD  %-12s %s — unchanged across %s\n",
+			f.Tool, Or(f.ID, f.Message), Plural(n, "run"))
 	}
+}
+
+// Unkept is every finding something claimed to fix that has survived being
+// fixed. A registry that over-claims is worse than one that under-claims: a
+// reader told "this file fixes it" writes the file and the fault is still
+// there, and a loop told the same thing never stops.
+//
+// Exported because it is what a test should assert on a project that runs
+// this loop — a claim held for three runs is a bug in the declaration, not a
+// hard problem, and it can be failed on rather than read.
+func Unkept(history []*Report, cur *Report) []Finding {
+	return Filter(cur.Findings, func(f Finding) bool {
+		return f.FixedBy != "" && Standing(history, f) > 2
+	})
 }
 
 // Failed reports whether anything was found at or above failOn. An empty

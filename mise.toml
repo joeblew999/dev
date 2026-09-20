@@ -304,7 +304,20 @@ run = [
 
 [tasks."site:evolve:agent"]
 description = "Hand the findings mise cannot fix to Claude Code, which changes dev until it can"
+# build before, so the agent reads a manual rendered from the code as it is
+# now — .claude/skills/dev/SKILL.md is what Claude Code loads when mise starts
+# it here, and a stale one briefs it on verbs that have changed.
 depends = ["build"]
+# And build again after, because the agent's whole job is to change the code
+# the manual is rendered from. Without this the loop degrades every time it
+# succeeds: run one edits a verb, run two is briefed on the verb as it was,
+# and the drift compounds silently because nothing reads SKILL.md but the
+# next agent.
+#
+# build has sources and outputs, so when the agent changed nothing this costs
+# a stat of each file and skips. mise is doing the work the Makefile would
+# have; depends_post is how it knows to do it afterwards rather than before.
+depends_post = ["build", "skill:check"]
 # The loop above closes what dev already knows how to close. What survives it
 # is, by construction, what no writer claims — and every one of those is a
 # question about dev itself: a writer that should exist, a validator that
@@ -351,3 +364,15 @@ run = [
   "mise run site:evolve:agent",
   "mise run site:evolve",
 ]
+
+[tasks."skill:check"]
+description = "Fail when any copy of the manual is behind the verbs it is rendered from"
+# The guard that makes depends_post worth having rather than merely present.
+# `dev skill` rewriting the file is not proof the file is right: the binary
+# it rendered from could itself be stale. --check reads every copy against
+# what the verbs say now and names whichever is behind.
+#
+# A gate rather than a report, and the one exception to this file's habit of
+# ending a report with `|| true`: a manual that disagrees with the binary is
+# not a smell, it is the tool lying to the next agent that reads it.
+run = ".bin/dev skill --check"

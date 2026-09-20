@@ -9,8 +9,10 @@ package seo
 import (
 	"encoding/xml"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/internal/seo/checkers"
@@ -55,7 +57,7 @@ func validateSitemap(name, content, origin string) (found []cli.Finding, covered
 		case u.Loc == "":
 			out = append(out, finding("sitemap-empty-loc", cli.SevError,
 				"a <url> has no <loc>", "every entry needs an absolute URL — "+docSitemaps))
-		case !strings.HasPrefix(u.Loc, "http://") && !strings.HasPrefix(u.Loc, "https://"):
+		case !absolute(u.Loc):
 			out = append(out, findingAt("sitemap-relative-loc", cli.SevError, u.Loc,
 				"<loc> is not absolute: "+u.Loc,
 				"write the full URL, scheme and host included — "+docSitemaps))
@@ -79,37 +81,33 @@ func validateSitemap(name, content, origin string) (found []cli.Finding, covered
 // it must not block everything by accident, and it should name the sitemap.
 func validateRobots(name, content, origin string) (found []cli.Finding, covered string) {
 	var out []cli.Finding
-	var directives, sitemaps int
+	lines := directives(content)
+	sitemaps := 0
 	blocksAll := false
 	agent := ""
-	for _, line := range cli.Lines(content) {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		directives++
-		key, value, ok := strings.Cut(line, ":")
-		if !ok {
-			continue
-		}
-		key, value = strings.ToLower(strings.TrimSpace(key)), strings.TrimSpace(value)
-		switch key {
+	for _, d := range lines {
+		switch d.key {
 		case "user-agent":
-			agent = value
+			agent = d.value
 		case "disallow":
-			if value == "/" && (agent == "*" || strings.EqualFold(agent, "googlebot")) {
+			if d.value == "/" && (agent == "*" || strings.EqualFold(agent, "googlebot")) {
 				blocksAll = true
 			}
 		case "sitemap":
 			sitemaps++
-			if !strings.HasPrefix(value, "http://") && !strings.HasPrefix(value, "https://") {
-				out = append(out, finding("robots-relative-sitemap", cli.SevError,
-					"Sitemap: must be an absolute URL, not "+value,
+			if !absolute(d.value) {
+				// A warning and not an error, because the consequence is the
+				// one robots-no-sitemap already reports at that severity:
+				// Google ignores a relative Sitemap: line, so the file names
+				// no sitemap. Two spellings of one outcome cannot fail a
+				// build differently.
+				out = append(out, finding("robots-relative-sitemap", cli.SevWarning,
+					"Sitemap: must be an absolute URL, not "+d.value,
 					"write the full URL, scheme and host included — "+checkers.DocRobotsIntro))
 			}
 		}
 	}
-	if directives == 0 {
+	if len(lines) == 0 {
 		out = append(out, finding("robots-empty", cli.SevWarning,
 			"robots.txt holds no directives",
 			"an empty file allows everything, which is fine — but say so, and name the sitemap — "+checkers.DocRobotsIntro))
@@ -130,7 +128,7 @@ func validateRobots(name, content, origin string) (found []cli.Finding, covered 
 			"over 500 KiB; Google reads no further",
 			"keep it small — what is past the limit is not applied — "+checkers.DocRobotsIntro))
 	}
-	covered = cli.Plural(directives, "directive")
+	covered = cli.Plural(len(lines), "directive")
 	if sitemaps > 0 {
 		covered += ", sitemap named"
 	}
@@ -138,18 +136,42 @@ func validateRobots(name, content, origin string) (found []cli.Finding, covered 
 }
 
 // validateHead holds a head fragment to what Search and a link preview read.
-// Presence, not taste: a missing canonical is a fact, a bad title is not.
+//
+// What writeHead is answerable for, and nothing else. A head fragment is not
+// the whole of a page's head: `charset` and `viewport` live in the page
+// template, which this command does not write, so their absence *here* says
+// nothing about the page and is not reported. Every tag below is one
+// writeHead emits, which is what makes each finding closeable by re-running
+// the writer.
+//
+// One writeHead emits is missing from the list: the `rel="icon"` and
+// `rel="apple-touch-icon"` links. Reading those back wants a finding id the
+// head writer claims, and its Fixes has no prefix that matches one — so the
+// check waits on that line rather than emitting an id `check --fix` would
+// drop on the floor.
 func validateHead(name, content, origin string) (found []cli.Finding, covered string) {
 	var out []cli.Finding
 	title := between(content, "<title>", "</title>")
+	// Characters, not bytes: Search truncates on what it renders, and a title
+	// of sixty accented letters is sixty characters and a hundred and twenty
+	// bytes.
+	length := utf8.RuneCountInString(title)
 	switch {
 	case title == "":
 		out = append(out, finding("missing-title", cli.SevError,
 			"no <title>", checkers.Fix("missing-title")))
-	case len(title) > 60:
+	case length > 60:
 		out = append(out, finding("title-too-long", cli.SevWarning,
-			fmt.Sprintf("<title> is %d characters; Search truncates near 60", len(title)),
+			fmt.Sprintf("<title> is %d characters; Search truncates near 60", length),
 			checkers.Fix("title-too-long")))
+	case length < 30:
+		// seo-audit reported TITLE_LENGTH against this repo's own site and
+		// nothing here could have said so first: the title was "dev", three
+		// characters, and this function only looked at the long end of the
+		// range. A one-word title describes nothing for a query to match.
+		out = append(out, finding("title-too-short", cli.SevWarning,
+			fmt.Sprintf("<title> is %d characters; Search has little to match a query against", length),
+			checkers.Fix("title-too-short")))
 	}
 	if strings.Count(content, "<title>") > 1 {
 		out = append(out, finding("duplicate-title", cli.SevError,
@@ -161,6 +183,11 @@ func validateHead(name, content, origin string) (found []cli.Finding, covered st
 		{`rel="canonical"`, "missing-canonical"},
 		{`property="og:title"`, "missing-og-title"},
 		{`property="og:description"`, "missing-og-description"},
+		// og:url and og:type are written by writeHead and were not read back,
+		// so kitsune's seo.open_graph.incomplete could name either of them on
+		// a deployed page while this said the fragment was whole.
+		{`property="og:url"`, "missing-og-url"},
+		{`property="og:type"`, "missing-og-type"},
 		{`property="og:image"`, "missing-og-image"},
 		{`application/ld+json`, "missing-json-ld"},
 	} {
@@ -171,9 +198,10 @@ func validateHead(name, content, origin string) (found []cli.Finding, covered st
 		out = append(out, finding(want.code, cli.SevWarning,
 			"no "+want.marker, checkers.Fix(want.code)))
 	}
-	// A canonical that is not absolute is the one that silently does nothing.
-	if href := between(content, `rel="canonical" href="`, `"`); href != "" &&
-		!strings.HasPrefix(href, "http") {
+	// A canonical that is not absolute resolves against whatever page includes
+	// the fragment, so one file names a different URL on every page it is on —
+	// which is the tag saying something other than what was meant.
+	if href := between(content, `rel="canonical" href="`, `"`); href != "" && !absolute(href) {
 		out = append(out, finding("canonical-relative", cli.SevError,
 			"canonical is not an absolute URL: "+href,
 			"write the full URL, scheme and host included — "+checkers.DocCanonical))
@@ -181,7 +209,202 @@ func validateHead(name, content, origin string) (found []cli.Finding, covered st
 	if title != "" {
 		present++
 	}
-	return out, fmt.Sprintf("%d of 7 tags Search reads", present)
+	return out, fmt.Sprintf("%d of 9 tags Search reads", present)
+}
+
+// validateHeaders reads a _headers file back: every header this writes is
+// there, a path rule applies them, and the values that can be wrong are not.
+//
+// Presence and policy, and the line between them has moved. It used to check
+// presence only, on the reasoning that whether a value is right for a site is
+// that site's business. That is still true of every value with more than one
+// right answer — how long HSTS should last, which referrer policy a site
+// wants, what a Content-Security-Policy may load — and none of those is
+// checked here. It was never true of a value that cannot do the header's job
+// whatever the site is: `'unsafe-inline'` in a policy whose purpose is to
+// stop inline injection, an HSTS that expires immediately, an
+// X-Content-Type-Options a browser will ignore. Two checkers reported the
+// first of those against this repo's own site while this function read the
+// same file and called it clean.
+//
+// So the line is correctness, not preference: a value is reported when it
+// makes the header a no-op, and never when it is merely not the value this
+// tool would have chosen.
+func validateHeaders(name, content, origin string) (found []cli.Finding, covered string) {
+	set := map[string]string{}
+	for _, d := range directives(content) {
+		set[d.key] = d.value
+	}
+	present := 0
+	for _, h := range headers {
+		if _, ok := set[strings.ToLower(h.name)]; ok {
+			present++
+			continue
+		}
+		found = append(found, finding("missing-header-"+strings.ToLower(h.name),
+			cli.SevWarning, "no "+h.name,
+			h.why+" — set it in "+name+" — "+checkers.DocEssentials))
+	}
+	if !strings.Contains(content, "/*") {
+		found = append(found, finding("headers-no-rule", cli.SevError,
+			"no path rule, so none of these headers is applied to anything",
+			"the file needs a path line such as /* before its headers — "+checkers.DocEssentials))
+	}
+	for _, p := range policies {
+		if value, ok := set[p.header]; ok {
+			found = append(found, p.faults(value)...)
+		}
+	}
+	return found, cli.Plural(present, "header") + " of " + strconv.Itoa(len(headers))
+}
+
+// policies are the headers whose value can be present and still not work, and
+// what is wrong with one when it is. A registry, so a header joins the policy
+// half by being an entry here — and a header whose value is the site's own
+// choice has no entry at all, which is how the line above is kept.
+//
+// Keyed as directives spells a name: lowercased.
+var policies = []struct {
+	header string
+	faults func(value string) []cli.Finding
+}{
+	{"content-security-policy", cspFaults},
+	{"strict-transport-security", hstsFaults},
+	{"x-content-type-options", nosniffFaults},
+	{"content-type", charsetFaults},
+}
+
+// cspFaults reads a Content-Security-Policy for the sources that make it a
+// header that is there and stops nothing.
+//
+// kitsune reported security.csp.unsafe.style-src and scry reported
+// security/csp-unsafe against this repo's own site, independently, while this
+// package wrote that CSP into _headers and validated the file as good. A
+// policy that allows inline style or script does not stop the injection the
+// header exists to stop, and a source list of `*` is the same as no policy
+// for that resource — neither is a matter of taste.
+func cspFaults(value string) []cli.Finding {
+	var out []cli.Finding
+	named := map[string]bool{}
+	for part := range strings.SplitSeq(value, ";") {
+		name, sources, _ := strings.Cut(strings.TrimSpace(part), " ")
+		name = strings.ToLower(name)
+		if name == "" {
+			continue
+		}
+		named[name] = true
+		for _, unsafe := range []string{"unsafe-inline", "unsafe-eval"} {
+			if strings.Contains(sources, "'"+unsafe+"'") {
+				out = append(out, findingAt("headers-csp-"+unsafe, cli.SevWarning, name,
+					name+" allows '"+unsafe+"'", checkers.Fix("csp-unsafe")))
+			}
+		}
+		if slices.Contains(strings.Fields(sources), "*") {
+			out = append(out, findingAt("headers-csp-wildcard", cli.SevWarning, name,
+				name+" allows any source",
+				"name the origins this site loads "+name+" from; * is the same as "+
+					"having no policy for it — "+checkers.DocEssentials))
+		}
+	}
+	if !named["default-src"] {
+		out = append(out, finding("headers-csp-no-default-src", cli.SevWarning,
+			"the policy sets no default-src, so anything it does not name is unrestricted",
+			"add default-src 'self' as the floor, then loosen only the directives "+
+				"that need it — "+checkers.DocEssentials))
+	}
+	return out
+}
+
+// hstsFaults: max-age is what the header is. Without one it is ignored, and
+// at zero it is how HSTS is switched off — either way a header that is
+// present and doing nothing, which is worse than one that is absent because
+// every checker reads it as done.
+func hstsFaults(value string) []cli.Finding {
+	for part := range strings.SplitSeq(value, ";") {
+		key, age, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if !ok || !strings.EqualFold(strings.TrimSpace(key), "max-age") {
+			continue
+		}
+		if n, err := strconv.Atoi(strings.TrimSpace(age)); err == nil && n > 0 {
+			return nil
+		}
+	}
+	return one("headers-hsts-disabled", cli.SevWarning,
+		"Strict-Transport-Security has no max-age above zero, so it does nothing",
+		"set max-age=31536000; includeSubDomains, or the first request is still "+
+			"plain http — "+checkers.DocEssentials)
+}
+
+// nosniffFaults: nosniff is the only value a browser acts on, so any other
+// spelling is a header that is present and ignored.
+func nosniffFaults(value string) []cli.Finding {
+	if strings.EqualFold(value, "nosniff") {
+		return nil
+	}
+	return one("headers-nosniff-wrong", cli.SevWarning,
+		"X-Content-Type-Options is "+strconv.Quote(value)+", which no browser acts on",
+		"set it to exactly nosniff, or a browser may still guess a type and run "+
+			"a .txt as a script — "+checkers.DocEssentials)
+}
+
+// charsetFaults: a Content-Type this file declares and leaves without a
+// charset makes the browser guess the encoding, which is the fault scry
+// reports as health/missing-charset.
+//
+// Only when the file declares one, which is the half a validator can see.
+// The live finding was about the type the edge served for an extensionless
+// URL, and the answer to that was to write the header rather than to read it
+// — see the note on what a validator can and cannot say in catalogue.md.
+func charsetFaults(value string) []cli.Finding {
+	if strings.Contains(strings.ToLower(value), "charset=") {
+		return nil
+	}
+	return one("headers-content-type-no-charset", cli.SevWarning,
+		"Content-Type is "+value+" with no charset, so the browser guesses the encoding",
+		checkers.Fix("missing-charset"))
+}
+
+// absolute says whether a URL is one a crawler can follow from anywhere:
+// scheme and host included.
+//
+// Three validators asked this and three spelled it differently, and one of
+// the three tested only for the prefix "http" — which passes "httpx", and
+// passes a path that happens to begin with those four letters.
+func absolute(u string) bool {
+	return strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://")
+}
+
+// directive is one `Name: value` line of a line-oriented configuration file.
+type directive struct{ key, value string }
+
+// directives reads the format robots.txt and _headers are both written in:
+// one `Name: value` per line, `#` for a comment, blank lines ignored. The key
+// comes back lowercased because neither format cares about case and a caller
+// comparing against "sitemap" should not have to know that.
+//
+// Both validators had written this walk out, and the second one needed the
+// values rather than a substring search: a header can be present and still be
+// wrong, which is not a question `strings.Contains` can be asked.
+//
+// A line with no colon is not a directive and is not counted as one. That is
+// what a path rule in _headers is, and what a typo in robots.txt is.
+func directives(content string) []directive {
+	var out []directive
+	for _, line := range cli.Lines(content) {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, ":")
+		if !ok {
+			continue
+		}
+		out = append(out, directive{
+			key:   strings.ToLower(strings.TrimSpace(key)),
+			value: strings.TrimSpace(value),
+		})
+	}
+	return out
 }
 
 func between(s, open, close string) string {
@@ -235,23 +458,24 @@ func validateLlms(name, content, origin string) (found []cli.Finding, covered st
 			links++
 		}
 	}
+	// Through the same two builders every other validator uses. Written out
+	// as literals these also set Tool, which each() overwrites with the
+	// writer's name on every finding it collects — a fact spelled twice, and
+	// the second spelling was the one that never applied.
 	if title == "" {
-		out = append(out, cli.Finding{
-			Tool: name, Severity: cli.SevError, ID: "llms-no-title", Where: name,
-			Message: name + " has no H1, so nothing names the site",
-			Fix:     "start the file with `# <the site's name>`"})
+		out = append(out, findingAt("llms-no-title", cli.SevError, name,
+			name+" has no H1, so nothing names the site",
+			"start the file with `# <the site's name>`"))
 	}
 	if summary == "" {
-		out = append(out, cli.Finding{
-			Tool: name, Severity: cli.SevWarning, ID: "llms-no-summary", Where: name,
-			Message: name + " has no one-line summary",
-			Fix:     "a `> ` blockquote under the title is what a model quotes when it describes you"})
+		out = append(out, findingAt("llms-no-summary", cli.SevWarning, name,
+			name+" has no one-line summary",
+			"a `> ` blockquote under the title is what a model quotes when it describes you"))
 	}
 	if links == 0 {
-		out = append(out, cli.Finding{
-			Tool: name, Severity: cli.SevError, ID: "llms-no-links", Where: name,
-			Message: name + " lists no pages",
-			Fix:     "list them as `- [name](url)` under an `## ` heading"})
+		out = append(out, findingAt("llms-no-links", cli.SevError, name,
+			name+" lists no pages",
+			"list them as `- [name](url)` under an `## ` heading"))
 	}
 	named := "untitled"
 	if title != "" {
