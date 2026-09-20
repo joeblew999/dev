@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestTargetIsReadFromTheDirectory(t *testing.T) {
@@ -77,6 +78,7 @@ func TestEveryCloudIsWholeSoAddingOneIsOneEdit(t *testing.T) {
 			"Name":      c.Name == nil,
 			"PutSecret": c.PutSecret == nil,
 			"List":      c.List == nil,
+			"Events":    c.Events == nil,
 		} {
 			if missing {
 				t.Errorf("cloud %q has no %s, so whatever calls it panics", name, what)
@@ -264,5 +266,32 @@ func TestScaffoldsCarryTheSettingsWorthHaving(t *testing.T) {
 		if strings.Count(written, "#") < 5 {
 			t.Errorf("%s's config explains too little of itself:\n%s", name, written)
 		}
+	}
+}
+
+// A target says how far back it can really see, because the two clouds do not
+// keep the same amount and --since would otherwise be a promise one of them
+// cannot meet. Cloudflare stores seven days of Workers Logs; Fly hands back
+// whatever is still in flyctl's buffer, which is not a window at all.
+func TestEveryTargetSaysHowFarBackItSees(t *testing.T) {
+	for name, c := range clouds {
+		if c.Keeps == "" {
+			t.Errorf("cloud %q does not say what it keeps, so --since promises something nobody checked", name)
+		}
+	}
+}
+
+// The default is what "what just happened" means, and both bounds have to be
+// bounded: Cloudflare keeps seven days and a query with no limit reads all of
+// it, and Fly's stream has no end.
+func TestTelemetryDefaultsAreBounded(t *testing.T) {
+	got := Telemetry{}.Defaults()
+	if got.Since <= 0 || got.Limit <= 0 {
+		t.Fatalf("Defaults() = %+v; both have to be bounded", got)
+	}
+	// What a caller did say is kept.
+	asked := Telemetry{Since: 3 * time.Minute, Limit: 7}.Defaults()
+	if asked.Since != 3*time.Minute || asked.Limit != 7 {
+		t.Errorf("Defaults() overrode what was asked for: %+v", asked)
 	}
 }

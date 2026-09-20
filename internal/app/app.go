@@ -28,6 +28,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/joeblew999/dev/cli"
@@ -85,6 +86,15 @@ func URLFlags(fs *flag.FlagSet) {
 // something already deployed, and there is nothing to choose.
 func toFlag(fs *flag.FlagSet) {
 	fs.String("to", "", "the `CLOUD` to deploy to, writing its config when the directory has none")
+}
+
+// LogsFlags are what logs takes. --json turns a stream into an answer that
+// ends, and the two bounds are only meaningful with it.
+func LogsFlags(fs *flag.FlagSet) {
+	EnvFlag(fs)
+	cli.JSONFlags(fs)
+	fs.String("since", "1h", "how far back to read, with --json")
+	fs.String("limit", "100", "at most this many events, with --json")
 }
 
 func DeployFlags(fs *flag.FlagSet) {
@@ -172,6 +182,22 @@ type cloud struct {
 	Smoke    func(c cli.Call) error // nil when the target has no local runtime
 	NoSmoke  string                 // and why, in words a person can act on
 
+	// Events is what the app has been saying, bounded and structured — the
+	// same question Logs answers by streaming, asked in a way that ends.
+	// Logs is for a person watching; this is for everything else.
+	Events func(c cli.Call, t Telemetry) ([]Event, error)
+
+	// Keeps is how far back Events can really see, in words, because the two
+	// clouds are not the same and pretending otherwise makes --since a lie.
+	//
+	// Cloudflare stores Workers Logs and answers a query over seven days of
+	// them. Fly streams from its machines: `flyctl logs --no-tail` returns
+	// what is in the buffer, which is recent and small and not a window at
+	// all. Fly does keep seven days behind an HTTP API its own documentation
+	// calls not officially documented for external use, so this does not use
+	// it — and says so rather than quietly returning less than was asked for.
+	Keeps string
+
 	// List is what this account has deployed on this target. It is the half
 	// of a lifecycle that was missing: dev could put an app in a cloud and
 	// take it away again, and never say what was there — so "what did I
@@ -211,6 +237,20 @@ var clouds = map[string]cloud{
 		Name:      cloudflare.Name,
 		PutSecret: cloudflare.PutSecret,
 		List:      cloudflare.List,
+		Keeps:     "seven days, for a Worker whose config enables observability",
+		Events: func(c cli.Call, t Telemetry) ([]Event, error) {
+			name, err := cloudflare.Name(c.Dir, c.Value("env"))
+			if err != nil {
+				return nil, err
+			}
+			said, err := cloudflare.Events(name, t.Since, t.Limit)
+			if err != nil {
+				return nil, err
+			}
+			return cli.Map(said, func(e cloudflare.Event) Event {
+				return Event{At: e.At, Level: e.Level, Message: e.Message}
+			}), nil
+		},
 	},
 	"fly": {
 		ConfigFile: fly.ConfigFile,
@@ -241,7 +281,17 @@ var clouds = map[string]cloud{
 		NoSmoke: "smoke runs a Worker on local workerd; a Fly app has no local runtime here. dev check DIR tests it, and dev deploy DIR --wait PATH proves it online",
 		// A Fly app's name is in its fly.toml and has no environments, so both
 		// take the dir alone and ignore the env a Worker needs.
-		List:      fly.List,
+		List:  fly.List,
+		Keeps: "only what flyctl still holds in its buffer, which is recent and not a window",
+		Events: func(c cli.Call, t Telemetry) ([]Event, error) {
+			said, err := fly.Events(c.Dir, t.Since, t.Limit)
+			if err != nil {
+				return nil, err
+			}
+			return cli.Map(said, func(e fly.Event) Event {
+				return Event{At: e.At, Level: e.Level, Message: e.Message, Source: e.Source}
+			}), nil
+		},
 		Name:      func(dir, _ string) (string, error) { return fly.App(dir) },
 		PutSecret: func(dir, _, name, value string) error { return fly.PutSecret(dir, name, value) },
 	},
@@ -299,7 +349,25 @@ func to(c cli.Call, verb string) error {
 		}
 		return Wait(c.Stdout, u+c.Value("wait"), 2*time.Minute)
 	case "logs":
-		return t.Logs(c)
+		// A person watching gets the stream; everything else gets an answer
+		// that ends. The flag that already means "for a reader that is not a
+		// person" decides, as it does everywhere else here.
+		if !c.WantsJSON() {
+			return t.Logs(c)
+		}
+		since, _ := c.ValueAs("since", time.ParseDuration)
+		limit, _ := c.ValueAs("limit", strconv.Atoi)
+		// Asking for further back than the target keeps is answered, but not
+		// silently: what comes back is whatever there was, and a reader who
+		// is not told that reads an empty answer as an app that said nothing.
+		if c.Set("since") && t.Keeps != "" {
+			fmt.Fprintf(c.Stderr, "note: this target keeps %s\n", t.Keeps)
+		}
+		events, err := t.Events(c, Telemetry{Since: since, Limit: limit}.Defaults())
+		if err != nil {
+			return err
+		}
+		return c.EmitJSON(events)
 	case "delete":
 		return t.Delete(c)
 	case "smoke":

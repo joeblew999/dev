@@ -8,8 +8,10 @@
 package cloudflare
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -49,12 +51,23 @@ func (r apiReply[T]) why() string {
 }
 
 // ask makes one GET against the account's API and hands back what Result held.
+func ask[T any](what, endpoint string) (T, error) {
+	return call[T](http.MethodGet, what, endpoint, nil)
+}
+
+// post makes one POST with a JSON body, for the endpoints that take a query
+// rather than a path.
+func post[T any](what, endpoint string, body any) (T, error) {
+	return call[T](http.MethodPost, what, endpoint, body)
+}
+
+// call is one request against the account's API.
 //
 // Generic because the envelope is the same every time and only the result
-// differs, which is the whole of what the two callers had duplicated: the
-// bearer header, the status check, the success flag, and walking the errors
-// to say why.
-func ask[T any](what, endpoint string) (T, error) {
+// differs, which is the whole of what every caller would otherwise duplicate:
+// the bearer header, the status check, the success flag, and walking the
+// errors to say why.
+func call[T any](method, what, endpoint string, body any) (T, error) {
 	var zero T
 	token, err := credential(TokenEnv)
 	if err != nil {
@@ -64,23 +77,34 @@ func ask[T any](what, endpoint string) (T, error) {
 	if err != nil {
 		return zero, err
 	}
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf(endpoint, account), nil)
+	var send io.Reader
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return zero, err
+		}
+		send = bytes.NewReader(encoded)
+	}
+	req, err := http.NewRequest(method, fmt.Sprintf(endpoint, account), send)
 	if err != nil {
 		return zero, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return zero, fmt.Errorf("asking Cloudflare for %s: %w", what, err)
 	}
 	defer resp.Body.Close()
-	var body apiReply[T]
-	_ = json.NewDecoder(resp.Body).Decode(&body)
-	if resp.StatusCode != http.StatusOK || !body.Success {
+	var reply apiReply[T]
+	_ = json.NewDecoder(resp.Body).Decode(&reply)
+	if resp.StatusCode != http.StatusOK || !reply.Success {
 		return zero, fmt.Errorf("could not read %s (HTTP %d%s); check that %s in fnox can read Workers and %s is the account that owns them",
-			what, resp.StatusCode, body.why(), TokenEnv, AccountEnv)
+			what, resp.StatusCode, reply.why(), TokenEnv, AccountEnv)
 	}
-	return body.Result, nil
+	return reply.Result, nil
 }
 
 // credential is one of the two, out of fnox.

@@ -1,0 +1,155 @@
+{
+ "level": "info",
+ "instance": "d8d999d0c99e08",
+ "message": "Pulling container image registry.fly.io/gsxui-site-devprobe@sha256:593439b785f664b18742bcec3541107be11a9c7427c8b84c6a562c63ddece2df",
+ "region": "lhr",
+ "timestamp": "2026-09-20T04:23:13.932164336Z",
+ "meta": {
+  "Instance": "d8d999d0c99e08",
+  "Region": "lhr",
+  "Event": {
+   "Provider": "runner"
+  },
+  "HTTP": {
+   "Request": {
+    "ID": "",
+    "Method": "",
+    "Version": ""
+   },
+   "Response": {
+    "status_code": 0
+   }
+  },
+  "Error": {
+   "Code": 0,
+   "Message": ""
+  },
+  "URL": {
+   "Full": ""
+  }
+ }
+}
+{
+ "level": "info",
+ "instance": "d8d999d0c99e08",
+ "message": "Successfully prepared image registry.fly.io/gsxui-site-devprobe@sha256:593439b785f664b18742bcec3541107be11a9c7427c8b84c6a562c63ddece2df (424.59397ms)",
+ "region": "lhr",
+ "timestamp": "2026-09-20T04:23:14.357443521Z",
+ "meta": {
+  "Instance": "d8d999d0c99e08",
+  "Region": "lhr",
+  "Event": {
+   "Provider": "runner"
+  },
+  "HTTP": {
+   "Request": {
+    "ID": "",
+    "Method": "",
+    "Version": ""
+   },
+   "Response": {
+    "status_code": 0
+   }
+  },
+  "Error": {
+   "Code": 0,
+   "Message": ""
+  },
+  "URL": {
+   "Full": ""
+  }
+ }
+}
+{
+ "level": "info",
+ "instance": "d8d999d0c99e08",
+ "message": "Configuring firecracker",
+ "region": "lhr",
+ "timestamp": "2026-09-20T04:23:14.921621633Z",
+ "meta": {
+  "Instance": "d8d999d0c99e08",
+  "Region": "lhr",
+  "Event": {
+   "Provider": "runner"
+  },
+  "HTTP": {
+   "Request": {
+    "ID": "",
+    "Method": "",
+    "Version": ""
+   },
+   "Response": {
+    "status_code": 0
+   }
+  },
+  "Error": {
+   "Code": 0,
+   "Message": ""
+  },
+  "URL": {
+   "Full": ""
+  }
+ }
+}
+{
+ "level": "info",
+ "instance": "d8d999d0c99e08",
+ "message": "2026-09-20T04:23:15.212423168 [01M2YGVKJ0WAE0081MR34G5MTB:main] Running Firecracker v1.14.4",
+ "region": "lhr",
+ "timestamp": "2026-09-20T04:23:15.212483809Z",
+ "meta": {
+  "Instance": "d8d999d0c99e08",
+  "Region": "lhr",
+  "Event": {
+   "Provider": "app"
+  },
+  "HTTP": {
+   "Request": {
+    "ID": "",
+    "Method": "",
+    "Version": ""
+   },
+   "Response": {
+    "status_code": 0
+   }
+  },
+  "Error": {
+   "Code": 0,
+   "Message": ""
+  },
+  "URL": {
+   "Full": ""
+  }
+ }
+}
+{
+ "level": "info",
+ "instance": "d8d999d0c99e08",
+ "message": "2026-09-20T04:23:15.212584739 [01M2YGVKJ0WAE0081MR34G5MTB:main] Listening on API socket (\"/fc.sock\").",
+ "region": "lhr",
+ "timestamp": "2026-09-20T04:23:15.21262162Z",
+ "meta": {
+  "Instance": "d8d999d0c99e08",
+  "Region": "lhr",
+  "Event": {
+   "Provider": "app"
+  },
+  "HTTP": {
+   "Request": {
+    "ID": "",
+    "Method": "",
+    "Version": ""
+   },
+   "Response": {
+    "status_code": 0
+   }
+  },
+  "Error": {
+   "Code": 0,
+   "Message": ""
+  },
+  "URL": {
+   "Full": ""
+  }
+ }
+}

@@ -59,7 +59,7 @@ var dev = cli.Command{
 		"workerd": {Run: stage.WorkerdVerb, Args: "DIR [-- ARGS]", Flags: stage.EnvFlag, Desc: "serve the Worker locally, the way Cloudflare will run it", Usage: stage.Usage},
 		"deploy":  {Run: app.DeployVerb, Args: "DIR [-- FLAGS]", Flags: app.DeployFlags, Desc: "put the command in the cloud its directory names", Usage: app.Usage},
 		"url":     {Run: app.URLVerb, Args: "DIR", Flags: app.URLFlags, Desc: "print the address to talk to, deployed or local", Usage: app.Usage},
-		"logs":    {Run: app.LogsVerb, Args: "DIR", Flags: app.EnvFlag, Desc: "follow the deployed app's logs as they happen", Usage: app.Usage},
+		"logs":    {Run: app.LogsVerb, Args: "DIR", Flags: app.LogsFlags, Desc: "follow the deployed app's logs as they happen", Usage: app.Usage},
 		"smoke":   {Run: app.SmokeVerb, Args: "DIR", Flags: app.SmokeFlags, Desc: "start the Worker locally and make one request, to know a build is not broken", Usage: app.Usage},
 		"wait":    {Run: app.WaitVerb, Args: "URL", Flags: app.WaitFlags, Desc: "poll a URL until it answers steadily", Usage: app.Usage},
 		"seo":     {Subs: seo.Subs, Usage: seo.Usage},

@@ -1,0 +1,27 @@
+{
+ "events": {
+  "count": 3,
+  "events": [
+   {
+    "timestamp": 1789878480242,
+    "source": {
+     "level": "info",
+     "message": "GET https://dev-probe-worker.gedw99.workers.dev/"
+    }
+   },
+   {
+    "timestamp": 1789878480242,
+    "source": {
+     "message": "dev telemetry probe: a line to find later"
+    }
+   },
+   {
+    "timestamp": 1789878480119,
+    "source": {
+     "level": "info",
+     "message": "GET https://dev-probe-worker.gedw99.workers.dev/"
+    }
+   }
+  ]
+ }
+}

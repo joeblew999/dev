@@ -17,6 +17,20 @@ directory is — because "what did I leave running" is the question a deploy
 raises and nothing here could answer. It is the other half of being able to
 remove something: a suffixed copy is easy to make and easy to forget.
 
+`logs DIR` streams, which is for a person watching a deploy. `logs DIR --json`
+asks the bounded question instead — the last `--limit` events over the last
+`--since` — so a script, a report or an agent can read it, since a stream has
+no end any of those can wait for.
+
+How far back that reaches is not the same on both, and the note on stderr says
+which. Cloudflare stores Workers Logs for seven days and answers a query over
+them, for a Worker whose config enables observability — which the config
+written here does. Fly streams from its machines, so what comes back is what
+`flyctl` still holds in its buffer: recent, and not a window. Fly does keep
+seven days behind an HTTP API, and dev does not use it, because Fly's own
+documentation calls that API not officially documented for external use.
+
+
 A directory deploys to the cloud its config names, and one with no config
 deploys nowhere. `deploy DIR --to fly` or `--to cloudflare` writes that
 cloud's conventional config and carries on, the way a release writes
