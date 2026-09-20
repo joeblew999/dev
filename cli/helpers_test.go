@@ -347,3 +347,47 @@ func TestEveryToolSaysWhatItIsForAndHowToGetIt(t *testing.T) {
 		}
 	}
 }
+
+// What mise calls a tool and what the binary is called are not always the
+// same, and getting that wrong is the kind of error that sends somebody to
+// install what they already have: opentofu ships tofu, node ships npm, so
+// asking mise whether "tofu" is active says no in a repo that pins opentofu
+// and has it.
+//
+// The pin line is the truth — it is what goes in [tools] — so the key it
+// names has to be the key this asks mise about.
+func TestTheMiseKeyMatchesThePinLine(t *testing.T) {
+	for _, n := range Needs() {
+		if n.Pin == "" {
+			if n.Key != "" {
+				t.Errorf("%s names a mise key and mise cannot install it", n.Bin)
+			}
+			continue
+		}
+		key, _, ok := strings.Cut(n.Pin, " =")
+		if !ok {
+			t.Errorf("%s's pin is not a [tools] line: %q", n.Bin, n.Pin)
+			continue
+		}
+		key = strings.Trim(strings.TrimSpace(key), `"`)
+		if got := n.MiseKey(); got != key {
+			t.Errorf("%s asks mise about %q and its pin installs %q; a repo that pins it would still read as missing", n.Bin, got, key)
+		}
+	}
+	// The two this was written for, so a refactor that loses the distinction
+	// is caught by name rather than by the rule alone.
+	for bin, key := range map[string]string{"tofu": "opentofu", "npm": "node"} {
+		var found bool
+		for _, n := range Needs() {
+			if n.Bin == bin {
+				found = true
+				if n.MiseKey() != key {
+					t.Errorf("%s should be asked of mise as %q, not %q", bin, key, n.MiseKey())
+				}
+			}
+		}
+		if !found {
+			t.Errorf("%s is no longer declared", bin)
+		}
+	}
+}

@@ -26,6 +26,7 @@ import (
 	"github.com/joeblew999/dev/cli"
 	"github.com/joeblew999/dev/cli/tool"
 	"github.com/joeblew999/dev/internal/cloudflare"
+	"github.com/joeblew999/dev/internal/fly"
 	"github.com/joeblew999/dev/internal/fnox"
 )
 
@@ -54,6 +55,31 @@ func pluginCache() string {
 // its settings" is a sentence that should make anybody nervous — so the zone
 // is something a person typed, and a mismatch is a refusal.
 func Front(c cli.Call, host, origin string) error {
+	// The origin is the app's own address, and Fly needs the app's name to
+	// issue a certificate for the host. `<app>.fly.dev` is the one, and
+	// anything else is a host Fly does not know about.
+	app := strings.TrimSuffix(origin, ".fly.dev")
+	if app == origin {
+		return cli.Usagef("the origin is %q; fronting a certificate needs a Fly app, which is <app>.fly.dev", origin)
+	}
+	// The Fly provider wants the organisation named. flyctl knows which ones
+	// these credentials reach, so it is asked rather than the person — and
+	// when there is exactly one there is nothing to choose.
+	org := c.Value("org")
+	if org == "" {
+		orgs, err := fly.Orgs()
+		if err != nil {
+			return err
+		}
+		switch len(orgs) {
+		case 1:
+			org = orgs[0]
+		case 0:
+			return fmt.Errorf("flyctl reports no organisation, so the Fly provider cannot be told one; check FLY_API_TOKEN in fnox")
+		default:
+			return cli.Usagef("these credentials reach %s; name the one this app is in with --org", cli.English(orgs))
+		}
+	}
 	zone, err := named(c, host)
 	if err != nil {
 		return err
@@ -62,7 +88,7 @@ func Front(c cli.Call, host, origin string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "main.tf"), []byte(config(zone, host, origin)), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "main.tf"), []byte(config(zone, host, origin, app, org)), 0o644); err != nil {
 		return err
 	}
 	if err := tofu(c, dir, "init", "-input=false", "-no-color"); err != nil {
@@ -157,27 +183,50 @@ func tofu(c cli.Call, dir string, args ...string) error {
 	}.Stream(c.Stdout)
 }
 
-// config is the whole of what dev asks Cloudflare for, written out so that
-// what tofu does is readable rather than implied.
-func config(zone cloudflare.Zone, host, origin string) string {
+// config is the whole arrangement, written out so what tofu does is readable
+// rather than implied.
+//
+// Both clouds in one plan, which is the thing worth having. A custom domain
+// on a Fly app behind Cloudflare is not two jobs that happen to be adjacent:
+// Fly issues the certificate and says what DNS it needs to prove ownership,
+// and Cloudflare is what answers for that DNS. The Fly provider computes
+// those values and the Cloudflare provider consumes them, so the dependency
+// is expressed rather than performed in the right order by hand.
+//
+// Which also settles the ordering problem that makes this fiddly by hand:
+// with Cloudflare proxying, Fly cannot use its usual TLS-ALPN challenge,
+// because Cloudflare terminates TLS. It needs the ownership record instead —
+// and that record has to exist before validation will pass. tofu works that
+// out from the references.
+func config(zone cloudflare.Zone, host, origin, app, org string) string {
 	name := strings.TrimSuffix(strings.TrimSuffix(host, zone.Name), ".")
 	if name == "" {
 		name = "@"
 	}
-	return `# Written by ` + "`dev front`" + `. Edit it if you need something this does
-# not do, and dev will leave your changes alone — it only writes this file
-# when it is not there.
+	return `# Written by ` + "`dev front`" + `. Edit it if you need something this does not
+# do; dev writes it only when it is not there, and leaves your changes alone.
 terraform {
   required_providers {
     cloudflare = { source = "cloudflare/cloudflare", version = "~> 5.0" }
+    fly        = { source = "ampbase-io/fly", version = "~> 0.2" }
   }
 }
 
-# The token comes from the environment, which fnox supplies.
+# Both take their token from the environment, which fnox supplies.
 provider "cloudflare" {}
+provider "fly" {
+  org_slug = "` + org + `"
+}
 
-# Terraform manages what is declared and nothing else, so the rest of this
-# zone is untouched.
+# Fly issues the certificate and computes what DNS it needs to prove the
+# domain is yours.
+resource "fly_cert" "app" {
+  app      = "` + app + `"
+  hostname = "` + host + `"
+}
+
+# Cloudflare answers for that DNS. Terraform manages what is declared and
+# nothing else, so the rest of this zone is untouched.
 resource "cloudflare_dns_record" "app" {
   zone_id = "` + zone.ID + `"
   name    = "` + name + `"
@@ -187,16 +236,42 @@ resource "cloudflare_dns_record" "app" {
   ttl     = 1
 }
 
+# Proving the domain is yours. With Cloudflare proxying, Fly cannot use its
+# usual TLS challenge — Cloudflare terminates TLS before Fly ever sees it —
+# so ownership is proved by this record instead. It is not proxied: it is a
+# fact to be read, not a site to be served.
+resource "cloudflare_dns_record" "ownership" {
+  zone_id = "` + zone.ID + `"
+  name    = fly_cert.app.ownership_name
+  type    = "TXT"
+  content = "\"${fly_cert.app.ownership_app_value}\""
+  ttl     = 60
+}
+
 # Without this, Cloudflare speaks plain HTTP to an origin that redirects to
 # HTTPS, and the request bounces between them until a browser gives up. A Fly
 # app redirects by default and the fly.toml dev writes sets force_https.
 #
-# It cannot be destroyed, only set to something else: removing the record
+# It cannot be destroyed, only set to something else: removing the records
 # above leaves this as it is, which is right for the zone either way.
 resource "cloudflare_zone_setting" "ssl" {
   zone_id    = "` + zone.ID + `"
   setting_id = "ssl"
   value      = "strict"
+}
+
+# Waits until Fly agrees the certificate is live, so an apply that finishes
+# means the address actually works rather than that the records exist.
+resource "fly_cert_validation" "app" {
+  cert_id = fly_cert.app.id
+  validation_dependencies = [
+    cloudflare_dns_record.app.id,
+    cloudflare_dns_record.ownership.id,
+  ]
+}
+
+output "address" {
+  value = "https://` + host + `/"
 }
 `
 }

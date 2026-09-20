@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/joeblew999/dev/cli"
@@ -93,6 +94,9 @@ func (c Cmd) Capture() (Result, error) {
 	runErr := cmd.Run()
 	res := Result{Bin: c.Bin, Out: out.String(), Took: time.Since(started), Code: exitCode(cmd, runErr)}
 	report(res, c.Quiet)
+	if why := unpinned(c.Bin, res.Out); why != nil {
+		return res, why
+	}
 	// A checker exits non-zero because it found something, which is its
 	// answer and not a failure to run: hand back what it printed and let the
 	// caller decide. Nothing printed and an error means it really failed.
@@ -251,4 +255,37 @@ func exitCode(cmd *exec.Cmd, runErr error) int {
 		return exit.ExitCode()
 	}
 	return -1
+}
+
+// noVersion is what mise says when a tool is on PATH as a shim and the repo
+// pins no version of it.
+const noVersion = "No version is set for shim"
+
+// unpinned turns that into the thing to do about it.
+//
+// A shim defeats the check that a missing binary is missing: exec.LookPath
+// finds it, because mise puts a shim on PATH for every tool it knows, and the
+// failure only happens on the run. So "flyctl is not installed here" arrived
+// as whatever the caller made of a non-zero exit — which in one case was
+// "flyctl will not say which organisations these credentials reach", a
+// sentence about credentials describing a missing pin.
+func unpinned(bin, said string) error {
+	_, after, ok := strings.Cut(said, noVersion)
+	if !ok {
+		return nil
+	}
+	// The tool mise names is the one to pin, and it is rarely the one that
+	// was launched: everything here runs under `fnox exec --`, so the outer
+	// binary is fnox and the shim that has no version is whatever fnox was
+	// asked to run. Reporting the outer one sends a reader to pin something
+	// they already have.
+	if rest := after; strings.HasPrefix(rest, ": ") {
+		if name, _, _ := strings.Cut(rest[2:], "\n"); name != "" {
+			bin = strings.TrimSpace(name)
+		}
+	}
+	if pin := cli.PinFor(bin); pin != "" && cli.Installable(bin) {
+		return fmt.Errorf("%s is on PATH as a mise shim and this repo pins no version of it; add to mise.toml [tools] and run mise install:\n  %s", bin, pin)
+	}
+	return fmt.Errorf("%s is on PATH as a mise shim and this repo pins no version of it", bin)
 }

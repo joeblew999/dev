@@ -146,7 +146,7 @@ next time anybody looked. Read it — it is the convention, not a ceiling.
   remove a deployed app, and the storage created with it; asks first
 - `dev domains [--fail-on error|warning|info] [--json] [--out PATH] [--quiet] [--record DIR]`
   every domain on the Cloudflare account, and what each one points at
-- `dev front HOST ORIGIN [--apply] [--zone ZONE]`
+- `dev front HOST ORIGIN [--apply] [--org ORG] [--zone ZONE]`
   put Cloudflare in front of a host; says what it would do unless --apply
 - `dev fronting HOST [--fail-on error|warning|info] [--json] [--out PATH] [--quiet] [--record DIR]`
   what stands in front of a host on Cloudflare, and whether it will work
@@ -211,7 +211,7 @@ Every command built on this verb system gets these two without writing them.
   rewrite the manual from the verbs, in all three places it is read
 - `dev skills [--json] [--out PATH]`
   list what every agent in this repo can read, and where each came from
-- `dev tools [--json] [--missing] [--out PATH]`
+- `dev tools [--add] [--json] [--missing] [--out PATH]`
   every program this command may run, the mise line that installs it, and whether it is here
 - `dev version [--pin]`
   print the version, or with --pin the line that installs this build

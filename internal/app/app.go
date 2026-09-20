@@ -155,6 +155,7 @@ func UnfrontVerb(c cli.Call) error { return Unfront(c, c.Args[0]) }
 // and nothing happens without --apply.
 func FrontFlags(fs *flag.FlagSet) {
 	fs.String("zone", "", "the `ZONE` this is about, named rather than inferred from the host")
+	fs.String("org", "", "the Fly `ORG` the app is in; asked of flyctl when there is only one")
 	fs.Var(new(cli.Bool), "apply", "make the changes; without it, only say what they would be")
 }
 

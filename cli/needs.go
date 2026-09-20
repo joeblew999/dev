@@ -17,6 +17,11 @@ import "sort"
 // Need is one program, and how a repo gets it.
 type Need struct {
 	Bin string // what it is called on PATH
+	// Key is what mise calls it, when that is not the binary's name. opentofu
+	// ships tofu and node ships npm, so asking mise whether "tofu" is active
+	// says no in a repo that pins opentofu and has it — which is the kind of
+	// wrong answer that sends somebody to install what they already have.
+	Key string
 	Pin string // the mise.toml [tools] line, "" when mise cannot install it
 	For string // which of dev's verbs want it, so a repo can skip what it will never run
 	// Why is what to say when mise cannot install it — Claude Code has its
@@ -41,7 +46,7 @@ var needs = map[string]Need{
 	"go":         {Bin: "go", Pin: `go = "1.27.1"`, For: "build, check, run, test"},
 	"tinygo":     {Bin: "tinygo", Pin: `tinygo = "latest"`, For: "wasm, for a Worker built from Go"},
 	"node":       {Bin: "node", Pin: `node = "latest"`, For: "wasm and deploy, because wrangler runs on it"},
-	"npm":        {Bin: "npm", Pin: `node = "latest"`, For: "a command directory holding a package.json"},
+	"npm":        {Bin: "npm", Key: "node", Pin: `node = "latest"`, For: "a command directory holding a package.json"},
 	"wrangler":   {Bin: "wrangler", Pin: `wrangler = "latest"`, For: "deploy, delete, logs, smoke on Cloudflare"},
 	"workerd":    {Bin: "workerd", Pin: `workerd = "latest"`, For: "running a Worker locally"},
 	"flyctl":     {Bin: "flyctl", Pin: `flyctl = "latest"`, For: "deploy, delete, logs, list on Fly"},
@@ -51,7 +56,7 @@ var needs = map[string]Need{
 	"gh":         {Bin: "gh", Pin: `gh = "latest"`, For: "release: publishing it"},
 	"cloudflared": {Bin: "cloudflared", Pin: `cloudflared = "latest"`,
 		For: "fronting an app through a tunnel"},
-	"tofu": {Bin: "tofu", Pin: `opentofu = "latest"`,
+	"tofu": {Bin: "tofu", Key: "opentofu", Pin: `opentofu = "latest"`,
 		For: "front and unfront: the Cloudflare zone changes, planned before they happen"},
 
 	// The three mise does not install.
@@ -82,3 +87,12 @@ func Needs() []Need {
 // needed and cannot be installed, and an error that offers a mise line for
 // them sends the reader somewhere that will not help.
 func Installable(bin string) bool { return needs[bin].Pin != "" }
+
+// MiseKey is what mise calls this tool, which is its binary's name unless it
+// says otherwise.
+func (n Need) MiseKey() string {
+	if n.Key != "" {
+		return n.Key
+	}
+	return n.Bin
+}

@@ -329,6 +329,24 @@ func credentials(app string) string {
 	return fmt.Sprintf("and these credentials are %s, which does not have it; check the account that owns %s", who, app)
 }
 
+// Orgs is the organisations these credentials can reach, which is what a
+// Terraform provider wants naming and what a person would otherwise look up.
+// flyctl knows; asking it is cheaper than asking anybody.
+func Orgs() ([]string, error) {
+	if err := installed(); err != nil {
+		return nil, err
+	}
+	said, err := fnox.Ask(".", FlyctlBin, "orgs", "list", "--json")
+	if err != nil {
+		return nil, fmt.Errorf("flyctl orgs list failed: %w — %s", err, credentials("an app"))
+	}
+	orgs, err := cli.DecodeJSON[map[string]string]("flyctl orgs list", said)
+	if err != nil {
+		return nil, err
+	}
+	return cli.SortedKeys(orgs), nil
+}
+
 // orgsSeen is the organisations these credentials can reach, which is the
 // fact that decides whether an app is reachable at all. Empty when Fly will
 // not say.
