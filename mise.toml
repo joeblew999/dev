@@ -5,11 +5,11 @@
 
 [tools]
 "packslip:github.com/jdx/hk" = "2.0.1"
-goreleaser = "latest"
-packslip = "latest"
-gh = "latest"
-fnox = "latest"   # the one way to a secret; dev release reads the signing key from it
-"go:golang.org/x/tools/cmd/deadcode" = "latest"   # what `mise run dead` reports
+goreleaser = "2.18.2"
+packslip = "1.4.0"
+gh = "2.101.0"
+fnox = "1.36.0"   # the one way to a secret; dev release reads the signing key from it
+"go:golang.org/x/tools/cmd/deadcode" = "0.50.0"   # what `mise run dead` reports
 # dupl is pinned where the rest of these float, because of how it is
 # maintained. It was dormant from 2020-12-17 to 2026-03-04 and then, in one
 # burst, added Go generics support AND changed its default threshold from 15
@@ -18,20 +18,20 @@ fnox = "latest"   # the one way to a secret; dev release reads the signing key f
 # silently rewrote what the tool does when you say nothing, is not a release
 # stream to take sight unseen.
 "go:github.com/mibk/dupl" = "v1.1.0"   # what `mise run dup` reports: the same code written twice
-"go:golang.org/x/vuln/cmd/govulncheck" = "latest"   # what `mise run audit:deep` reports: a dependency with a known CVE
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.8.0"   # what `mise run audit:deep` reports: a dependency with a known CVE
 "go:github.com/jgautheron/goconst/cmd/goconst" = "v1.11.0"   # what `mise run repeated` reports: one string written in three places
-"go:honnef.co/go/tools/cmd/staticcheck" = "latest"   # an hk step: every commit, and lint
+"go:honnef.co/go/tools/cmd/staticcheck" = "0.8.1"   # an hk step: every commit, and lint
 "go:github.com/nelsonlaidev/scoutly/cmd/scoutly" = "v0.5.0"   # what `dev seo` runs: crawl and on-page
 "go:github.com/raviqqe/muffet/v2" = "v2.11.5"   # dev seo: the link layer
-"go:github.com/Erose112/seo-audit" = "latest"   # dev seo: the scored gate
-"go:github.com/berkaycubuk/kitsune/cmd/kitsune" = "latest"   # dev seo: stable dotted ids  (note the /cmd path)
-"go:github.com/jimsmart/grobotstxt/cmd/icanhasrobot" = "latest"   # dev seo: Google own robots matcher, ported
-"go:github.com/meysam81/scry" = "latest"   # dev seo: the broad one, TLS and headers included
-"go:github.com/kevhq/ldlint/cmd/ldlint" = "latest"   # dev seo: schema.org vocabulary
-wrangler = { version = "latest", allow_builds = ["esbuild", "sharp", "workerd"] }
-node = "latest"
-flyctl = "latest"
-golangci-lint = "latest"
+"go:github.com/Erose112/seo-audit" = "0.0.0-20260922172516-b5e287e752e3"   # dev seo: the scored gate
+"go:github.com/berkaycubuk/kitsune/cmd/kitsune" = "0.1.0"   # dev seo: stable dotted ids  (note the /cmd path)
+"go:github.com/jimsmart/grobotstxt/cmd/icanhasrobot" = "1.0.3"   # dev seo: Google own robots matcher, ported
+"go:github.com/meysam81/scry" = "0.0.2"   # dev seo: the broad one, TLS and headers included
+"go:github.com/kevhq/ldlint/cmd/ldlint" = "0.3.1"   # dev seo: schema.org vocabulary
+wrangler = { version = "4.135.0", allow_builds = ["esbuild", "sharp", "workerd"] }
+node = "26.10.0"
+flyctl = "0.4.109"
+golangci-lint = "2.14.0"
 
 # The site's own address, named once: three tasks write it into canonical
 # links, a sitemap and an llms.txt, and a fourth checks the deployed thing.
