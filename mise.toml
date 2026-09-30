@@ -4,7 +4,6 @@
 # and get `dev` on PATH plus its skill in .claude/skills/dev.
 
 [tools]
-go = "1.27.1"
 "packslip:github.com/jdx/hk" = "2.0.1"
 goreleaser = "latest"
 packslip = "latest"
@@ -80,6 +79,7 @@ prune = true
 
 # Exact packslip pins are signature-checked; the 24h wait only ever held CI.
 [settings]
+idiomatic_version_file_enable_tools = ["go"]
 minimum_release_age_excludes = ["packslip:*"]
 
 # ------------------------------------------------------------------------------
